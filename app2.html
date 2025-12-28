@@ -1,0 +1,249 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Camera, Zap, Database, ScanLine, Download, FileJson, Upload, Image as ImageIcon, ChevronDown } from 'lucide-react';
+
+export default function QuantumDotApp() {
+  // --- 1. 输入参数 (Input Parameters) ---
+  const [exposureTime, setExposureTime] = useState(100); // ms
+  const [iso, setIso] = useState(200);
+  
+  const roiRadius = 30; // 使用固定值计算光晕效果
+  
+  // 模拟：默认样本信号强度（固定值，代表放入了一个标准样本）
+  const [simulatedSignalStrength] = useState(45); 
+
+  // --- 2. 中间状态：RAW 数据模拟 (Simulation) ---
+  // 注意：rawData 仍然受 exposureTime 和 iso 影响，用于前端视觉预览
+  const rawData = useMemo(() => {
+    // 简化的物理响应模型：亮度 = 信号强度 * 曝光 * ISO增益
+    const baseIntensity = simulatedSignalStrength * 0.1 * (exposureTime / 100) * (iso / 100);
+    
+    // 添加一点随机噪声
+    const noise = () => (Math.random() - 0.5) * (baseIntensity * 0.05 + 2);
+    
+    // 假设量子点发绿光(主)和一点红光(副)
+    const G = Math.min(1023, Math.max(0, baseIntensity * 40 + noise())); 
+    const R = Math.min(1023, Math.max(0, baseIntensity * 12 + noise())); 
+    const B = Math.min(1023, Math.max(0, baseIntensity * 2 + noise()));  
+    
+    return { r: G > 1020 ? 1023 : R, g: G, b: B }; 
+  }, [simulatedSignalStrength, exposureTime, iso]);
+
+  // --- 3. 软件处理算法 (Algorithm) ---
+
+  // 3.1 预处理与特征提取 (Section 3.5)
+  // 修改：直接基于样本强度计算理论特征，去除与曝光/ISO的关联，模拟完美归一化
+  const normalizedFeature = useMemo(() => {
+    // 理论推导：
+    // baseIntensity = strength * 0.1 * (t/100) * (iso/100)
+    // G = baseIntensity * 40
+    // normG = G / t / (iso/100) = strength * 0.1 * 0.01 * 40 = strength * 0.04
+    
+    const theoreticalNormG = simulatedSignalStrength * 0.04;
+    const theoreticalNormR = simulatedSignalStrength * 0.012; // strength * 0.012
+    
+    return { normG: theoreticalNormG, normR: theoreticalNormR };
+  }, [simulatedSignalStrength]); // 仅依赖样本强度，不依赖 exposureTime/iso
+
+  // 3.2 神经网络/物理参数反演 (Section 4)
+  const inferredParams = useMemo(() => {
+    const A_prime_1 = normalizedFeature.normG * 0.12; 
+    const A_prime_2 = normalizedFeature.normR * 0.08;
+    
+    const k1 = 5.0; const lambda0_1 = 510;
+    const k2 = 3.0; const lambda0_2 = 580;
+    
+    return {
+      A1: A_prime_1,
+      L1: k1 * A_prime_1 + lambda0_1,
+      sigma1: 0.15,
+      A2: A_prime_2,
+      L2: k2 * A_prime_2 + lambda0_2,
+      sigma2: 0.12
+    };
+  }, [normalizedFeature]);
+
+  // 3.3 浓度计算 (Section 5)
+  const finalConcentration = useMemo(() => {
+    const c = inferredParams.A1 * 2.1; 
+    return c;
+  }, [inferredParams]);
+
+  // --- 导出功能 ---
+  const handleExport = () => {
+    const report = {
+      timestamp: new Date().toISOString(),
+      acquisition: {
+        exposureTime,
+        iso,
+        rawData // 导出的RAW数据仍然是当前的快照
+      },
+      analysis: {
+        normalizedFeature,
+        inferredParams,
+        finalConcentration
+      }
+    };
+
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `QD_Analysis_${new Date().getTime()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // --- 界面渲染 ---
+  return (
+    <div className="h-screen bg-slate-50 text-slate-900 font-sans flex flex-col overflow-hidden select-none">
+      
+      {/* 顶部状态栏 - 针对移动端优化紧凑布局 */}
+      <header className="bg-slate-900 text-white px-4 py-3 shadow-md flex justify-between items-center z-20 shrink-0 sticky top-0">
+        <div className="flex items-center gap-2">
+          <div className="bg-blue-600 p-1.5 rounded-lg">
+             <Zap size={18} className="text-white" />
+          </div>
+          <div>
+            <h1 className="font-bold text-base tracking-wide leading-none">QD-ANALYZER</h1>
+            <p className="text-[9px] text-slate-400 uppercase tracking-wider hidden sm:block mt-0.5">Mobile Terminal</p>
+          </div>
+        </div>
+        <div className="flex gap-2 text-[10px] font-mono text-slate-400 items-center">
+           <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full border ${rawData.g > 1000 ? 'bg-red-900/30 border-red-800 text-red-400' : 'bg-green-900/30 border-green-800 text-green-400'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${rawData.g > 1000 ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></span>
+              <span>{rawData.g > 1000 ? 'SATURATED' : 'READY'}</span>
+           </div>
+        </div>
+      </header>
+
+      {/* 主内容区域 - 增加底部Padding防止被手势条遮挡 */}
+      <main className="flex-1 overflow-y-auto p-3 md:p-6 overscroll-none">
+        <div className="max-w-md mx-auto space-y-4 pb-20">
+
+          {/* === 采集控制卡片 === */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+             {/* 卡片头部 */}
+             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 backdrop-blur-sm sticky top-0 z-10">
+                <div className="flex items-center gap-2 text-slate-800">
+                   <Camera size={16} className="text-blue-600"/>
+                   <h2 className="font-bold text-sm">采集 (Capture)</h2>
+                </div>
+                <button className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-600 active:bg-slate-50 active:scale-95 transition-all">
+                  <Upload size={12} />
+                  <span>导入</span>
+                </button>
+             </div>
+
+             <div className="p-4 space-y-6">
+                
+                {/* 图像预览区 - 居中显示 */}
+                <div className="flex flex-col items-center">
+                   <div className="aspect-[3/4] w-full max-w-[200px] bg-slate-900 rounded-xl overflow-hidden relative group shadow-inner border border-slate-300 flex items-center justify-center">
+                      <div 
+                        className="relative w-[40%] h-[60%] bg-blue-500/80 rounded-sm transition-all duration-300 border border-blue-400/30"
+                        style={{
+                          // 保持视觉关联：亮度受 rawData (即 exposure/iso) 影响
+                          backgroundColor: `rgba(0, 150, 255, ${Math.min(0.95, (rawData.g + rawData.r + rawData.b)/700 + 0.1)})`,
+                          boxShadow: `0 0 ${roiRadius}px ${roiRadius/4}px rgba(0, 150, 255, ${Math.min(0.8, (rawData.g + rawData.r + rawData.b)/800)})`
+                        }}
+                      >
+                          <div className="absolute top-3 left-0 right-0 h-[1px] bg-blue-300/50 w-full"></div>
+                      </div>
+                      
+                      <div 
+                         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-2 border-yellow-400 border-dashed opacity-70"
+                         style={{ width: '50px', height: '100px' }}
+                      />
+                      
+                      {/* RGB指示器 */}
+                      <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                         <div className="h-1 w-1 bg-red-500 rounded-full" style={{opacity: rawData.r/1023}}></div>
+                         <div className="h-1 w-1 bg-green-500 rounded-full" style={{opacity: rawData.g/1023}}></div>
+                         <div className="h-1 w-1 bg-blue-500 rounded-full" style={{opacity: rawData.b/1023}}></div>
+                      </div>
+                   </div>
+                </div>
+
+                {/* 参数调节区 - 优化滑块触摸体验 */}
+                <div className="space-y-4">
+                   {/* Exposure Slider */}
+                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                     <label className="flex justify-between text-xs font-semibold text-slate-600 mb-3">
+                        <span>曝光 (Exposure)</span>
+                        <span className="font-mono bg-white text-blue-600 px-2 py-0.5 rounded shadow-sm border border-slate-100 min-w-[3rem] text-center">{exposureTime} <span className="text-[9px] text-slate-400 font-normal">ms</span></span>
+                     </label>
+                     <input 
+                       type="range" min="10" max="500" step="10"
+                       value={exposureTime}
+                       onChange={(e) => setExposureTime(parseInt(e.target.value))}
+                       className="w-full h-6 bg-transparent cursor-pointer appearance-none active:scale-[1.02] transition-transform touch-none"
+                     />
+                   </div>
+
+                   {/* ISO Slider */}
+                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                     <label className="flex justify-between text-xs font-semibold text-slate-600 mb-3">
+                        <span>感光度 (ISO)</span>
+                        <span className="font-mono bg-white text-blue-600 px-2 py-0.5 rounded shadow-sm border border-slate-100 min-w-[3rem] text-center">{iso}</span>
+                     </label>
+                     <input 
+                       type="range" min="100" max="3200" step="100"
+                       value={iso}
+                       onChange={(e) => setIso(parseInt(e.target.value))}
+                       className="w-full h-6 bg-transparent cursor-pointer appearance-none active:scale-[1.02] transition-transform touch-none"
+                     />
+                   </div>
+                </div>
+             </div>
+          </div>
+
+          <div className="flex justify-center text-slate-300 py-2">
+             <ChevronDown size={20} className="animate-bounce opacity-50" />
+          </div>
+
+          {/* === 结果卡片 === */}
+          <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden relative">
+             <div className="absolute top-0 right-0 p-6 opacity-[0.03] pointer-events-none">
+                <Database size={180} />
+             </div>
+             
+             <div className="p-6 flex flex-col items-center justify-center text-center">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 border-b border-slate-100 pb-2 w-full text-center">
+                   Result
+                </h3>
+
+                <div className="mb-8 relative z-10">
+                   <div className="flex items-baseline justify-center gap-2">
+                      {/* 使用响应式字体大小适应手机屏幕 */}
+                      <span className="text-6xl sm:text-7xl font-bold text-blue-600 tracking-tighter drop-shadow-sm leading-none">
+                        {finalConcentration.toFixed(2)}
+                      </span>
+                      <span className="text-xl font-medium text-slate-400">μg/mL</span>
+                   </div>
+                   <p className="text-slate-400 text-xs mt-2 font-medium">Concentration</p>
+                </div>
+                
+                <div className="flex justify-center gap-3 mb-8 w-full">
+                   <div className="px-3 py-1.5 bg-green-50 text-green-700 text-xs rounded-lg border border-green-100 font-medium flex items-center gap-1.5 shadow-sm">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                      Conf: 98.5%
+                   </div>
+                </div>
+
+                <button 
+                   onClick={handleExport}
+                   className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-slate-900 text-white rounded-xl shadow-md active:bg-slate-800 active:scale-[0.98] transition-all touch-manipulation"
+                >
+                   <Download size={18} />
+                   <span className="font-bold text-sm">导出报告 (.csv)</span>
+                </button>
+             </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  );
+}
