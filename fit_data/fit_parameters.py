@@ -28,6 +28,12 @@ DPI = 150                            # 图片分辨率 / Image resolution
 FIGSIZE = (10, 6)                    # 图片尺寸 / Figure size
 LINEAR_FIT_CSV = "results_parameter.csv"  # 线性拟合结果输出 / Linear fit results output
 
+# 拟合时忽略的浓度点配置 / Concentration points to ignore during fitting
+IGNORE_ZERO_CONCENTRATION = True  # 是否忽略0浓度点（如空白） / Whether to ignore zero concentration (e.g., blank)
+IGNORE_CONCENTRATIONS = []  # 要忽略的特定浓度值列表 / List of specific concentration values to ignore
+                            # 例如 / Example: [0.05, 0.1, 5.0]
+                            # 留空则不忽略其他浓度 / Leave empty to not ignore other concentrations
+
 # 要绘制的参数列表 / Parameters to plot
 PARAMETERS = [
     'A_prime',
@@ -499,6 +505,33 @@ def load_and_process_data(csv_path: Path) -> Tuple[pd.DataFrame, int]:
 # 绘图函数 / Plotting Functions
 # ============================================================================
 
+def apply_concentration_filter(concentrations: np.ndarray, values: np.ndarray, valid_mask: np.ndarray) -> np.ndarray:
+    """
+    应用浓度过滤，排除指定的浓度点 / Apply concentration filter to exclude specified points
+    
+    Args:
+        concentrations: 浓度数组 / Concentration array
+        values: 参数值数组 / Parameter value array
+        valid_mask: 有效数据掩码 / Valid data mask
+    
+    Returns:
+        过滤后的掩码 / Filtered mask
+    """
+    fit_mask = valid_mask.copy()
+    
+    # 忽略0浓度点 / Ignore zero concentration
+    if IGNORE_ZERO_CONCENTRATION:
+        fit_mask = fit_mask & (concentrations > 0)
+    
+    # 忽略特定浓度点 / Ignore specific concentrations
+    if IGNORE_CONCENTRATIONS:
+        for ignore_conc in IGNORE_CONCENTRATIONS:
+            # 使用小的容差来比较浮点数 / Use small tolerance for float comparison
+            fit_mask = fit_mask & (np.abs(concentrations - ignore_conc) > 1e-6)
+    
+    return fit_mask
+
+
 def plot_parameter(
     df: pd.DataFrame,
     parameter: str,
@@ -547,8 +580,15 @@ def plot_parameter(
             alpha=0.8
         )
         
-        # 拟合时过滤掉浓度为0的数据点 / Filter out zero concentration for fitting
-        fit_mask = valid_mask & (concentrations > 0)
+        # 应用浓度过滤 / Apply concentration filter
+        fit_mask = apply_concentration_filter(concentrations, values, valid_mask)
+        
+        # 检查拟合数据点数量
+        n_ignored = valid_mask.sum() - fit_mask.sum()
+        if n_ignored > 0:
+            ignored_concentrations = concentrations[valid_mask & ~fit_mask]
+            print(f"  ℹ️ Peak{peak_idx} {parameter}: 已忽略 {n_ignored} 个浓度点 {list(ignored_concentrations)}")
+        
         if fit_mask.sum() < 2:
             print(f"  ⚠️ Peak{peak_idx} {parameter}: 拟合数据点不足 (< 2)")
             continue
@@ -754,6 +794,15 @@ def main() -> None:
     print("="*70)
     print("量子点光谱拟合结果可视化 / Quantum Dot Fitting Results Visualization")
     print("="*70)
+    
+    # 显示浓度过滤配置 / Display concentration filter configuration
+    print("\n📌 浓度过滤配置 / Concentration Filter Configuration:")
+    print(f"   忽略0浓度点 / Ignore zero concentration: {IGNORE_ZERO_CONCENTRATION}")
+    if IGNORE_CONCENTRATIONS:
+        print(f"   忽略特定浓度 / Ignore specific concentrations: {IGNORE_CONCENTRATIONS}")
+    else:
+        print(f"   忽略特定浓度 / Ignore specific concentrations: 无 / None")
+    print()
     
     try:
         # 加载数据 / Load data

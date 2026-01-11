@@ -20,7 +20,7 @@ Y_COLUMNS = "all"  # "all"表示处理所有强度列，或指定列表如[2,3,4
 # 拟合参数 / Fitting Parameters
 # ============================================================================
 
-N_PEAKS = 3  # 拟合峰数量 / Number of peaks to fit
+N_PEAKS = 2  # 拟合峰数量 / Number of peaks to fit
 
 # 峰参数预设 / Peak parameter presets: list of (k_m, lambda0_m, sigma_E_m)
 # 使用 math.nan 表示该参数需要自动拟合 / Use math.nan for parameters to be fitted
@@ -39,7 +39,7 @@ PEAK_PARAMS: Sequence[Tuple[float, float, float]] = [(0.0, math.nan, math.nan)]
 
 # 手动初始值 / Manual initial guesses for peaks
 # 格式: [(A_prime, k, lambda0_nm, sigma_E_eV), ...]; 使用 math.nan 表示自动估计
-MANUAL_INITIAL_GUESSES: Sequence[Tuple[float, float, float, float]] = [(20000, math.nan, 420, math.nan),(6000, math.nan, 455, math.nan),(35000, math.nan, 570, math.nan)]
+MANUAL_INITIAL_GUESSES: Sequence[Tuple[float, float, float, float]] = [(20000, math.nan, 420, math.nan),(35000, math.nan, 570, math.nan)]
 
 # 背景初值 / Background initial value
 # math.nan 表示自动估计（使用数据最小值） / math.nan means auto-estimate from data minimum
@@ -87,8 +87,7 @@ B_MAX_RATIO = 0.5  # 背景上界 = max(强度) × B_MAX_RATIO / B upper bound =
 
 PEAK_SPECIFIC_BOUNDS = {
     0: {},  # 峰1
-    1: {'lambda0_min': 425, 'lambda0_max': 475},  # 峰2
-    2: {}  # 峰3
+    1: {},  # 峰2
 }
 
 # ============================================================================
@@ -100,7 +99,7 @@ MAX_FUNCTION_EVALS = 50000 # 最大函数评估次数 / Maximum function evaluat
 DISPLAY_ITER = False       # 是否显示优化过程 / Whether to display optimization progress
 
 # 多起点优化 / Multi-start optimization
-N_MULTI_START = 1          # 尝试的起点数量（1=单次，3=多起点）/ Number of starting points (1=single, 3=multi-start)
+N_MULTI_START = 3          # 尝试的起点数量（1=单次，3=多起点）/ Number of starting points (1=single, 3=multi-start)
 
 # 数据预处理 / Data preprocessing
 SMOOTH_DATA = False         # 是否平滑数据以减少噪声 / Smooth data to reduce noise
