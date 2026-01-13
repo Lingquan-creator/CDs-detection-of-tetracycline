@@ -30,7 +30,7 @@ LINEAR_FIT_CSV = "results_parameter.csv"  # 线性拟合结果输出 / Linear fi
 
 # 拟合时忽略的浓度点配置 / Concentration points to ignore during fitting
 IGNORE_ZERO_CONCENTRATION = True  # 是否忽略0浓度点（如空白） / Whether to ignore zero concentration (e.g., blank)
-IGNORE_CONCENTRATIONS = []  # 要忽略的特定浓度值列表 / List of specific concentration values to ignore
+IGNORE_CONCENTRATIONS = [0.2,0.4]  # 要忽略的特定浓度值列表 / List of specific concentration values to ignore
                             # 例如 / Example: [0.05, 0.1, 5.0]
                             # 留空则不忽略其他浓度 / Leave empty to not ignore other concentrations
 
