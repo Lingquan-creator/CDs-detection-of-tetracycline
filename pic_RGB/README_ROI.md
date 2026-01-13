@@ -1,162 +1,92 @@
-# ROI自动识别和特征提取
+# ROI 自动识别与特征提取
 
-## 功能说明
+从 DNG 原始图片中自动定位荧光试剂区域，生成可用于光谱拟合、建模或可视化的特征数据。
 
-本模块用于从荧光图像（DNG格式RAW图像）中自动识别中央黄白色高亮区域（荧光试剂），并提取输入特征向量。
+## 模块概览
+- RAW 读取与线性化：用 `rawpy` 读取 DNG，分离 RGGB 四通道，做黑电平扣除。
+- 强度图构建：`Y = max(R, G1, G2, B)`，中值滤波抑制热噪声。
+- 荧光区域分割：Otsu 阈值 + 形态学开闭运算 + 连通域筛选。
+- ROI 设计：以质心为中心的固定矩形 ROI；同心环作为背景 ROI，自动避开荧光主体。
+- 特征输出：背景校正后的 [R, G1, G2, B]，可选 RGB 展示向量；同时生成可视化图、JSON、CSV、NumPy 矩阵。
 
-## 核心功能
+## 快速开始
+1. 安装依赖（在 `pic_RGB` 下）：`pip install -r requirements.txt`
+2. 将 DNG 放入 `pic_RGB/data_pic/`，如需修改路径或参数，编辑 `roi_config.py`。
+3. 批量处理：`python roi_extractor.py`  
+   交互测试：`python test_roi.py`
+4. 在 `pic_RGB/roi_results/` 查看输出（`*.png`、`roi_results.json`、`roi_features.csv`、`feature_matrix.npy`）。
+更多细节见 `QUICKSTART.md`。
 
-### 1. RAW图像处理
-- 读取DNG格式RAW图像
-- 线性化处理（黑电平扣除）
-- 保持在线性域，不做gamma校正和sRGB转换
-- 按Bayer模式拆分为4个通道：R, G1, G2, B
-
-### 2. 自动ROI识别
-- **强度图构建**：使用 Y = max(R, G1, G2, B) 对颜色变化更鲁棒
-- **荧光区域分割**：Otsu阈值 + 形态学处理 + 连通域分析
-- **固定ROI定位**：使用质心定位，采用固定半径圆形ROI避免统计偏差
-- **背景ROI生成**：环形区域，排除荧光污染
-
-### 3. 特征向量提取
-- 计算ROI内各通道统计值（均值、中位数、分位数等）
-- 背景扣除：样品值 - 背景值
-- 输出4维特征向量：[R, G1, G2, B]（背景校正后）
-- 可选RGB显示向量：[R, (G1+G2)/2, B]
-
-## 使用方法
-
-### 基本用法
-
+## 代码调用示例
 ```python
 from pathlib import Path
 from roi_extractor import ROIExtractor
 
-# 1. 创建提取器
 extractor = ROIExtractor(
-    fixed_roi_radius=50,      # 固定ROI半径（像素）
-    bg_ring_inner=80,         # 背景环内径
-    bg_ring_outer=120,        # 背景环外径
-    min_area=1000             # 最小荧光区域面积
+    fixed_roi_width=100,
+    fixed_roi_height=100,
+    roi_angle_deg=0.0,   # 需要旋转时调整角度（度，逆时针为正）
+    bg_ring_inner=80,
+    bg_ring_outer=120,
+    morph_kernel_size=5,
+    min_area=1000,
 )
-
-# 2. 批量处理图像
-data_dir = Path(r'pic_RGB\data_pic')
-output_dir = Path(r'pic_RGB\roi_results')
 
 results = extractor.batch_process(
-    image_dir=data_dir,
-    output_dir=output_dir,
-    save_visualization=True   # 保存可视化结果
+    image_dir=Path("pic_RGB/data_pic"),
+    output_dir=Path("pic_RGB/roi_results"),
+    save_visualization=True,
 )
 
-# 3. 访问结果
-for result in results:
-    print(f"文件: {result.filename}")
-    print(f"中心: ({result.center_x:.1f}, {result.center_y:.1f})")
-    print(f"特征向量: {result.get_feature_vector()}")
-    print(f"RGB向量: {result.get_rgb_vector()}")
+first = results[0]
+print(first.filename, first.get_feature_vector())  # [R, G1, G2, B] 背景校正后
 ```
 
-### 处理单张图像
-
+处理单张图片：
 ```python
-# 处理单张图像
-filepath = Path(r'pic_RGB\data_pic\IMG_20260112_213237.dng')
-result = extractor.process_image(filepath, save_visualization=True, output_dir=output_dir)
-
-# 获取特征向量（用于后续建模）
-feature_vector = result.get_feature_vector()  # [R, G1, G2, B]
-print(f"特征向量: {feature_vector}")
-
-# 获取RGB向量（用于显示）
-rgb_vector = result.get_rgb_vector()  # [R, G, B]
-print(f"RGB向量: {rgb_vector}")
+result = extractor.process_image(
+    Path("pic_RGB/data_pic/IMG_001.dng"),
+    save_visualization=True,
+    output_dir=Path("pic_RGB/roi_results"),
+)
+print(result.center_x, result.center_y, result.area)
 ```
 
-## 输出结果
+## 配置参数（`roi_config.py`）
+- 路径：`DATA_DIR`（输入 DNG 目录），`OUTPUT_DIR`（输出目录）。
+- 固定 ROI 尺寸：`FIXED_ROI_WIDTH=100`，`FIXED_ROI_HEIGHT=100`。
+- ROI 旋转：`ROI_ANGLE_DEG=0.0`（度，逆时针为正，可用于对齐倾斜样品）。
+- 背景环：`BG_RING_INNER=80`，`BG_RING_OUTER=120`（应大于 ROI 尺寸以避免污染）。
+- 分割与去噪：`MIN_AREA=1000`（最小连通域），`MORPH_KERNEL_SIZE=5`（形态学核大小）。
+- 输出：`SAVE_VISUALIZATION=True`，`VISUALIZATION_DPI=150`，`VISUALIZATION_FIGSIZE=(15, 10)`。
 
-### 1. 可视化图像
-- 每张图像生成一个可视化PNG文件，包含6个子图：
-  - 强度图
-  - 荧光区域分割
-  - 固定ROI标注
-  - 背景ROI标注
-  - RGB伪彩色 + ROI叠加
-  - 通道值柱状图
+调参提示：
+- ROI 太小覆盖不全 → 增大 `FIXED_ROI_WIDTH/HEIGHT`。
+- 背景被荧光污染 → 增大 `BG_RING_INNER`。
+- 找不到荧光区域 → 减小 `MIN_AREA` 或 `MORPH_KERNEL_SIZE`。
+- 噪声太多 → 略微增大 `MORPH_KERNEL_SIZE`。
 
-### 2. 数据文件
-- **roi_results.json**: 完整的ROI提取结果（JSON格式）
-- **roi_features.csv**: 特征数据表（CSV格式，易于分析）
-- **feature_matrix.npy**: 特征矩阵（NumPy数组，shape: [N, 4]）
+## 输出文件说明
+- `roi_results.json`：完整 ROI 记录列表（含位置、通道统计、背景校正值、曝光/ISO 等）。
+- `roi_features.csv`：同上但以表格形式便于 Excel/分析。
+- `feature_matrix.npy`：形状 `(N, 4)`，顺序 `[R, G1, G2, B]`，背景校正后。
+- `*_roi.png`：六宫格可视化（强度图、分割、固定 ROI、背景环、伪彩+ROI、通道柱状图）。
 
-### 3. ROIResult对象属性
+`ROIResult` 主要字段：
+- `filename`、`center_x/center_y`、`width/height`、`bbox`、`area`
+- `R_mean/G1_mean/G2_mean/B_mean` 与对应背景值 `*_bg`
+- 背景校正后 `R_corrected/G1_corrected/G2_corrected/B_corrected`
+- 展示用 `R_display/G_display/B_display`
+- 元信息 `exposure_time`, `iso`
 
-```python
-result.filename          # 文件名
-result.center_x, center_y  # ROI中心坐标
-result.radius            # ROI半径
-result.area              # 荧光区域面积
-
-# 原始通道值
-result.R_mean, G1_mean, G2_mean, B_mean
-
-# 背景值
-result.R_bg, G1_bg, G2_bg, B_bg
-
-# 背景校正后的值（特征向量）
-result.R_corrected, G1_corrected, G2_corrected, B_corrected
-
-# RGB显示值
-result.R_display, G_display, B_display
-
-# 元信息
-result.exposure_time     # 曝光时间
-result.iso               # ISO感光度
-```
-
-## 参数调节指南
-
-### ROI尺寸参数
-- `fixed_roi_radius=50`: 根据荧光区域大小调整，确保覆盖主要发光区
-- `bg_ring_inner=80`: 应大于fixed_roi_radius，避免荧光散射污染
-- `bg_ring_outer=120`: 确保有足够的背景采样区域
-
-### 分割参数
-- `min_area=1000`: 最小荧光区域面积，过滤噪声
-- `morph_kernel_size=5`: 形态学操作核大小，调整去噪强度
-
-### 如何调整
-1. **ROI太小/太大**：调整`fixed_roi_radius`
-2. **背景区域被污染**：增大`bg_ring_inner`
-3. **分割失败**：减小`min_area`或调整`morph_kernel_size`
-
-## 与量子点.md的对应关系
-
-本代码实现了文档中"三、RAW 图像处理"部分的内容：
-
-1. **3.2 RAW解码与线性化** → `load_raw_image()`方法
-2. **3.3 自动识别ROI** → `segment_fluorescence()` + `create_fixed_roi()`
-3. **3.4 背景ROI生成** → `create_background_roi()`
-4. **3.5 ROI统计与背景扣除** → `compute_roi_statistics()`
-
-## 依赖包
-
-```bash
-pip install numpy opencv-python rawpy matplotlib
-```
-
-## 注意事项
-
-1. **DNG格式**: 确保图像为RAW格式（.dng），避免JPEG等压缩格式
-2. **线性处理**: 代码保持在线性域，不做gamma校正
-3. **固定ROI**: 使用固定半径避免亮区面积变化导致的统计偏差
-4. **背景扣除**: 确保背景ROI足够暗且不被荧光污染
+## 常见问题
+- rawpy 安装失败：`pip install rawpy --no-binary rawpy`
+- OpenCV GUI 冲突：在无显示环境使用 `pip install opencv-python-headless`
+- 结果全零或全空：检查 `data_pic` 是否是 DNG，或调低 `MIN_AREA`/`MORPH_KERNEL_SIZE`。
+- 可视化缺失：确认 `SAVE_VISUALIZATION=True` 且 `output_dir` 可写。
 
 ## 后续应用
-
-提取的特征向量可用于：
-- 光谱反演（结合fit_spectrum_general.py）
-- 浓度预测建模
-- 深度学习输入（DNN文件夹）
-- 参数拟合分析
+生成的特征可直接用于：
+- 光谱拟合/线性回归（与上游 `fit_*` 模块结合）
+- 深度学习输入（`DNN/` 目录）
+- 参数分析与可视化（`fit_data/plot_*` 等脚本）

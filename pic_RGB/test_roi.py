@@ -5,6 +5,7 @@ ROI提取测试脚本
 
 from pathlib import Path
 from roi_extractor import ROIExtractor
+from roi_config import CURRENT_CONFIG
 import numpy as np
 
 
@@ -24,13 +25,8 @@ def test_single_image():
     test_image = image_files[0]
     print(f"测试图像: {test_image.name}\n")
     
-    # 创建提取器
-    extractor = ROIExtractor(
-        fixed_roi_radius=50,
-        bg_ring_inner=80,
-        bg_ring_outer=120,
-        min_area=1000
-    )
+    # 创建提取器（沿用配置文件字典）
+    extractor = ROIExtractor(roi_params=CURRENT_CONFIG)
     
     # 处理图像
     try:
@@ -43,7 +39,8 @@ def test_single_image():
         print("\n=== 提取结果 ===")
         print(f"文件名: {result.filename}")
         print(f"ROI中心: ({result.center_x:.1f}, {result.center_y:.1f})")
-        print(f"ROI半径: {result.radius:.1f} px")
+        print(f"ROI尺寸: {result.width:.1f} x {result.height:.1f} px")
+        print(f"ROI角度: {result.angle_deg:.1f} deg")
         print(f"荧光区域面积: {result.area} px²")
         print(f"\n原始通道值:")
         print(f"  R={result.R_mean:.1f}, G1={result.G1_mean:.1f}, G2={result.G2_mean:.1f}, B={result.B_mean:.1f}")
@@ -74,13 +71,8 @@ def test_batch_processing():
     data_dir = Path(r'h:\000\CDs\pic_RGB\data_pic')
     output_dir = Path(r'h:\000\CDs\pic_RGB\roi_results')
     
-    # 创建提取器
-    extractor = ROIExtractor(
-        fixed_roi_radius=50,
-        bg_ring_inner=80,
-        bg_ring_outer=120,
-        min_area=1000
-    )
+    # 创建提取器（沿用配置文件字典）
+    extractor = ROIExtractor(roi_params=CURRENT_CONFIG)
     
     # 批量处理
     try:
@@ -147,19 +139,23 @@ def test_parameter_adjustment():
     
     test_image = image_files[0]
     
-    # 测试不同的ROI半径
-    radii = [30, 50, 70]
+    # 测试不同的ROI尺寸与背景环
+    sizes = [(60, 60), (100, 100), (140, 140)]
     
-    print("测试不同ROI半径的影响:\n")
+    print("测试不同ROI尺寸的影响:\n")
     
-    for radius in radii:
-        output_dir = Path(rf'h:\000\CDs\pic_RGB\roi_results_r{radius}')
+    for w, h in sizes:
+        output_dir = Path(rf'h:\000\CDs\pic_RGB\roi_results_{w}x{h}')
         
-        extractor = ROIExtractor(
-            fixed_roi_radius=radius,
-            bg_ring_inner=radius + 30,
-            bg_ring_outer=radius + 60
-        )
+        roi_params = {
+            **CURRENT_CONFIG,
+            "fixed_roi_width": w,
+            "fixed_roi_height": h,
+            "bg_ring_inner": max(w, h) // 2 + 20,
+            "bg_ring_outer": max(w, h) // 2 + 50
+        }
+        
+        extractor = ROIExtractor(roi_params=roi_params)
         
         try:
             result = extractor.process_image(
@@ -169,10 +165,10 @@ def test_parameter_adjustment():
             )
             
             feature = result.get_feature_vector()
-            print(f"半径={radius}px: 特征向量 = [{feature[0]:.0f}, {feature[1]:.0f}, {feature[2]:.0f}, {feature[3]:.0f}]")
+            print(f"尺寸={w}x{h}px: 特征向量 = [{feature[0]:.0f}, {feature[1]:.0f}, {feature[2]:.0f}, {feature[3]:.0f}]")
             
         except Exception as e:
-            print(f"半径={radius}px: 处理失败 - {str(e)}")
+            print(f"尺寸={w}x{h}px: 处理失败 - {str(e)}")
 
 
 if __name__ == '__main__':
