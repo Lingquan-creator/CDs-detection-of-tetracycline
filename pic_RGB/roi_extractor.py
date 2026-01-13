@@ -11,6 +11,11 @@ import json
 from typing import Tuple, Dict, List, Optional
 from dataclasses import dataclass, asdict
 import matplotlib.pyplot as plt
+import matplotlib
+
+# 配置中文字体
+matplotlib.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'Arial Unicode MS', 'DejaVu Sans']
+matplotlib.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
 
 
 @dataclass
@@ -52,8 +57,15 @@ class ROIResult:
     iso: Optional[int] = None
     
     def to_dict(self):
-        """转换为字典"""
-        return asdict(self)
+        """转换为字典（处理numpy类型以便JSON序列化）"""
+        data = asdict(self)
+        # 转换numpy类型为Python原生类型
+        for key, value in data.items():
+            if isinstance(value, (np.integer, np.floating)):
+                data[key] = value.item()
+            elif isinstance(value, np.ndarray):
+                data[key] = value.tolist()
+        return data
     
     def get_feature_vector(self) -> np.ndarray:
         """获取输入特征向量（4通道背景校正后的值）"""
@@ -108,33 +120,48 @@ class ROIExtractor:
             metadata: 包含曝光、ISO等信息的字典
         """
         with rawpy.imread(str(filepath)) as raw:
-            # 获取元信息
+            # 获取元信息（简化版，避免访问不存在的属性）
             metadata = {
-                'exposure_time': getattr(raw.raw_image_sizes, 'raw_image_exif_tags', {}).get('ExposureTime'),
-                'iso': getattr(raw.raw_image_sizes, 'raw_image_exif_tags', {}).get('ISOSpeedRatings'),
-                'black_level': raw.black_level_per_channel if hasattr(raw, 'black_level_per_channel') else None,
-                'white_level': raw.white_level if hasattr(raw, 'white_level') else None,
+                'exposure_time': None,  # 需要通过EXIF单独读取
+                'iso': None,  # 需要通过EXIF单独读取
+                'black_level': None,
+                'white_level': None,
             }
+            
+            # 尝试获取白电平
+            try:
+                if hasattr(raw, 'white_level'):
+                    metadata['white_level'] = raw.white_level
+                elif hasattr(raw, 'camera_white_level_per_channel'):
+                    metadata['white_level'] = raw.camera_white_level_per_channel
+            except:
+                pass
             
             # 获取RAW数据（线性，不做demosaic）
             raw_data = raw.raw_image.copy().astype(np.float32)
             
-            # 黑电平扣除
-            if hasattr(raw, 'black_level_per_channel') and raw.black_level_per_channel is not None:
-                black_levels = raw.black_level_per_channel
-            else:
-                black_levels = [0, 0, 0, 0]
-            
-            # 获取Bayer模式
-            raw_pattern = raw.raw_pattern
-            raw_colors = raw.raw_colors
+            # 黑电平扣除 - 支持多种属性形式
+            black_levels = [0, 0, 0, 0]
+            try:
+                if hasattr(raw, 'black_level_per_channel') and raw.black_level_per_channel is not None:
+                    bl = raw.black_level_per_channel
+                    if isinstance(bl, (list, tuple, np.ndarray)) and len(bl) >= 4:
+                        black_levels = list(bl)[:4]
+                    elif isinstance(bl, (int, float)):
+                        black_levels = [bl] * 4
+                    metadata['black_level'] = black_levels
+                elif hasattr(raw, 'camera_black_level_per_channel') and raw.camera_black_level_per_channel is not None:
+                    bl = raw.camera_black_level_per_channel
+                    if isinstance(bl, (list, tuple, np.ndarray)) and len(bl) >= 4:
+                        black_levels = list(bl)[:4]
+                    elif isinstance(bl, (int, float)):
+                        black_levels = [bl] * 4
+                    metadata['black_level'] = black_levels
+            except Exception as e:
+                print(f"  警告: 无法获取黑电平，使用默认值0: {e}")
             
             # 按Bayer模式拆分通道
             H, W = raw_data.shape
-            R = np.zeros((H//2, W//2), dtype=np.float32)
-            G1 = np.zeros((H//2, W//2), dtype=np.float32)
-            G2 = np.zeros((H//2, W//2), dtype=np.float32)
-            B = np.zeros((H//2, W//2), dtype=np.float32)
             
             # 标准RGGB模式处理
             R = raw_data[0::2, 0::2] - black_levels[0]
