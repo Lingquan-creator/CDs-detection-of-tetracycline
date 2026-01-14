@@ -29,10 +29,9 @@ FIGSIZE = (10, 6)                    # 图片尺寸 / Figure size
 LINEAR_FIT_CSV = "results_parameter.csv"  # 线性拟合结果输出 / Linear fit results output
 
 # 拟合时忽略的浓度点配置 / Concentration points to ignore during fitting
-IGNORE_ZERO_CONCENTRATION = True  # 是否忽略0浓度点（如空白） / Whether to ignore zero concentration (e.g., blank)
-IGNORE_CONCENTRATIONS = [0.2,0.4]  # 要忽略的特定浓度值列表 / List of specific concentration values to ignore
-                            # 例如 / Example: [0.05, 0.1, 5.0]
-                            # 留空则不忽略其他浓度 / Leave empty to not ignore other concentrations
+IGNORE_CONCENTRATIONS = [0, 0.2, 0.4]  # 要忽略的特定浓度值列表（0对应空白） / List of specific concentration values to ignore (0 for blank)
+                                        # 例如 / Example: [0, 0.05, 0.1, 5.0]
+                                        # 留空则不忽略任何浓度 / Leave empty to not ignore any concentrations
 
 # 要绘制的参数列表 / Parameters to plot
 PARAMETERS = [
@@ -430,9 +429,16 @@ def get_best_fit_for_parameter(x: np.ndarray, y: np.ndarray, parameter: str, pea
     return result
 
 
-def evaluate_fit_function(x: np.ndarray, y: np.ndarray, fit_result: dict) -> np.ndarray:
+def evaluate_fit_function(x: np.ndarray, fit_result: dict) -> np.ndarray:
     """
     根据拟合结果计算拟合曲线 / Calculate fitted curve from fit result
+    
+    Args:
+        x: 自变量数组 / Independent variable array
+        fit_result: 拟合结果字典 / Fit result dictionary
+    
+    Returns:
+        拟合曲线的 y 值 / Fitted y values
     """
     fit_type = fit_result['type']
     params = fit_result['params']
@@ -464,8 +470,8 @@ def extract_concentration(concentration_str: str) -> float:
     """
     if pd.isna(concentration_str) or str(concentration_str).lower() == 'blank':
         return 0.0
-    # 提取数字（包括小数点）/ Extract numbers (including decimals)
-    match = re.search(r'(\d+\.?\d*)', str(concentration_str))
+    # 提取数字（包括小数点和科学计数法）/ Extract numbers (including decimals and scientific notation)
+    match = re.search(r'([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)', str(concentration_str))
     if match:
         return float(match.group(1))
     return 0.0
@@ -519,10 +525,6 @@ def apply_concentration_filter(concentrations: np.ndarray, values: np.ndarray, v
     """
     fit_mask = valid_mask.copy()
     
-    # 忽略0浓度点 / Ignore zero concentration
-    if IGNORE_ZERO_CONCENTRATION:
-        fit_mask = fit_mask & (concentrations > 0)
-    
     # 忽略特定浓度点 / Ignore specific concentrations
     if IGNORE_CONCENTRATIONS:
         for ignore_conc in IGNORE_CONCENTRATIONS:
@@ -567,27 +569,32 @@ def plot_parameter(
         if valid_mask.sum() == 0:
             continue
         
-        style = PEAK_STYLES[(peak_idx - 1) % len(PEAK_STYLES)]
-        
-        ax.plot(
-            concentrations[valid_mask],
-            values[valid_mask],
-            marker=style['marker'],
-            color=style['color'],
-            linewidth=2,
-            markersize=8,
-            label=style['label'],
-            alpha=0.8
-        )
-        
         # 应用浓度过滤 / Apply concentration filter
         fit_mask = apply_concentration_filter(concentrations, values, valid_mask)
         
-        # 检查拟合数据点数量
+        # 检查绘图数据点数量
+        if fit_mask.sum() == 0:
+            print(f"  ⚠️ Peak{peak_idx} {parameter}: 所有数据点都被忽略")
+            continue
+        
         n_ignored = valid_mask.sum() - fit_mask.sum()
         if n_ignored > 0:
             ignored_concentrations = concentrations[valid_mask & ~fit_mask]
             print(f"  ℹ️ Peak{peak_idx} {parameter}: 已忽略 {n_ignored} 个浓度点 {list(ignored_concentrations)}")
+        
+        style = PEAK_STYLES[(peak_idx - 1) % len(PEAK_STYLES)]
+        
+        # 使用 fit_mask 绘制散点，被忽略的点不显示
+        ax.plot(
+            concentrations[fit_mask],
+            values[fit_mask],
+            marker=style['marker'],
+            color=style['color'],
+            linewidth=2,
+            markersize=8,
+            label=f'Peak {peak_idx}',
+            alpha=0.8
+        )
         
         if fit_mask.sum() < 2:
             print(f"  ⚠️ Peak{peak_idx} {parameter}: 拟合数据点不足 (< 2)")
@@ -602,10 +609,13 @@ def plot_parameter(
         )
         
         if fit_result:
-            x_fit = np.linspace(fit_result['x_min'], fit_result['x_max'], 100)
-            y_fit = evaluate_fit_function(x_fit, values[fit_mask], fit_result)
+            # 使用实际绘制的数据点范围（fit_mask）绘制拟合曲线
+            x_min_plot = concentrations[fit_mask].min()
+            x_max_plot = concentrations[fit_mask].max()
+            x_fit = np.linspace(x_min_plot, x_max_plot, 100)
+            y_fit = evaluate_fit_function(x_fit, fit_result)
             
-            fit_label = f"{style['label']} fit: {fit_result['type']} (R²={fit_result['r_squared']:.4f})"
+            fit_label = f"Peak {peak_idx} fit: {fit_result['type']} (R²={fit_result['r_squared']:.4f})"
             ax.plot(
                 x_fit,
                 y_fit,
@@ -649,8 +659,13 @@ def plot_parameter(
     # 图例 / Legend
     ax.legend(loc='best', framealpha=0.9, fontsize=9)
     
-    # 设置坐标轴范围 / Set axis limits
-    ax.set_xlim(left=-0.5)
+    # 设置坐标轴范围 / Set axis limits (data-driven)
+    x_min = concentrations.min()
+    x_margin = max(0.5, x_min * 0.05)  # 5% margin or at least 0.5
+    ax.set_xlim(left=max(0, x_min - x_margin))
+    
+    # 添加网格线 / Add grid for better readability
+    ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
     
     # 紧凑布局 / Tight layout
     plt.tight_layout()
@@ -719,16 +734,22 @@ def create_summary_plot(df: pd.DataFrame, n_peaks: int, output_dir: Path) -> Non
             if valid_mask.sum() == 0:
                 continue
             
+            # 应用浓度过滤，被忽略的点不显示
+            fit_mask = apply_concentration_filter(concentrations, values, valid_mask)
+            
+            if fit_mask.sum() == 0:
+                continue
+            
             style = PEAK_STYLES[(peak_idx - 1) % len(PEAK_STYLES)]
             
             ax.plot(
-                concentrations[valid_mask],
-                values[valid_mask],
+                concentrations[fit_mask],
+                values[fit_mask],
                 marker=style['marker'],
                 color=style['color'],
                 linewidth=2,
                 markersize=6,
-                label=style['label'],
+                label=f'Peak {peak_idx}',
                 alpha=0.8
             )
         
@@ -741,7 +762,14 @@ def create_summary_plot(df: pd.DataFrame, n_peaks: int, output_dir: Path) -> Non
         ax.set_ylabel(ylabel, fontsize=10)
         ax.set_title(title, fontsize=11, fontweight='bold')
         ax.legend(loc='best', fontsize=8)
-        ax.set_xlim(left=-0.5)
+        
+        # 设置坐标轴范围 / Set axis limits (data-driven)
+        x_min = concentrations.min()
+        x_margin = max(0.5, x_min * 0.05)
+        ax.set_xlim(left=max(0, x_min - x_margin))
+        
+        # 添加网格线 / Add grid
+        ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
     
     plt.suptitle('Fitting Parameters vs Concentration - Summary', 
                  fontsize=14, fontweight='bold', y=0.995)
@@ -797,11 +825,10 @@ def main() -> None:
     
     # 显示浓度过滤配置 / Display concentration filter configuration
     print("\n📌 浓度过滤配置 / Concentration Filter Configuration:")
-    print(f"   忽略0浓度点 / Ignore zero concentration: {IGNORE_ZERO_CONCENTRATION}")
     if IGNORE_CONCENTRATIONS:
-        print(f"   忽略特定浓度 / Ignore specific concentrations: {IGNORE_CONCENTRATIONS}")
+        print(f"   忽略的浓度点 / Ignored concentration points: {IGNORE_CONCENTRATIONS} μM")
     else:
-        print(f"   忽略特定浓度 / Ignore specific concentrations: 无 / None")
+        print(f"   忽略的浓度点 / Ignored concentration points: 无 / None")
     print()
     
     try:

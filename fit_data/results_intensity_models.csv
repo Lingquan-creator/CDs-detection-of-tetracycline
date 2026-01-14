@@ -1,0 +1,2 @@
+model,formula,params,r_squared,rmse,aic
+exponential,y = a * exp(b*x) + c,7.18086e+07; -0.0129865; -2.47972e+06,0.974556536998333,3930766.0041469573,704.4798643350655
