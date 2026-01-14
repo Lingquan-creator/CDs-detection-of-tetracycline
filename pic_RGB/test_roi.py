@@ -1,12 +1,12 @@
 """
-ROI提取测试脚本
-快速测试ROI自动识别功能
+ROI 提取测试脚本，验证自动/手动 ROI 识别流程。
 """
 
-from pathlib import Path
-from roi_extractor import ROIExtractor
-from roi_config import CURRENT_CONFIG
 import numpy as np
+from pathlib import Path
+
+from roi_config import CURRENT_CONFIG
+from roi_processor import ROIProcessor
 
 
 def test_single_image():
@@ -25,8 +25,8 @@ def test_single_image():
     test_image = image_files[0]
     print(f"测试图像: {test_image.name}\n")
     
-    # 创建提取器（沿用配置文件字典）
-    extractor = ROIExtractor(roi_params=CURRENT_CONFIG)
+    # 创建处理器（沿用配置文件字典）
+    extractor = ROIProcessor(roi_params=CURRENT_CONFIG)
     
     # 处理图像
     try:
@@ -71,8 +71,8 @@ def test_batch_processing():
     data_dir = Path(r'h:\000\CDs\pic_RGB\data_pic')
     output_dir = Path(r'h:\000\CDs\pic_RGB\roi_results')
     
-    # 创建提取器（沿用配置文件字典）
-    extractor = ROIExtractor(roi_params=CURRENT_CONFIG)
+    # 创建处理器（沿用配置文件字典）
+    extractor = ROIProcessor(roi_params=CURRENT_CONFIG)
     
     # 批量处理
     try:
@@ -155,7 +155,7 @@ def test_parameter_adjustment():
             "bg_ring_outer": max(w, h) // 2 + 50
         }
         
-        extractor = ROIExtractor(roi_params=roi_params)
+        extractor = ROIProcessor(roi_params=roi_params)
         
         try:
             result = extractor.process_image(
