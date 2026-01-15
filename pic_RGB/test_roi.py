@@ -1,5 +1,5 @@
 """
-ROI 提取测试脚本，验证自动/手动 ROI 识别流程。
+ROI extraction test script for the GUI rectangle workflow.
 """
 
 import numpy as np
@@ -10,8 +10,8 @@ from roi_processor import ROIProcessor
 
 
 def test_single_image():
-    """测试单张图像处理"""
-    print("=== 测试单张图像 ===\n")
+    """Test processing a single image with GUI ROI selection."""
+    print("=== 单张图像（将弹出 GUI 进行框选） ===\n")
     
     data_dir = Path(r'h:\000\CDs\pic_RGB\data_pic')
     output_dir = Path(r'h:\000\CDs\pic_RGB\roi_results_test')
@@ -24,6 +24,7 @@ def test_single_image():
     
     test_image = image_files[0]
     print(f"测试图像: {test_image.name}\n")
+    print("提示: 窗口会打开，请拖拽矩形选择 ROI，并按 Enter/Space 确认。\n")
     
     # 创建处理器（沿用配置文件字典）
     extractor = ROIProcessor(roi_params=CURRENT_CONFIG)
@@ -65,8 +66,8 @@ def test_single_image():
 
 
 def test_batch_processing():
-    """测试批量处理"""
-    print("\n\n=== 测试批量处理 ===\n")
+    """Batch process with GUI selection for each image."""
+    print("\n\n=== 批量处理（每张图都会弹出 GUI 框选） ===\n")
     
     data_dir = Path(r'h:\000\CDs\pic_RGB\data_pic')
     output_dir = Path(r'h:\000\CDs\pic_RGB\roi_results')

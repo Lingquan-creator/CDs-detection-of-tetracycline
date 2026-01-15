@@ -23,6 +23,7 @@ def test_detailed_statistics():
     # 查找DNG文件
     dng_files = list(data_dir.glob("*.dng"))
     print(f"\n找到 {len(dng_files)} 个DNG文件")
+    print("提示: 每张图都会弹出 GUI 让你拖拽矩形选择 ROI。")
     
     if len(dng_files) == 0:
         print("没有DNG文件可供测试")

@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import rawpy
 
-from roi_auto import AutoROIFinder
 from roi_config import (
     DATA_DIR,
     OUTPUT_DIR,
@@ -22,6 +21,7 @@ from roi_config import (
     get_settings,
     print_config,
 )
+from roi_gui import ROISelector
 from roi_manual import ManualROITools
 
 # 字体设置：尽量兼容中英文
@@ -100,7 +100,7 @@ class ROIResult:
 
 
 class ROIProcessor:
-    """封装自动/手动 ROI 处理流程。"""
+    """GUI-driven ROI processing pipeline."""
 
     def __init__(
         self,
@@ -112,8 +112,8 @@ class ROIProcessor:
             base_settings = base_settings.with_overrides(roi_params)
         self.settings = base_settings
 
-        self.auto = AutoROIFinder(self.settings)
         self.manual = ManualROITools(self.settings)
+        self.gui = ROISelector(self.settings)
 
     def load_raw_image(self, filepath: Path) -> Tuple[np.ndarray, Dict]:
         """加载 RAW 图像为 4 通道矩阵，并返回元信息。"""
@@ -224,47 +224,43 @@ class ROIProcessor:
         
         return stats
 
+    def create_intensity_map(self, raw_channels: np.ndarray) -> np.ndarray:
+        """Construct an intensity map for visualization."""
+        Y = np.max(raw_channels, axis=-1)
+        Y = cv2.medianBlur(Y.astype(np.uint16), 3).astype(np.float32)
+        return Y
+
+
     def process_image(
         self,
         filepath: Path,
         save_visualization: bool = True,
         output_dir: Optional[Path] = None,
     ) -> ROIResult:
-        """处理单张图像，输出 ROIResult。"""
+        """Process a single image and return ROIResult."""
         print(f"\n处理图像: {filepath.name}")
 
         raw_channels, metadata = self.load_raw_image(filepath)
         H, W = raw_channels.shape[:2]
         print(f"  图像尺寸: {W}x{H}")
 
-        Y = self.auto.create_intensity_map(raw_channels)
-        fluor_mask, props = self.auto.segment_fluorescence(Y)
-        center = (props["center_x"], props["center_y"])
-        detected_angle = props.get("angle_deg", self.settings.roi_angle_deg)
+        Y = self.create_intensity_map(raw_channels)
+        selection = self.gui.select_roi(raw_channels, filepath)
 
-        center_offset = np.sqrt((center[0] - W / 2) ** 2 + (center[1] - H / 2) ** 2)
-        center_offset_pct = center_offset / np.sqrt((W / 2) ** 2 + (H / 2) ** 2) * 100
+        center = selection.center
+        roi_width = selection.width or self.settings.fixed_roi_width
+        roi_height = selection.height or self.settings.fixed_roi_height
+        roi_angle = selection.angle_deg if selection.angle_deg is not None else self.settings.roi_angle_deg
+
         print(
-            f"  荧光中心: ({center[0]:.1f}, {center[1]:.1f}), 偏移: {center_offset_pct:.1f}%, 角度: {detected_angle:.1f}°, 面积: {props['area']}"
+            f"  ROI: center=({center[0]:.1f}, {center[1]:.1f}), size={roi_width:.1f}x{roi_height:.1f}px, angle={roi_angle:.1f} deg"
         )
 
-        if self.settings.roi_mode in ["default", "auto"]:
-            roi_width, roi_height, roi_angle, adjusted_center, fluor_mask = self.auto.auto_detect_roi(
-                Y, raw_channels, fluor_mask, center
-            )
-            roi_mask = self.manual.create_fixed_roi(
-                adjusted_center, (H, W), roi_width, roi_height, roi_angle
-            )
-            center = adjusted_center
-        else:
-            roi_width = self.settings.fixed_roi_width
-            roi_height = self.settings.fixed_roi_height
-            roi_angle = detected_angle
-            roi_mask = self.manual.create_fixed_roi(center, (H, W), roi_width, roi_height, roi_angle)
-
+        roi_mask = self.manual.create_fixed_roi(center, (H, W), roi_width, roi_height, roi_angle)
         bg_mask = self.manual.create_background_roi(
-            center, (H, W), roi_width, roi_height, roi_angle, exclude_mask=fluor_mask
+            center, (H, W), roi_width, roi_height, roi_angle, exclude_mask=None
         )
+        selection_mask = roi_mask.copy()
 
         roi_stats = self.compute_roi_statistics(raw_channels, roi_mask, metadata)
         bg_stats = self.compute_roi_statistics(raw_channels, bg_mask, metadata)
@@ -282,8 +278,13 @@ class ROIProcessor:
             width=float(roi_width),
             height=float(roi_height),
             angle_deg=float(roi_angle),
-            bbox=props["bbox"],
-            area=props["area"],
+            bbox=(
+                max(0, int(round(center[0] - roi_width / 2))),
+                max(0, int(round(center[1] - roi_height / 2))),
+                min(W, int(round(center[0] + roi_width / 2))),
+                min(H, int(round(center[1] + roi_height / 2))),
+            ),
+            area=int(np.sum(roi_mask)),
             R_mean=roi_stats["R_mean"],
             G1_mean=roi_stats["G1_mean"],
             G2_mean=roi_stats["G2_mean"],
@@ -304,15 +305,17 @@ class ROIProcessor:
         )
 
         print(
-            f"  特征向量: R={R_corrected:.1f}, G1={G1_corrected:.1f}, G2={G2_corrected:.1f}, B={B_corrected:.1f}"
+            f"  Features: R={R_corrected:.1f}, G1={G1_corrected:.1f}, G2={G2_corrected:.1f}, B={B_corrected:.1f}"
         )
 
         if save_visualization and output_dir is not None:
             self._save_visualization(
-                filepath, raw_channels, Y, roi_mask, bg_mask, fluor_mask, result, output_dir
+                filepath, raw_channels, Y, roi_mask, bg_mask, selection_mask, result, output_dir
             )
 
         return result
+
+
 
     def _save_visualization(
         self,
@@ -321,23 +324,23 @@ class ROIProcessor:
         Y: np.ndarray,
         roi_mask: np.ndarray,
         bg_mask: np.ndarray,
-        fluor_mask: np.ndarray,
+        selection_mask: np.ndarray,
         result: ROIResult,
         output_dir: Path,
     ):
-        """保存可视化结果。"""
+        """Save a quick-look visualization of the selected ROI."""
         fig, axes = plt.subplots(2, 3, figsize=VISUALIZATION_FIGSIZE)
 
         ax = axes[0, 0]
         im = ax.imshow(Y, cmap="gray")
-        ax.set_title("强度图 Y = max(R,G1,G2,B)")
+        ax.set_title("Intensity map (max channel)")
         ax.axis("off")
         plt.colorbar(im, ax=ax)
 
         ax = axes[0, 1]
-        ax.imshow(fluor_mask, cmap="gray")
+        ax.imshow(selection_mask, cmap="gray")
         ax.plot(result.center_x, result.center_y, "r+", markersize=20, markeredgewidth=2)
-        ax.set_title(f"荧光区域\n({result.center_x:.1f}, {result.center_y:.1f})")
+        ax.set_title("Selected ROI mask")
         ax.axis("off")
 
         ax = axes[0, 2]
@@ -349,19 +352,13 @@ class ROIProcessor:
         poly = plt.Polygon(box, closed=True, fill=False, edgecolor="red", linewidth=2)
         ax.add_patch(poly)
         ax.plot(result.center_x, result.center_y, "r+", markersize=15, markeredgewidth=2)
-        if self.settings.roi_mode in ["default", "auto"]:
-            mode_label = "默认"
-        elif self.settings.roi_mode in ["advanced", "manual"]:
-            mode_label = "高级"
-        else:
-            mode_label = self.settings.roi_mode
-        ax.set_title(f"{mode_label} ROI ({result.width:.0f}x{result.height:.0f}px, {result.angle_deg:.1f}°)")
+        ax.set_title(f"ROI ({result.width:.0f}x{result.height:.0f}px, {result.angle_deg:.1f} deg)")
         ax.axis("off")
 
         ax = axes[1, 0]
         ax.imshow(Y, cmap="gray")
         ax.imshow(bg_mask, cmap="Blues", alpha=0.3)
-        ax.set_title("背景环形 ROI")
+        ax.set_title("Background ring ROI")
         ax.axis("off")
 
         ax = axes[1, 1]
@@ -376,7 +373,7 @@ class ROIProcessor:
         rgb_image = np.clip(rgb_image / np.percentile(rgb_image, 99.5), 0, 1)
         ax.imshow(rgb_image)
         ax.imshow(roi_mask, cmap="Reds", alpha=0.3)
-        ax.set_title("RGB 伪彩 + ROI")
+        ax.set_title("RGB preview + ROI")
         ax.axis("off")
 
         ax = axes[1, 2]
@@ -389,21 +386,22 @@ class ROIProcessor:
         ]
         colors = ["red", "green", "green", "blue"]
         bars = ax.bar(channels, corrected_values, color=colors, alpha=0.7)
-        ax.set_title("背景校正后的通道值")
-        ax.set_ylabel("强度 (ADU)")
+        ax.set_title("Background-corrected channels")
+        ax.set_ylabel("Intensity (ADU)")
         ax.grid(axis="y", alpha=0.3)
         for bar, val in zip(bars, corrected_values):
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width() / 2.0, height, f"{val:.0f}", ha="center", va="bottom", fontsize=9)
 
-        plt.suptitle(f"ROI 提取结果: {filepath.name}", fontsize=14, fontweight="bold")
+        plt.suptitle(f"ROI extraction: {filepath.name}", fontsize=14, fontweight="bold")
         plt.tight_layout()
 
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / f"{filepath.stem}_roi.png"
         plt.savefig(output_path, dpi=VISUALIZATION_DPI, bbox_inches="tight")
         plt.close()
-        print(f"  可视化已保存: {output_path}")
+        print(f"  Visualization saved: {output_path}")
+
 
     def batch_process(
         self,
@@ -411,7 +409,7 @@ class ROIProcessor:
         output_dir: Optional[Path] = None,
         save_visualization: bool = True,
     ) -> List[ROIResult]:
-        """批量处理文件夹中的 DNG 文件。"""
+        """Batch process DNG files (prompts GUI selection per image)."""
         if output_dir is None:
             output_dir = image_dir.parent / "roi_results"
 
@@ -497,17 +495,15 @@ class ROIProcessor:
             try:
                 # 重新加载图像并计算详细统计
                 raw_channels, metadata = self.load_raw_image(filepath)
-                Y = self.auto.create_intensity_map(raw_channels)
-                fluor_mask, _ = self.auto.segment_fluorescence(Y)
-                
-                # 重建ROI mask
+
+                # 重建 ROI mask
                 center = (result.center_x, result.center_y)
                 H, W = raw_channels.shape[:2]
                 roi_mask = self.manual.create_fixed_roi(
                     center, (H, W), result.width, result.height, result.angle_deg
                 )
                 bg_mask = self.manual.create_background_roi(
-                    center, (H, W), result.width, result.height, result.angle_deg, exclude_mask=fluor_mask
+                    center, (H, W), result.width, result.height, result.angle_deg, exclude_mask=None
                 )
                 
                 # 计算详细统计
@@ -555,7 +551,7 @@ class ROIProcessor:
 def main():
     print_config()
     processor = ROIProcessor()
-    print("\n开始批量处理...")
+    print("\nStarting batch processing (GUI selection per image)...")
     results = processor.batch_process(
         image_dir=DATA_DIR,
         output_dir=OUTPUT_DIR,

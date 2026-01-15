@@ -1,3 +1,9 @@
+# GUI 手动框选更新 (2026-01)
+
+- 自动/高级 ROI 流程已移除，改为在 OpenCV 窗口中手动画矩形选择 ROI。
+- 运行 `roi_processor.py` 或 `test_roi.py` 时，每张图都会弹出 GUI；按 Enter/Space 确认、Esc/C 取消。
+- `roi_config.py` 只保留路径、背景环厚度、预览缩放等参数；输出格式保持兼容。
+
 # ROI处理器详细统计功能更新
 
 ## 更新内容
