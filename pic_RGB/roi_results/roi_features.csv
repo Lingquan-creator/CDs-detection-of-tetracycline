@@ -1,3 +1,2 @@
-filename,center_x,center_y,width,height,angle_deg,area,R_mean,G1_mean,G2_mean,B_mean,R_bg,G1_bg,G2_bg,B_bg,R_corrected,G1_corrected,G2_corrected,B_corrected,R_display,G_display,B_display,exposure_time,iso
-0.2.dng,839.68,817.15,86.02,356.35,0.00,31059,46.21,106.19,106.11,46.22,2.45,4.39,4.41,5.05,43.76,101.79,101.70,41.17,43.76,101.75,41.17,None,None
-0.4.dng,933.89,808.96,65.54,323.58,0.00,21775,45.12,103.88,103.62,45.33,2.43,4.73,4.76,4.98,42.70,99.15,98.86,40.35,42.70,99.01,40.35,None,None
+filename,center_x,center_y,width,height,angle_deg,area,bg_ring_inner_h,bg_ring_outer_h,bg_ring_inner_v,bg_ring_outer_v,bg_center_x,bg_center_y,R_mean,G1_mean,G2_mean,B_mean,R_bg,G1_bg,G2_bg,B_bg,R_corrected,G1_corrected,G2_corrected,B_corrected,R_display,G_display,B_display,exposure_time,iso
+0.2.dng,837.63,817.15,77.82,352.26,0.00,27887,79.87,239.62,79.87,239.62,839.68,1282.05,45.51,104.67,104.52,45.60,4.16,8.38,8.36,6.27,41.36,96.29,96.16,39.32,41.36,96.23,39.32,None,None

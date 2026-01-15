@@ -1,4 +1,4 @@
-"""ROI configuration for GUI-based manual rectangle selection."""
+"""ROI configuration for GUI-based ROI selection."""
 
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -7,25 +7,21 @@ from typing import Any, Dict, Optional
 # ============================================
 # Paths
 # ============================================
-DATA_DIR = Path(r"h:\000\CDs\pic_RGB\data_pic")       # Input DNG directory
-OUTPUT_DIR = Path(r"h:\000\CDs\pic_RGB\roi_results")  # Output directory
+DATA_DIR = Path(r"h:\000\CDs\pic_RGB\data_pic")
+OUTPUT_DIR = Path(r"h:\000\CDs\pic_RGB\roi_results")
 
 # ============================================
 # ROI parameters (dict form)
 # ============================================
-# Defaults used as fallbacks when a value is not supplied by the GUI.
 DEFAULT_PARAMS: Dict[str, Any] = {
-    "fixed_roi_width": 120,
-    "fixed_roi_height": 400,
-    "roi_angle_deg": 0.0,
     "bg_ring_inner": 80,
     "bg_ring_outer": 240,
 }
 
 # GUI preview controls
 GUI_PARAMS: Dict[str, Any] = {
-    "preview_max_dim": 1000,       # Downscale longer edge for display
-    "preview_percentile": 99.5,    # Contrast stretching for preview
+    "preview_max_dim": 1000,
+    "preview_percentile": 99.5,
 }
 
 # Active configuration
@@ -38,10 +34,6 @@ CURRENT_CONFIG: Dict[str, Any] = {**DEFAULT_PARAMS, **GUI_PARAMS}
 @dataclass
 class ROISettings:
     """Structured ROI configuration."""
-
-    fixed_roi_width: int = 120
-    fixed_roi_height: int = 400
-    roi_angle_deg: float = 0.0
     bg_ring_inner: int = 80
     bg_ring_outer: int = 240
     preview_max_dim: int = 1000
@@ -65,7 +57,6 @@ class ROISettings:
                     merged[key] = value
         return ROISettings.from_dict(merged)
 
-
 # ============================================
 # Output control
 # ============================================
@@ -77,7 +68,6 @@ VISUALIZATION_FIGSIZE = (15, 10)
 # Misc
 # ============================================
 VERBOSE = True
-IMAGE_EXTENSION = "*.dng"
 
 
 def get_config_dict() -> Dict[str, Any]:
@@ -95,9 +85,15 @@ def print_config():
     """Print active config."""
     settings = get_settings()
     print("=" * 50)
-    print("Current ROI extractor config (GUI manual selection)")
+    print("Current ROI extractor config (GUI selection)")
     print("=" * 50)
     print(f"Data path:   {DATA_DIR}")
+    print(f"Output path: {OUTPUT_DIR}")
+    print(f"Background ring: inner={settings.bg_ring_inner}, outer={settings.bg_ring_outer}")
+    print(f"Preview: max_dim={settings.preview_max_dim}, percentile={settings.preview_percentile}")
+    print(f"Visualization: save={SAVE_VISUALIZATION}, dpi={VISUALIZATION_DPI}")
+    print("=" * 50)
+
     print(f"Output path: {OUTPUT_DIR}")
     print("\nROI:")
     print(f"  Default ROI size hint: {settings.fixed_roi_width} x {settings.fixed_roi_height} px")

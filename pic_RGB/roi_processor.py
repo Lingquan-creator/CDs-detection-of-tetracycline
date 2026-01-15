@@ -22,7 +22,6 @@ from roi_config import (
     print_config,
 )
 from roi_gui import ROISelector
-from roi_manual import ManualROITools
 
 # 字体设置：尽量兼容中英文
 matplotlib.rcParams["font.sans-serif"] = [
@@ -46,6 +45,12 @@ class ROIResult:
     angle_deg: float
     bbox: Tuple[int, int, int, int]
     area: int
+    bg_ring_inner_h: float  # 水平内边距
+    bg_ring_outer_h: float  # 水平外边距
+    bg_ring_inner_v: float  # 垂直内边距
+    bg_ring_outer_v: float  # 垂直外边距
+    bg_center_x: float
+    bg_center_y: float
     R_mean: float
     G1_mean: float
     G2_mean: float
@@ -54,6 +59,15 @@ class ROIResult:
     G1_bg: float
     G2_bg: float
     B_bg: float
+    
+    # 向后兼容属性
+    @property
+    def bg_ring_inner(self) -> float:
+        return self.bg_ring_inner_h
+    
+    @property
+    def bg_ring_outer(self) -> float:
+        return self.bg_ring_outer_h
     R_corrected: float
     G1_corrected: float
     G2_corrected: float
@@ -111,9 +125,59 @@ class ROIProcessor:
         if roi_params:
             base_settings = base_settings.with_overrides(roi_params)
         self.settings = base_settings
-
-        self.manual = ManualROITools(self.settings)
         self.gui = ROISelector(self.settings)
+
+    def _create_roi_mask(
+        self, center: Tuple[float, float], shape: Tuple[int, int], width: float, height: float, angle: float
+    ) -> np.ndarray:
+        """创建旋转矩形ROI mask."""
+        H, W = shape
+        mask = np.zeros((H, W), dtype=np.uint8)
+        rect = ((float(center[0]), float(center[1])), (float(width), float(height)), float(angle))
+        box = cv2.boxPoints(rect)
+        cv2.fillConvexPoly(mask, np.int32(np.round(box)), 1)
+        return mask
+
+    def _create_background_mask(
+        self,
+        center: Tuple[float, float],
+        shape: Tuple[int, int],
+        roi_width: float,
+        roi_height: float,
+        roi_angle: float,
+        ring_inner_h: float,
+        ring_outer_h: float,
+        ring_inner_v: float,
+        ring_outer_v: float,
+        exclude_mask: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        """创建空心矩形背景ROI."""
+        H, W = shape
+        cx, cy = center
+
+        outer_width = roi_width + 2 * ring_outer_h
+        outer_height = roi_height + 2 * ring_outer_v
+        inner_width = roi_width + 2 * ring_inner_h
+        inner_height = roi_height + 2 * ring_inner_v
+
+        outer_mask = np.zeros((H, W), dtype=np.uint8)
+        outer_rect = ((cx, cy), (outer_width, outer_height), roi_angle)
+        cv2.fillConvexPoly(outer_mask, np.int32(cv2.boxPoints(outer_rect)), 1)
+
+        inner_mask = np.zeros((H, W), dtype=np.uint8)
+        inner_rect = ((cx, cy), (inner_width, inner_height), roi_angle)
+        cv2.fillConvexPoly(inner_mask, np.int32(cv2.boxPoints(inner_rect)), 1)
+
+        ring_mask = outer_mask & (~inner_mask)
+        if exclude_mask is not None:
+            ring_mask = ring_mask & (~exclude_mask.astype(bool))
+
+        return ring_mask.astype(np.uint8)
+
+    def _get_rotated_box(self, center: Tuple[float, float], width: float, height: float, angle: float) -> np.ndarray:
+        """返回旋转矩形的四个顶点."""
+        rect = ((float(center[0]), float(center[1])), (float(width), float(height)), float(angle))
+        return cv2.boxPoints(rect)
 
     def load_raw_image(self, filepath: Path) -> Tuple[np.ndarray, Dict]:
         """加载 RAW 图像为 4 通道矩阵，并返回元信息。"""
@@ -256,9 +320,19 @@ class ROIProcessor:
             f"  ROI: center=({center[0]:.1f}, {center[1]:.1f}), size={roi_width:.1f}x{roi_height:.1f}px, angle={roi_angle:.1f} deg"
         )
 
-        roi_mask = self.manual.create_fixed_roi(center, (H, W), roi_width, roi_height, roi_angle)
-        bg_mask = self.manual.create_background_roi(
-            center, (H, W), roi_width, roi_height, roi_angle, exclude_mask=None
+        roi_mask = self._create_roi_mask(center, (H, W), roi_width, roi_height, roi_angle)
+        bg_center = selection.bg_center if selection.bg_center else center
+        bg_mask = self._create_background_mask(
+            bg_center,
+            (H, W),
+            roi_width,
+            roi_height,
+            roi_angle,
+            selection.bg_ring_inner_h,
+            selection.bg_ring_outer_h,
+            selection.bg_ring_inner_v,
+            selection.bg_ring_outer_v,
+            exclude_mask=None,
         )
         selection_mask = roi_mask.copy()
 
@@ -285,6 +359,12 @@ class ROIProcessor:
                 min(H, int(round(center[1] + roi_height / 2))),
             ),
             area=int(np.sum(roi_mask)),
+            bg_ring_inner_h=float(selection.bg_ring_inner_h),
+            bg_ring_outer_h=float(selection.bg_ring_outer_h),
+            bg_ring_inner_v=float(selection.bg_ring_inner_v),
+            bg_ring_outer_v=float(selection.bg_ring_outer_v),
+            bg_center_x=float(bg_center[0]),
+            bg_center_y=float(bg_center[1]),
             R_mean=roi_stats["R_mean"],
             G1_mean=roi_stats["G1_mean"],
             G2_mean=roi_stats["G2_mean"],
@@ -346,13 +426,14 @@ class ROIProcessor:
         ax = axes[0, 2]
         ax.imshow(Y, cmap="gray")
         ax.imshow(roi_mask, cmap="Reds", alpha=0.3)
-        box = self.manual.get_rotated_box(
+        box = self._get_rotated_box(
             (result.center_x, result.center_y), result.width, result.height, result.angle_deg
         )
         poly = plt.Polygon(box, closed=True, fill=False, edgecolor="red", linewidth=2)
         ax.add_patch(poly)
         ax.plot(result.center_x, result.center_y, "r+", markersize=15, markeredgewidth=2)
-        ax.set_title(f"ROI ({result.width:.0f}x{result.height:.0f}px, {result.angle_deg:.1f} deg)")
+        ax.plot(result.bg_center_x, result.bg_center_y, "yx", markersize=12, markeredgewidth=2)
+        ax.set_title(f"ROI ({result.width:.0f}x{result.height:.0f}px, {result.angle_deg:.1f} deg)\nBG center: ({result.bg_center_x:.1f}, {result.bg_center_y:.1f})")
         ax.axis("off")
 
         ax = axes[1, 0]
@@ -451,6 +532,7 @@ class ROIProcessor:
         csv_path = output_dir / "roi_features.csv"
         with open(csv_path, "w", encoding="utf-8") as f:
             f.write("filename,center_x,center_y,width,height,angle_deg,area,")
+            f.write("bg_ring_inner_h,bg_ring_outer_h,bg_ring_inner_v,bg_ring_outer_v,bg_center_x,bg_center_y,")
             f.write("R_mean,G1_mean,G2_mean,B_mean,")
             f.write("R_bg,G1_bg,G2_bg,B_bg,")
             f.write("R_corrected,G1_corrected,G2_corrected,B_corrected,")
@@ -460,6 +542,8 @@ class ROIProcessor:
                 f.write(
                     f"{r.filename},{r.center_x:.2f},{r.center_y:.2f},{r.width:.2f},{r.height:.2f},{r.angle_deg:.2f},{r.area},"
                 )
+                f.write(f"{r.bg_ring_inner_h:.2f},{r.bg_ring_outer_h:.2f},{r.bg_ring_inner_v:.2f},{r.bg_ring_outer_v:.2f},")
+                f.write(f"{r.bg_center_x:.2f},{r.bg_center_y:.2f},")
                 f.write(
                     f"{r.R_mean:.2f},{r.G1_mean:.2f},{r.G2_mean:.2f},{r.B_mean:.2f},"
                 )
@@ -499,11 +583,20 @@ class ROIProcessor:
                 # 重建 ROI mask
                 center = (result.center_x, result.center_y)
                 H, W = raw_channels.shape[:2]
-                roi_mask = self.manual.create_fixed_roi(
+                roi_mask = self._create_roi_mask(
                     center, (H, W), result.width, result.height, result.angle_deg
                 )
-                bg_mask = self.manual.create_background_roi(
-                    center, (H, W), result.width, result.height, result.angle_deg, exclude_mask=None
+                bg_mask = self._create_background_mask(
+                    (result.bg_center_x, result.bg_center_y),
+                    (H, W),
+                    result.width,
+                    result.height,
+                    result.angle_deg,
+                    result.bg_ring_inner_h,
+                    result.bg_ring_outer_h,
+                    result.bg_ring_inner_v,
+                    result.bg_ring_outer_v,
+                    exclude_mask=None,
                 )
                 
                 # 计算详细统计

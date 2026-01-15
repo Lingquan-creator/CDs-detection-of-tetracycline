@@ -56,19 +56,41 @@ class ManualROITools:
         roi_height: Optional[float] = None,
         roi_angle: Optional[float] = None,
         exclude_mask: Optional[np.ndarray] = None,
+        ring_inner_h: Optional[float] = None,
+        ring_outer_h: Optional[float] = None,
+        ring_inner_v: Optional[float] = None,
+        ring_outer_v: Optional[float] = None,
+        ring_inner: Optional[float] = None,  # 向后兼容参数
+        ring_outer: Optional[float] = None,  # 向后兼容参数
     ) -> np.ndarray:
-        """创建空心矩形背景 ROI（与 ROI 同心、同角度）。"""
+        """创建空心矩形背景 ROI（与 ROI 同心、同角度）。
+        
+        支持独立的水平和垂直边距：
+        - ring_inner_h, ring_outer_h: 水平方向的内外边距
+        - ring_inner_v, ring_outer_v: 垂直方向的内外边距
+        - ring_inner, ring_outer: 向后兼容，如果未指定H/V参数则使用这些值
+        """
         H, W = shape
         cx, cy = center
 
         w = roi_width if roi_width is not None else self.settings.fixed_roi_width
         h = roi_height if roi_height is not None else self.settings.fixed_roi_height
         a = roi_angle if roi_angle is not None else self.settings.roi_angle_deg
+        
+        # 处理参数：优先使用独立的H/V参数，否则回退到统一参数
+        if ring_inner_h is None:
+            ring_inner_h = ring_inner if ring_inner is not None else self.settings.bg_ring_inner
+        if ring_outer_h is None:
+            ring_outer_h = ring_outer if ring_outer is not None else self.settings.bg_ring_outer
+        if ring_inner_v is None:
+            ring_inner_v = ring_inner if ring_inner is not None else self.settings.bg_ring_inner
+        if ring_outer_v is None:
+            ring_outer_v = ring_outer if ring_outer is not None else self.settings.bg_ring_outer
 
-        outer_width = w + 2 * self.settings.bg_ring_outer
-        outer_height = h + 2 * self.settings.bg_ring_outer
-        inner_width = w + 2 * self.settings.bg_ring_inner
-        inner_height = h + 2 * self.settings.bg_ring_inner
+        outer_width = w + 2 * ring_outer_h
+        outer_height = h + 2 * ring_outer_v
+        inner_width = w + 2 * ring_inner_h
+        inner_height = h + 2 * ring_inner_v
 
         outer_mask = np.zeros((H, W), dtype=np.uint8)
         outer_rect = ((cx, cy), (outer_width, outer_height), a)
