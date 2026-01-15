@@ -16,6 +16,10 @@ OUTPUT_DIR = Path(r"h:\000\CDs\pic_RGB\roi_results")
 DEFAULT_PARAMS: Dict[str, Any] = {
     "bg_ring_inner": 80,
     "bg_ring_outer": 240,
+    # Fixed-size ROI defaults (used as fallbacks/initial hints)
+    "fixed_roi_width": 200,
+    "fixed_roi_height": 200,
+    "roi_angle_deg": 0.0,
 }
 
 # GUI preview controls
@@ -36,6 +40,9 @@ class ROISettings:
     """Structured ROI configuration."""
     bg_ring_inner: int = 80
     bg_ring_outer: int = 240
+    fixed_roi_width: int = 200
+    fixed_roi_height: int = 200
+    roi_angle_deg: float = 0.0
     preview_max_dim: int = 1000
     preview_percentile: float = 99.5
 

@@ -214,6 +214,16 @@ class ROISelector:
                 break
             if key in (27, ord("c"), ord("C")):
                 cv2.destroyWindow(window_title)
+                cv2.destroyWindow(control_window)
+                raise RuntimeError(f"ROI selection canceled for {filepath.name}")
+
+            # 如果用户直接关闭窗口，视作取消，避免后续 getTrackbarPos 抛错
+            if (
+                cv2.getWindowProperty(window_title, cv2.WND_PROP_VISIBLE) < 1
+                or cv2.getWindowProperty(control_window, cv2.WND_PROP_VISIBLE) < 1
+            ):
+                cv2.destroyWindow(window_title)
+                cv2.destroyWindow(control_window)
                 raise RuntimeError(f"ROI selection canceled for {filepath.name}")
 
             # Tab键切换控制模式
@@ -228,16 +238,17 @@ class ROISelector:
             y_trackbar = "ROI Y" if control_mode == 0 else "BG Y"
             
             moved = False
-            if key in (2424832, 65362, ord('w'), ord('W')):  # Up
+            # waitKeyEx箭头键码（Win）：左=2424832，上=2490368，右=2555904，下=2621440
+            if key in (2490368, 65362, ord('w'), ord('W')):  # Up
                 target_dy -= step
                 moved = True
-            elif key in (2555904, 65364, ord('s'), ord('S')):  # Down
+            elif key in (2621440, 65364, ord('s'), ord('S')):  # Down
                 target_dy += step
                 moved = True
-            elif key in (2490368, 65361, ord('a'), ord('A')):  # Left
+            elif key in (2424832, 65361, ord('a'), ord('A')):  # Left
                 target_dx -= step
                 moved = True
-            elif key in (2621440, 65363, ord('d'), ord('D')):  # Right
+            elif key in (2555904, 65363, ord('d'), ord('D')):  # Right
                 target_dx += step
                 moved = True
             

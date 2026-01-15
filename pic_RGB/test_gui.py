@@ -38,9 +38,9 @@ def test_gui_roi():
         try:
             result = processor.process_image(filepath, save_visualization=True, output_dir=output_dir)
             results.append(result)
-            print("✓ 成功")
+            print("OK: 处理成功")
         except Exception as exc:
-            print(f"✗ 失败: {exc}")
+            print(f"FAIL: 处理失败: {exc}")
     
     if results:
         print(f"\n{'=' * 60}")
