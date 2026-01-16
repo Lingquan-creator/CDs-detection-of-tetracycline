@@ -23,7 +23,7 @@ DEFAULT_PARAMS: Dict[str, Any] = {
     "bg_ring_inner_y": 80,
     "bg_ring_outer_x": 240,
     "bg_ring_outer_y": 240,
-    "move_step": 5,
+    "move_step": 2,
     "size_step": 5,
     "angle_step_deg": 1.0,
 }

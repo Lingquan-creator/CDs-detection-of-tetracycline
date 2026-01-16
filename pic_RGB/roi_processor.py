@@ -534,46 +534,15 @@ class ROIProcessor:
 
         results: List[ROIResult] = []
         failed_files: List[str] = []
-        roi_sel = roi_selection
-        bg_sel = bg_selection
-
-        start_idx = 0
-        if interactive and roi_sel is None and bg_sel is None:
-            first_path = image_files[0]
-            print(f"\n首次选择将在 {first_path.name} 上进行")
-            try:
-                raw_channels, metadata = self.load_raw_image(first_path)
-                roi_sel, bg_sel = self._resolve_selections(
-                    raw_channels=raw_channels,
-                    roi_selection=roi_sel,
-                    bg_selection=bg_sel,
-                    interactive=True,
-                )
-                result = self._process_loaded_image(
-                    filepath=first_path,
-                    raw_channels=raw_channels,
-                    metadata=metadata,
-                    roi_sel=roi_sel,
-                    bg_sel=bg_sel,
-                    save_visualization=save_visualization,
-                    output_dir=output_dir,
-                )
-                results.append(result)
-                start_idx = 1
-            except Exception as exc:
-                print(f"  错误: {exc}")
-                failed_files.append(first_path.name)
-                start_idx = 1
-
-        for filepath in image_files[start_idx:]:
+        for filepath in image_files:
             try:
                 result = self.process_image(
                     filepath,
                     save_visualization,
                     output_dir,
-                    roi_selection=roi_sel,
-                    bg_selection=bg_sel,
-                    interactive=False,
+                    roi_selection=roi_selection,
+                    bg_selection=bg_selection,
+                    interactive=interactive,
                 )
                 results.append(result)
             except Exception as exc:
