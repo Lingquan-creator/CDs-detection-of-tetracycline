@@ -97,12 +97,14 @@ class ROISelectorGUI:
         self.max_width = w
         self.max_height = h
         self.max_ring = int(max(w, h) * 0.75)
+        self.trackbar_ready = False
 
     def run(self) -> Tuple[ROISelection, BackgroundSelection]:
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(self.window_name, min(1200, self.max_width), min(900, self.max_height))
         cv2.setMouseCallback(self.window_name, self._on_mouse)
         self._create_trackbars()
+        self.trackbar_ready = True
 
         while True:
             display = self._render()
@@ -204,8 +206,10 @@ class ROISelectorGUI:
         else:
             self.bg = BackgroundSelection(
                 center=new_center,
-                inner=self.bg.inner,
-                outer=self.bg.outer,
+                inner_x=self.bg.inner_x,
+                inner_y=self.bg.inner_y,
+                outer_x=self.bg.outer_x,
+                outer_y=self.bg.outer_y,
                 angle_deg=self.bg.angle_deg,
             )
         self._sync_trackbars()
@@ -240,8 +244,10 @@ class ROISelectorGUI:
         )
         self.bg = BackgroundSelection(
             center=self.bg.center,
-            inner=self.bg.inner,
-            outer=self.bg.outer,
+            inner_x=self.bg.inner_x,
+            inner_y=self.bg.inner_y,
+            outer_x=self.bg.outer_x,
+            outer_y=self.bg.outer_y,
             angle_deg=float(new_angle),
         )
         self._sync_trackbars()
@@ -366,8 +372,10 @@ class ROISelectorGUI:
         )
         self.bg = BackgroundSelection(
             center=self.bg.center,
-            inner=self.bg.inner,
-            outer=self.bg.outer,
+            inner_x=self.bg.inner_x,
+            inner_y=self.bg.inner_y,
+            outer_x=self.bg.outer_x,
+            outer_y=self.bg.outer_y,
             angle_deg=float(value),
         )
 
@@ -393,8 +401,10 @@ class ROISelectorGUI:
         clipped = np.clip(value, 0, self.max_width - 1)
         self.bg = BackgroundSelection(
             center=(float(clipped), self.bg.center[1]),
-            inner=self.bg.inner,
-            outer=self.bg.outer,
+            inner_x=self.bg.inner_x,
+            inner_y=self.bg.inner_y,
+            outer_x=self.bg.outer_x,
+            outer_y=self.bg.outer_y,
             angle_deg=self.bg.angle_deg,
         )
 
@@ -402,8 +412,10 @@ class ROISelectorGUI:
         clipped = np.clip(value, 0, self.max_height - 1)
         self.bg = BackgroundSelection(
             center=(self.bg.center[0], float(clipped)),
-            inner=self.bg.inner,
-            outer=self.bg.outer,
+            inner_x=self.bg.inner_x,
+            inner_y=self.bg.inner_y,
+            outer_x=self.bg.outer_x,
+            outer_y=self.bg.outer_y,
             angle_deg=self.bg.angle_deg,
         )
 
@@ -450,6 +462,8 @@ class ROISelectorGUI:
         )
 
     def _sync_trackbars(self):
+        if not self.trackbar_ready:
+            return
         cv2.setTrackbarPos("ROI center X", self.window_name, int(self.roi.center[0]))
         cv2.setTrackbarPos("ROI center Y", self.window_name, int(self.roi.center[1]))
         cv2.setTrackbarPos("ROI width", self.window_name, int(self.roi.width))
@@ -457,7 +471,7 @@ class ROISelectorGUI:
         cv2.setTrackbarPos("ROI angle", self.window_name, int(self.roi.angle_deg % 180))
         cv2.setTrackbarPos("BG center X", self.window_name, int(self.bg.center[0]))
         cv2.setTrackbarPos("BG center Y", self.window_name, int(self.bg.center[1]))
-        cv2.setTrackbarPos("BG inner", self.window_name, int(self.bg.inner_x))
+        cv2.setTrackbarPos("BG inner X", self.window_name, int(self.bg.inner_x))
         cv2.setTrackbarPos("BG inner Y", self.window_name, int(self.bg.inner_y))
         cv2.setTrackbarPos("BG outer X", self.window_name, int(self.bg.outer_x))
         cv2.setTrackbarPos("BG outer Y", self.window_name, int(self.bg.outer_y))
@@ -492,8 +506,10 @@ class ROISelectorGUI:
         )
         self.bg = BackgroundSelection(
             center=self.bg.center if self.active_region == "bg" else center,
-            inner=self.bg.inner,
-            outer=self.bg.outer,
+            inner_x=self.bg.inner_x,
+            inner_y=self.bg.inner_y,
+            outer_x=self.bg.outer_x,
+            outer_y=self.bg.outer_y,
             angle_deg=self.bg.angle_deg,
         )
         self._sync_trackbars()
