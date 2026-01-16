@@ -379,6 +379,8 @@ def main() -> None:
         print(f"{'='*70}")
         
         if batch_results:
+            # Ensure results directory exists
+            (script_dir / cfg.CSV_OUTPUT_FILE).parent.mkdir(parents=True, exist_ok=True)
             if cfg.SAVE_CSV:
                 save_batch_results_csv(script_dir / cfg.CSV_OUTPUT_FILE, batch_results)
             

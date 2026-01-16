@@ -29,10 +29,11 @@ from scipy.optimize import curve_fit
 # -----------------------------------------------------------------------------
 
 BASE_DIR = Path(__file__).parent
+RESULTS_DIR = BASE_DIR / "results"
 DATA_FILE = BASE_DIR / "data.csv"
 PLOT_DIR = BASE_DIR / "fit_plots"
-INTEGRATED_CSV = BASE_DIR / "results_integrated_intensity.csv"
-MODEL_SUMMARY_CSV = BASE_DIR / "results_intensity_models.csv"
+INTEGRATED_CSV = RESULTS_DIR / "results_integrated_intensity.csv"
+MODEL_SUMMARY_CSV = RESULTS_DIR / "results_intensity_models.csv"
 SPECTRA_FIG = PLOT_DIR / "spectra_by_concentration.png"
 FIT_FIG = PLOT_DIR / "integrated_intensity_fit.png"
 INTEGRATION_RANGE = (400.0, 700.0)  # nm
@@ -65,6 +66,7 @@ def load_spectra(path: Path = DATA_FILE) -> Tuple[np.ndarray, pd.DataFrame]:
 
 def ensure_output_dirs() -> None:
     PLOT_DIR.mkdir(parents=True, exist_ok=True)
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # -----------------------------------------------------------------------------

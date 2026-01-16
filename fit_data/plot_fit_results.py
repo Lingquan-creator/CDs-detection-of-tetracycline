@@ -143,7 +143,7 @@ def main():
     
     # 文件路径（使用绝对路径）
     data_file = script_dir / "data.csv"
-    results_file = script_dir / "results_spec.csv"
+    results_file = script_dir / "results" / "results_spec.csv"
     output_dir = script_dir / "fit_plots"
     
     # 创建输出目录

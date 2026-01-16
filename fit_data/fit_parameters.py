@@ -17,19 +17,21 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
 
+BASE_DIR = Path(__file__).parent
+RESULTS_DIR = BASE_DIR / "results"
 
 # ============================================================================
 # 配置 / Configuration
 # ============================================================================
 
-INPUT_CSV = "results_spec.csv"  # 输入CSV文件 / Input CSV file
-OUTPUT_DIR = "parameter_plots"       # 输出图片目录 / Output directory for plots
+INPUT_CSV = RESULTS_DIR / "results_spec.csv"  # 输入CSV文件 / Input CSV file
+OUTPUT_DIR = BASE_DIR / "parameter_plots"       # 输出图片目录 / Output directory for plots
 DPI = 150                            # 图片分辨率 / Image resolution
 FIGSIZE = (10, 6)                    # 图片尺寸 / Figure size
-LINEAR_FIT_CSV = "results_parameter.csv"  # 线性拟合结果输出 / Linear fit results output
+LINEAR_FIT_CSV = RESULTS_DIR / "results_parameter.csv"  # 线性拟合结果输出 / Linear fit results output
 
 # 拟合时忽略的浓度点配置 / Concentration points to ignore during fitting
-IGNORE_CONCENTRATIONS = [0, 0.2, 0.4]  # 要忽略的特定浓度值列表（0对应空白） / List of specific concentration values to ignore (0 for blank)
+IGNORE_CONCENTRATIONS = [0, 0.2]  # 要忽略的特定浓度值列表（0对应空白） / List of specific concentration values to ignore (0 for blank)
                                         # 例如 / Example: [0, 0.05, 0.1, 5.0]
                                         # 留空则不忽略任何浓度 / Leave empty to not ignore any concentrations
 
@@ -813,7 +815,7 @@ def main() -> None:
     """主程序入口 / Main program entry"""
     # 获取脚本所在目录 / Get script directory
     script_dir = Path(__file__).parent
-    csv_path = script_dir / INPUT_CSV
+    csv_path = INPUT_CSV
     
     if not csv_path.exists():
         print(f"❌ 错误 / Error: 文件不存在 / File not found: {csv_path}")
@@ -836,7 +838,7 @@ def main() -> None:
         df, n_peaks = load_and_process_data(csv_path)
         
         # 创建输出目录 / Create output directory
-        output_dir = script_dir / OUTPUT_DIR
+        output_dir = OUTPUT_DIR
         
         # 用于收集线性拟合结果 / Collect linear fit metrics
         fit_records: List[dict] = []

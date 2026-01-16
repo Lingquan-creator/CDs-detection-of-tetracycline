@@ -5,13 +5,17 @@
 """
 
 import math
+from pathlib import Path
 from typing import Sequence, Tuple
+
+BASE_DIR = Path(__file__).parent
+RESULTS_DIR = BASE_DIR / "results"
 
 # ============================================================================
 # 数据文件设置 / Data File Settings
 # ============================================================================
 
-DATA_FILE = "data.csv"  # CSV文件名 / CSV file to read
+DATA_FILE = BASE_DIR / "data.csv"  # CSV文件名 / CSV file to read
 SKIP_ROWS = 1  # 跳过的头部行数 / Number of header lines to skip (including concentration labels)
 X_COLUMN = 1   # 波长列索引（从1开始） / 1-based index for wavelength column
 Y_COLUMNS = "all"  # "all"表示处理所有强度列，或指定列表如[2,3,4] / "all" or list like [2,3,4]
@@ -20,7 +24,7 @@ Y_COLUMNS = "all"  # "all"表示处理所有强度列，或指定列表如[2,3,4
 # 拟合参数 / Fitting Parameters
 # ============================================================================
 
-N_PEAKS = 2  # 拟合峰数量 / Number of peaks to fit
+N_PEAKS = 3  # 拟合峰数量 / Number of peaks to fit
 
 # 峰参数预设 / Peak parameter presets: list of (k_m, lambda0_m, sigma_E_m)
 # 使用 math.nan 表示该参数需要自动拟合 / Use math.nan for parameters to be fitted
@@ -110,13 +114,13 @@ REMOVE_OUTLIERS = False     # 是否移除异常值 / Remove outliers
 # ============================================================================
 
 SAVE_RESULTS = False                           # 保存文本结果 / Save text results
-RESULTS_FILE = "results_spec.txt"              # 文本结果文件名 / Text results filename
+RESULTS_FILE = RESULTS_DIR / "results_spec.txt"              # 文本结果文件名 / Text results filename
 
 SAVE_CSV = True                               # 保存批量结果为CSV / Save batch results to CSV
-CSV_OUTPUT_FILE = "results_spec.csv"     # CSV输出文件名 / CSV output filename
+CSV_OUTPUT_FILE = RESULTS_DIR / "results_spec.csv"     # CSV输出文件名 / CSV output filename
 
 SAVE_FIGURE = True                            # 保存图形 / Save figure
-FIGURE_FILE = "results_spec.png"                # 图形文件名 / Figure filename
+FIGURE_FILE = RESULTS_DIR / "results_spec.png"                # 图形文件名 / Figure filename
 
 # ============================================================================
 # 物理常数 / Physical Constants
