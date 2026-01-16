@@ -58,19 +58,20 @@ def solve_params(y_bg: float, x1: float, y1: float, x2: float, y2: float) -> Tup
 def main():
     ap = argparse.ArgumentParser(description="Solve exponential A,B,C from background + two samples.")
     ap.add_argument("--roi-csv", type=Path, default=DEFAULT_ROI_CSV, help="Path to roi_detailed_statistics.csv")
-    ap.add_argument("--bg-file", required=True, help="Filename for background image (match in ROI CSV)")
-    ap.add_argument("--sample1", required=True, help="Filename for first sample")
+    ap.add_argument("--bg-file", required=True, help="Absolute or relative path to background image (matched by basename)")
+    ap.add_argument("--sample1", required=True, help="Absolute or relative path to first sample")
     ap.add_argument("--conc1", type=float, required=True, help="Concentration for first sample")
-    ap.add_argument("--sample2", required=True, help="Filename for second sample")
+    ap.add_argument("--sample2", required=True, help="Absolute or relative path to second sample")
     ap.add_argument("--conc2", type=float, required=True, help="Concentration for second sample")
     ap.add_argument("--channel", default="G_corr", help="Channel to use (G_corr, R_corr, G1_corr, G2_corr, B_corr or raw column name)")
     args = ap.parse_args()
 
     df = pd.read_csv(args.roi_csv)
     def row_for(name: str) -> pd.Series:
-        row = df.loc[df["filename"] == name]
+        fname = Path(name).name
+        row = df.loc[df["filename"] == fname]
         if row.empty:
-            raise ValueError(f"Filename {name} not found in {args.roi_csv}")
+            raise ValueError(f"Filename {fname} not found in {args.roi_csv}")
         return row.iloc[0]
 
     bg_val = compute_channel(row_for(args.bg_file), args.channel)

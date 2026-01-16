@@ -1,84 +1,42 @@
-# fit_data
+# fit_data README
 
-`fit_data/` 用于“量子点多峰光谱拟合 → 参数随浓度变化建模（标定曲线）→ 结果可视化/导出”这一套流程。
+量子点光谱处理与拟合工具集，输入/输出统一至 `fit_data/results/`，便于批量运行和下游（如 RGB 浓度映射）使用。
 
-## 目录结构（当前仓库）
+## 数据与目录
+- 原始光谱：`fit_data/data.csv`（首列波长，后续列为不同浓度光谱）
+- 结果目录：`fit_data/results/`
+  - `results_spec.csv` / `results_spec.txt` / `results_spec.png`：多峰拟合结果及可视化
+  - `results_parameter.csv`：参数趋势拟合（线性/指数）
+  - `results_integrated_intensity.csv`：400–700 nm 积分强度
+  - `results_intensity_models.csv`：积分强度 vs 浓度模型摘要（AIC 选择）
+  - `fit_plots/`：全谱、积分拟合等辅助图
+  - `parameter_plots/`：参数趋势图（由 `fit_parameters.py` 生成）
 
-- `fit_spectrum.py`：批量光谱拟合主程序（读入 `y4.csv`，逐列拟合，输出结果 CSV/图）
-- `spectrum_fitter.py`：拟合核心算法（峰检测、参数初始化、非线性最小二乘、多起点拟合等）
-- `fit_config.py`：拟合配置（输入文件名、峰数、边界、是否平滑/去异常点、输出文件名等）
-- `fit_parameters.py`：参数可视化 + 参数-浓度拟合（生成 `parameter_plots/`，并输出“拟合关系表”CSV）
-- `y4.csv`：示例/实验数据（第一列为波长，后续每列为一个样品/浓度的强度）
-- `parameter_plots/`：由 `fit_parameters.py` 生成的图
-- `results_spec.csv`、`results_spec.png`：一次运行产生的拟合结果示例（文件名由配置决定）
-- `改进说明.md`、`模型配置说明.md`、`拟合分析报告.md`、`可视化使用说明.md`：过程说明与分析文档
+## 核心脚本
+- `fit_config.py`：全局配置（数据/结果路径、峰数、初值、边界等，已默认指向 `results/`）。
+- `fit_spectrum.py`：多峰拟合批处理，产出 `results_spec.*`。
+- `spectrum_fitter.py`：峰建模、优化与指标计算的核心逻辑。
+- `integrate_and_fit.py`：光谱积分并对积分强度做模型选择（AIC），产出积分相关 CSV。
+- `plot_fit_results.py`：根据 `results_spec.csv` 绘制各浓度拟合/原始光谱对比。
+- `fit_parameters.py`：绘制/拟合参数随浓度趋势，写出 `results_parameter.csv` 与参数图。
 
-> 说明：部分文档里仍沿用旧文件名 `fit_spectrum_general.py` / `plot_parameters.py`，对应当前目录下的 `fit_spectrum.py` / `fit_parameters.py`。
-
-## 环境依赖
-
-- Python 3.10+（建议）
-- 依赖包：`numpy`、`scipy`、`matplotlib`（可视化还需要 `pandas`）
-
-安装示例：
+## 运行顺序示例
 ```bash
-pip install numpy scipy matplotlib pandas
-```
-
-## 1) 批量拟合（生成每个浓度的峰参数）
-
-1. 配置 `fit_config.py`
-   - `DATA_FILE`：输入数据文件名（默认 `y4.csv`）
-   - `SKIP_ROWS`：跳过头部行数（包含表头）
-   - `X_COLUMN`：波长列（从 1 开始）
-   - `N_PEAKS`：拟合峰数量
-   - `PEAK_PARAMS` / `MANUAL_INITIAL_GUESSES`：固定参数/初值策略
-   - `ALLOW_NEGATIVE_A`：是否允许出现负峰（吸收/差分）
-   - `SMOOTH_DATA`、`REMOVE_OUTLIERS`：预处理开关
-   - `N_MULTI_START`：多起点拟合次数（>1 更稳但更慢）
-   - `CSV_OUTPUT_FILE`、`FIGURE_FILE`：输出文件名
-
-2. 在 `fit_data/` 目录运行：
-```bash
+cd fit_data
+# 1) 多峰拟合
 python fit_spectrum.py
-```
-
-3. 主要输出（取决于 `fit_config.py` 的开关与文件名）：
-   - 结果表：`CSV_OUTPUT_FILE`（示例：`results_spec.csv`）
-   - 拟合对比图：`FIGURE_FILE`（示例：`results_spec.png`）
-   - （可选）文本摘要：`RESULTS_FILE`
-
-结果 CSV 的字段包含：
-- 每个样品：`Concentration`、`R_squared`、`RMSE`、`Relative_RMSE_%`、`Background_B`
-- 每个峰：`Peak{i}_A_prime`、`Peak{i}_k`、`Peak{i}_lambda0_nm`、`Peak{i}_sigma_E_eV`、`Peak{i}_peak_position_nm`、`Peak{i}_E0_eV`、`Peak{i}_max_intensity`、`Peak{i}_integrated_intensity`
-
-## 2) 参数可视化 + 生成“参数-浓度”拟合表
-
-`fit_parameters.py` 用于：
-- 读取上一步结果 CSV
-- 绘制“参数 vs 浓度”的曲线图（输出到 `parameter_plots/`）
-- 对每个参数/每个峰，拟合一条“参数-浓度关系”（输出为一张 CSV 表，后续可用于反解浓度）
-
-使用方法：
-1. 打开 `fit_parameters.py`，把 `INPUT_CSV` 改成你的拟合结果 CSV（例如 `results_spec.csv` 或你在 `fit_config.py` 配置的 `CSV_OUTPUT_FILE`）。
-2. 在 `fit_data/` 目录运行：
-```bash
+# 2) 光谱积分 + 模型选择
+python integrate_and_fit.py
+# 3) 绘制拟合光谱对比
+python plot_fit_results.py
+# 4) 参数趋势/线性-指数拟合
 python fit_parameters.py
 ```
+所有输出将落到 `results/` 或对应图像目录（`fit_plots/`, `parameter_plots/`）。
 
-输出：
-- `parameter_plots/*.png`：各参数随浓度变化趋势图 + 汇总图
-- `LINEAR_FIT_CSV`（脚本内配置的输出名）：每个参数/峰的拟合类型、公式、系数、R2、RMSE、有效浓度范围等
+## 与浓度映射衔接
+`results_intensity_models.csv`、`results_integrated_intensity.csv`、`results_parameter.csv` 等文件被 `concentration/` 下的映射脚本引用（如 `rgb_exponential_fit.py`、`rgb_to_concentration.py`），路径已统一到 `fit_data/results/`，无需额外配置。
 
-关于“用标定曲线反解浓度”的写法，见仓库根目录的 `量子点.md`（浓度计算部分）。
-
-## 输入数据格式说明（y4.csv）
-
-默认假设：
-- 第一行是表头：第 1 列可为空/波长名，后面每一列是样品/浓度标签（如 `0.2μM`）
-- 从第 `SKIP_ROWS+1` 行开始为数值数据
-- 第 `X_COLUMN` 列为波长（单位 nm）
-- 其他列为同一波长下的强度
-
-编码注意：
-- 建议把 `y4.csv` 存为 UTF-8 编码；若用 ANSI/GBK，表头里的 `μ` 可能在程序输出/结果 CSV 里显示成乱码，但不影响数值拟合。
+## 依赖
+- Python 3.8+
+- numpy, pandas, matplotlib, scipy
