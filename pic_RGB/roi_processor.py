@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import matplotlib
@@ -20,6 +20,8 @@ from roi_config import (
     ROISettings,
     get_settings,
     print_config,
+    REUSE_LAST_SELECTION,
+    SELECTION_CACHE_PATH,
 )
 from roi_gui import BackgroundSelection, ROISelection, select_roi_with_gui
 from roi_manual import ManualROITools
@@ -113,13 +115,105 @@ class ROIProcessor:
         self,
         settings: Optional[ROISettings] = None,
         roi_params: Optional[Dict[str, float]] = None,
+        reuse_last_selection: Optional[bool] = None,
+        selection_cache_path: Optional[Path] = None,
     ):
         base_settings = settings or get_settings()
         if roi_params:
             base_settings = base_settings.with_overrides(roi_params)
         self.settings = base_settings
 
+        self.reuse_last_selection = (
+            REUSE_LAST_SELECTION if reuse_last_selection is None else reuse_last_selection
+        )
+        self.selection_cache_path = selection_cache_path or SELECTION_CACHE_PATH
+        self.selection_cache: Dict[str, Tuple[ROISelection, BackgroundSelection]] = (
+            self._load_selection_cache()
+        )
+
         self.manual = ManualROITools(self.settings)
+
+    def _load_selection_cache(self) -> Dict[str, Tuple[ROISelection, BackgroundSelection]]:
+        """Load previous selections from roi_results.json and optional cache file."""
+        cache: Dict[str, Tuple[ROISelection, BackgroundSelection]] = {}
+
+        def load_from_path(path: Path, label: str):
+            if not path or not path.exists():
+                return
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception as exc:
+                print(f"  警告: 无法读取历史选择 ({label}): {exc}")
+                return
+
+            # roi_results.json is a list of ROIResult dicts
+            if isinstance(data, list):
+                for entry in data:
+                    fname = entry.get("filename")
+                    if not fname:
+                        continue
+                    try:
+                        roi_sel = ROISelection(
+                            center=(float(entry["center_x"]), float(entry["center_y"])),
+                            width=float(entry["width"]),
+                            height=float(entry["height"]),
+                            angle_deg=float(entry.get("angle_deg", 0.0)),
+                        )
+                        bg_sel = BackgroundSelection(
+                            center=(
+                                float(entry.get("bg_center_x", roi_sel.center[0])),
+                                float(entry.get("bg_center_y", roi_sel.center[1])),
+                            ),
+                            inner_x=float(entry.get("bg_inner_x", 0)),
+                            inner_y=float(entry.get("bg_inner_y", 0)),
+                            outer_x=float(entry.get("bg_outer_x", 0)),
+                            outer_y=float(entry.get("bg_outer_y", 0)),
+                            angle_deg=float(entry.get("bg_angle_deg", roi_sel.angle_deg)),
+                        )
+                        cache[fname] = (roi_sel, bg_sel)
+                    except Exception:
+                        continue
+
+            # selection cache file stored as {filename: {"roi": {...}, "bg": {...}}}
+            if isinstance(data, dict):
+                for fname, pair in data.items():
+                    try:
+                        roi_sel = ROISelection.from_dict(pair.get("roi", {}))
+                        bg_sel = BackgroundSelection.from_dict(pair.get("bg", {}))
+                        cache[fname] = (roi_sel, bg_sel)
+                    except Exception:
+                        continue
+
+        # 1) load from previous roi_results.json as baseline
+        load_from_path(OUTPUT_DIR / "roi_results.json", "roi_results.json")
+        # 2) overlay with dedicated selection cache (latest GUI choices in单张处理)
+        if self.selection_cache_path:
+            load_from_path(self.selection_cache_path, str(self.selection_cache_path))
+
+        return cache
+
+    def _persist_selection(self, filename: str, roi_sel: ROISelection, bg_sel: BackgroundSelection):
+        if not self.selection_cache_path:
+            return
+        self.selection_cache[filename] = (roi_sel, bg_sel)
+        try:
+            self.selection_cache_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.selection_cache_path, "w", encoding="utf-8") as f:
+                serializable = {
+                    fname: {"roi": r.to_dict(), "bg": b.to_dict()}
+                    for fname, (r, b) in self.selection_cache.items()
+                }
+                json.dump(serializable, f, indent=2, ensure_ascii=False)
+        except Exception as exc:
+            print(f"  警告: 无法写入 ROI/BG 选择缓存: {exc}")
+
+    def _get_cached_selection(
+        self, filename: str
+    ) -> Optional[Tuple[ROISelection, BackgroundSelection]]:
+        if filename not in self.selection_cache:
+            return None
+        return self.selection_cache.get(filename)
 
     def load_raw_image(self, filepath: Path) -> Tuple[np.ndarray, Dict]:
         """加载 RAW 图像为 4 通道矩阵，并返回元信息。"""
@@ -254,6 +348,7 @@ class ROIProcessor:
             roi_selection=roi_selection,
             bg_selection=bg_selection,
             interactive=interactive,
+            filename=filepath.name,
         )
 
         print(
@@ -263,7 +358,7 @@ class ROIProcessor:
             f"  BG : center=({bg_sel.center[0]:.1f}, {bg_sel.center[1]:.1f}), inner=({bg_sel.inner_x:.1f},{bg_sel.inner_y:.1f})px, outer=({bg_sel.outer_x:.1f},{bg_sel.outer_y:.1f})px"
         )
 
-        return self._process_loaded_image(
+        result = self._process_loaded_image(
             filepath=filepath,
             raw_channels=raw_channels,
             metadata=metadata,
@@ -272,6 +367,8 @@ class ROIProcessor:
             save_visualization=save_visualization,
             output_dir=output_dir,
         )
+        self._persist_selection(filepath.name, roi_sel, bg_sel)
+        return result
 
     def _resolve_selections(
         self,
@@ -279,6 +376,7 @@ class ROIProcessor:
         roi_selection: Optional[ROISelection],
         bg_selection: Optional[BackgroundSelection],
         interactive: bool,
+        filename: str,
     ) -> Tuple[ROISelection, BackgroundSelection]:
         H, W = raw_channels.shape[:2]
         roi_sel = roi_selection or ROISelection(
@@ -295,6 +393,19 @@ class ROIProcessor:
             outer_y=float(self.settings.bg_ring_outer_y),
             angle_deg=float(roi_sel.angle_deg),
         )
+
+        cached_sel: Optional[Tuple[ROISelection, BackgroundSelection]] = None
+        if roi_selection is None and bg_selection is None:
+            cached_sel = self._get_cached_selection(filename)
+
+        should_launch_gui = interactive
+        if cached_sel:
+            roi_sel, bg_sel = cached_sel
+            if self.reuse_last_selection:
+                should_launch_gui = False
+                print("  复用上次保存的 ROI/BG 选择")
+            else:
+                print("  已载入上次的 ROI/BG 作为初始值（本次仍可重新选择）")
 
         if bg_sel.outer_x <= bg_sel.inner_x:
             bg_sel = BackgroundSelection(
@@ -315,7 +426,7 @@ class ROIProcessor:
                 angle_deg=bg_sel.angle_deg,
             )
 
-        if interactive:
+        if should_launch_gui:
             roi_sel, bg_sel = select_roi_with_gui(
                 raw_channels=raw_channels,
                 settings=self.settings,

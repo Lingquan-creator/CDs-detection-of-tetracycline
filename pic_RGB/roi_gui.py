@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -19,6 +19,26 @@ class ROISelection:
     height: float
     angle_deg: float
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "center": [float(self.center[0]), float(self.center[1])],
+            "width": float(self.width),
+            "height": float(self.height),
+            "angle_deg": float(self.angle_deg),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ROISelection":
+        center = data.get("center")
+        if not isinstance(center, (list, tuple)) or len(center) != 2:
+            raise ValueError("Invalid ROI center in persisted data")
+        return cls(
+            center=(float(center[0]), float(center[1])),
+            width=float(data["width"]),
+            height=float(data["height"]),
+            angle_deg=float(data.get("angle_deg", 0.0)),
+        )
+
 
 @dataclass
 class BackgroundSelection:
@@ -30,6 +50,30 @@ class BackgroundSelection:
     outer_x: float
     outer_y: float
     angle_deg: float
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "center": [float(self.center[0]), float(self.center[1])],
+            "inner_x": float(self.inner_x),
+            "inner_y": float(self.inner_y),
+            "outer_x": float(self.outer_x),
+            "outer_y": float(self.outer_y),
+            "angle_deg": float(self.angle_deg),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "BackgroundSelection":
+        center = data.get("center")
+        if not isinstance(center, (list, tuple)) or len(center) != 2:
+            raise ValueError("Invalid BG center in persisted data")
+        return cls(
+            center=(float(center[0]), float(center[1])),
+            inner_x=float(data["inner_x"]),
+            inner_y=float(data["inner_y"]),
+            outer_x=float(data["outer_x"]),
+            outer_y=float(data["outer_y"]),
+            angle_deg=float(data.get("angle_deg", 0.0)),
+        )
 
 
 def _build_preview_image(raw_channels: np.ndarray) -> np.ndarray:
@@ -93,6 +137,7 @@ class ROISelectorGUI:
         self.move_step = int(settings.move_step)
         self.size_step = int(settings.size_step)
         self.angle_step = float(settings.angle_step_deg)
+        self.angle_scale = 10  # Trackbar precision: 0.1°
 
         self.max_width = w
         self.max_height = h
@@ -119,7 +164,7 @@ class ROISelectorGUI:
             if key in (13, ord("\r"), ord("\n")):
                 cv2.destroyWindow(self.window_name)
                 return self.roi, self.bg
-            if key in (9, ord("\t"), ord(" ")):
+            if key in (9, ord("\t")):
                 self._toggle_active_region()
             elif key in (ord("w"), ord("W")):
                 self._nudge_position(0, -self.move_step)
@@ -174,18 +219,8 @@ class ROISelectorGUI:
                 self._adjust_ring_outer(x_delta=-self.size_step)
             elif direction == "right":
                 self._adjust_ring_outer(x_delta=self.size_step)
-        else:
-            dx, dy = 0, 0
-            if direction == "up":
-                dy = -self.move_step
-            elif direction == "down":
-                dy = self.move_step
-            elif direction == "left":
-                dx = -self.move_step
-            elif direction == "right":
-                dx = self.move_step
-            self._nudge_position(dx, dy)
-        return True
+            return True
+        return False
 
     def _toggle_active_region(self):
         self.active_region = "bg" if self.active_region == "roi" else "roi"
@@ -308,10 +343,10 @@ class ROISelectorGUI:
             lambda v: self._track_roi_height(v),
         )
         cv2.createTrackbar(
-            "ROI angle",
+            "ROI angle (0.1 deg)",
             self.window_name,
-            int(self.roi.angle_deg % 180),
-            179,
+            int(round(self.roi.angle_deg * self.angle_scale) % (180 * self.angle_scale)),
+            180 * self.angle_scale - 1,
             lambda v: self._track_angle(v),
         )
         cv2.createTrackbar(
@@ -364,11 +399,12 @@ class ROISelectorGUI:
         self._adjust_roi_height(value - self.roi.height)
 
     def _track_angle(self, value: int):
+        angle = (value / self.angle_scale) % 180
         self.roi = ROISelection(
             center=self.roi.center,
             width=self.roi.width,
             height=self.roi.height,
-            angle_deg=float(value),
+            angle_deg=float(angle),
         )
         self.bg = BackgroundSelection(
             center=self.bg.center,
@@ -376,7 +412,7 @@ class ROISelectorGUI:
             inner_y=self.bg.inner_y,
             outer_x=self.bg.outer_x,
             outer_y=self.bg.outer_y,
-            angle_deg=float(value),
+            angle_deg=float(angle),
         )
 
     def _track_roi_center_x(self, value: int):
@@ -468,7 +504,11 @@ class ROISelectorGUI:
         cv2.setTrackbarPos("ROI center Y", self.window_name, int(self.roi.center[1]))
         cv2.setTrackbarPos("ROI width", self.window_name, int(self.roi.width))
         cv2.setTrackbarPos("ROI height", self.window_name, int(self.roi.height))
-        cv2.setTrackbarPos("ROI angle", self.window_name, int(self.roi.angle_deg % 180))
+        cv2.setTrackbarPos(
+            "ROI angle (0.1 deg)",
+            self.window_name,
+            int(round(self.roi.angle_deg * self.angle_scale) % (180 * self.angle_scale)),
+        )
         cv2.setTrackbarPos("BG center X", self.window_name, int(self.bg.center[0]))
         cv2.setTrackbarPos("BG center Y", self.window_name, int(self.bg.center[1]))
         cv2.setTrackbarPos("BG inner X", self.window_name, int(self.bg.inner_x))
@@ -547,10 +587,10 @@ class ROISelectorGUI:
             cv2.rectangle(canvas, (x0, y0), (x1, y1), (0, 255, 0), 1)
 
         info_lines = [
-            f"Active: {'ROI' if self.active_region == 'roi' else 'BG ring'} (Tab/Space to switch)",
+            f"Active: {'ROI' if self.active_region == 'roi' else 'BG ring'} (Tab to switch)",
             "Mouse drag: draw ROI rectangle (angle preserved)",
-            "AWSD: move ROI center | Arrows: adjust BG ring (X=left/right outer, Y=up/down outer) when BG active",
-            "E/R: rotate +/-; B: align BG center to ROI",
+            "W/A/S/D: move active center | Arrows (BG active): adjust outer ring X/Y",
+            f"E/R: rotate ±{self.angle_step:.2f}° (trackbar 0.1°); B: align BG center to ROI",
             "Enter: confirm  |  Q/ESC: cancel",
         ]
         y = 20

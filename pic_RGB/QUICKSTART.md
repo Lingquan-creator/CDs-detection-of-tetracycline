@@ -22,9 +22,9 @@ pip install -r requirements.txt
 
 ## 4) GUI 操作提示
 - 鼠标左键拖拽：绘制 ROI 矩形（保持当前角度）
-- Tab/Space：切换正在调整的区域（ROI / 背景环）
-- AWSD：移动 ROI 中心；方向键：背景环激活时调节外边距（上下=外高，左右=外宽），ROI 激活时也可移动
-- E/R：ROI 角度 ±；B：将背景环中心对齐到 ROI
+- Tab：切换正在调整的区域（ROI / 背景环）
+- AWSD：移动当前激活区域的中心；方向键（仅 BG 激活时）：调整外边距（上下=外高，左右=外宽）
+- E/R：ROI 角度 ±（更细步长 0.5°，滑块精度 0.1°）；B：将背景环中心对齐到 ROI
 - Enter：确认并计算；Q/ESC：取消
 
 ## 5) 输出
@@ -33,3 +33,4 @@ pip install -r requirements.txt
 - `*_roi.png` 可视化
 
 提示：选择好的 ROI/BG 会沿用到同一批次的其余图像，避免重复操作。
+`roi_config.py` 的 `REUSE_LAST_SELECTION` 可控制同名文件：为 True 时若在 `roi_results/roi_results.json`（或缓存）找到上次选择则直接计算不弹 GUI；为 False 时若有历史选择则作为初始值打开 GUI 供微调。缓存位置：`roi_results/roi_selection_cache.json`（单次运行的轻量记录）。

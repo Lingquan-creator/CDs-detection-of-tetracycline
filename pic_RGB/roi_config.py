@@ -25,7 +25,7 @@ DEFAULT_PARAMS: Dict[str, Any] = {
     "bg_ring_outer_y": 240,
     "move_step": 2,
     "size_step": 5,
-    "angle_step_deg": 1.0,
+    "angle_step_deg": 0.5,
 }
 
 CURRENT_CONFIG: Dict[str, Any] = DEFAULT_PARAMS
@@ -47,7 +47,7 @@ class ROISettings:
     bg_ring_outer_y: int = 240
     move_step: int = 5
     size_step: int = 5
-    angle_step_deg: float = 1.0
+    angle_step_deg: float = 0.5
 
     @classmethod
     def from_dict(cls, config: Dict[str, Any]) -> "ROISettings":
@@ -74,6 +74,16 @@ class ROISettings:
 SAVE_VISUALIZATION = True
 VISUALIZATION_DPI = 150
 VISUALIZATION_FIGSIZE = (15, 10)
+
+# ============================================
+# Selection persistence
+# ============================================
+# When True, reuse cached ROI/BG selections for images with the same filename.
+# Sources: existing `roi_results/roi_results.json` (previous runs) + a lightweight cache file
+# for single-image runs. With reuse enabled and a match found, GUI is skipped.
+REUSE_LAST_SELECTION = False
+# JSON file to store per-image ROI/BG selections (used as a lightweight cache for single runs).
+SELECTION_CACHE_PATH = OUTPUT_DIR / "roi_selection_cache.json"
 
 # ============================================
 # Misc
@@ -107,6 +117,7 @@ def print_config():
     print(f"  BG ring inner: ({settings.bg_ring_inner_x}, {settings.bg_ring_inner_y}) px")
     print(f"  BG ring outer: ({settings.bg_ring_outer_x}, {settings.bg_ring_outer_y}) px")
     print(f"  Move step: {settings.move_step}px | Size step: {settings.size_step}px | Angle step: {settings.angle_step_deg} deg")
+    print(f"\nSelection cache: reuse={REUSE_LAST_SELECTION} -> {SELECTION_CACHE_PATH}")
     print(f"\nOutput:")
     print(f"  Save visualization: {SAVE_VISUALIZATION}")
     print(f"  DPI: {VISUALIZATION_DPI}")

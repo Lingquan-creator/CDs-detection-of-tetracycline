@@ -18,9 +18,9 @@
 
 ### GUI 快捷键
 - 鼠标拖拽：绘制 ROI（保持当前角度）
-- Tab/Space：切换 ROI / 背景环
-- AWSD：移动 ROI 中心；方向键：背景环激活时调节外边距（上下=外高，左右=外宽），ROI 激活时也可移动
-- E/R：ROI 角度 ±；B：背景环中心对齐 ROI
+- Tab：切换 ROI / 背景环
+- AWSD：移动当前激活区域的中心；方向键（仅 BG 激活时）：调整外边距（上下=外高，左右=外宽）
+- E/R：ROI 角度 ±（更细步长 0.5°，滑块精度 0.1°）；B：背景环中心对齐 ROI
 - Enter：确认；Q/ESC：取消
 
 ## 输出文件
@@ -31,3 +31,4 @@
 - `*_roi.png`：可视化覆盖图
 
 提示：选定的 ROI/BG 会在同一批处理过程中复用，避免重复操作。
+`roi_config.py` 中的 `REUSE_LAST_SELECTION` 可控制对同名文件的行为：为 True 时若在 `roi_results/roi_results.json`（或缓存）找到上次选择则直接计算不弹 GUI；为 False 时若有历史选择则作为初始值打开 GUI 供微调。缓存文件：`roi_results/roi_selection_cache.json`（单次运行的轻量记录）。
