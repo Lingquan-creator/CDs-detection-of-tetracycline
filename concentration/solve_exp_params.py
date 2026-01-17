@@ -1,5 +1,6 @@
 """
-Solve exponential parameters A, B (and C) from 3 images: 1 background + 2 known concentrations.
+Legacy helper to solve exponential parameters A, B (and C) from 3 images: 1 background + 2 known concentrations.
+Prefer the Ridge-based pipeline in rgb_exponential_fit.py for production use.
 
 Model: y = A * exp(B * x) + C
 Given:

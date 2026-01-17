@@ -86,6 +86,18 @@ REUSE_LAST_SELECTION = False
 SELECTION_CACHE_PATH = OUTPUT_DIR / "roi_selection_cache.json"
 
 # ============================================
+# GUI shortcuts (for quick reference / help screens)
+# ============================================
+GUI_SHORTCUTS = [
+    "Mouse drag: draw ROI (keeps current angle)",
+    "Tab: toggle ROI / BG ring",
+    "W/A/S/D: move active region center",
+    "Arrows (BG active): adjust outer ring X/Y",
+    "E/R: rotate +/- (step=angle_step_deg); B: align BG center to ROI",
+    "Enter: confirm | Q/ESC: cancel",
+]
+
+# ============================================
 # Misc
 # ============================================
 VERBOSE = True
@@ -118,6 +130,9 @@ def print_config():
     print(f"  BG ring outer: ({settings.bg_ring_outer_x}, {settings.bg_ring_outer_y}) px")
     print(f"  Move step: {settings.move_step}px | Size step: {settings.size_step}px | Angle step: {settings.angle_step_deg} deg")
     print(f"\nSelection cache: reuse={REUSE_LAST_SELECTION} -> {SELECTION_CACHE_PATH}")
+    print("\nGUI shortcuts:")
+    for line in GUI_SHORTCUTS:
+        print(f"  - {line}")
     print(f"\nOutput:")
     print(f"  Save visualization: {SAVE_VISUALIZATION}")
     print(f"  DPI: {VISUALIZATION_DPI}")
