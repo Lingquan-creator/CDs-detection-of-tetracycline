@@ -1,6 +1,5 @@
 """
-ROI extractor configuration (manual GUI workflow).
-All defaults consolidated; selections can be persisted to reuse per image.
+ROI extractor configuration for GUI-driven manual selection.
 """
 
 from dataclasses import asdict, dataclass
@@ -12,7 +11,6 @@ from typing import Any, Dict, Optional
 # ============================================
 DATA_DIR = Path(r"h:\000\CDs\pic_RGB\data_pic")       # Input DNG directory
 OUTPUT_DIR = Path(r"h:\000\CDs\pic_RGB\roi_results")  # Output directory
-SELECTION_STORE = OUTPUT_DIR / "roi_selections.json"
 
 # ============================================
 # ROI parameters (dict form)
@@ -28,8 +26,6 @@ DEFAULT_PARAMS: Dict[str, Any] = {
     "move_step": 2,
     "size_step": 5,
     "angle_step_deg": 1.0,
-    "use_saved_selection": True,
-    "selection_store": str(SELECTION_STORE),
 }
 
 CURRENT_CONFIG: Dict[str, Any] = DEFAULT_PARAMS
@@ -49,11 +45,9 @@ class ROISettings:
     bg_ring_inner_y: int = 80
     bg_ring_outer_x: int = 240
     bg_ring_outer_y: int = 240
-    move_step: int = 2
+    move_step: int = 5
     size_step: int = 5
     angle_step_deg: float = 1.0
-    use_saved_selection: bool = True
-    selection_store: str = str(SELECTION_STORE)
 
     @classmethod
     def from_dict(cls, config: Dict[str, Any]) -> "ROISettings":
@@ -113,8 +107,6 @@ def print_config():
     print(f"  BG ring inner: ({settings.bg_ring_inner_x}, {settings.bg_ring_inner_y}) px")
     print(f"  BG ring outer: ({settings.bg_ring_outer_x}, {settings.bg_ring_outer_y}) px")
     print(f"  Move step: {settings.move_step}px | Size step: {settings.size_step}px | Angle step: {settings.angle_step_deg} deg")
-    print(f"  Use saved selection: {settings.use_saved_selection}")
-    print(f"  Selection store: {settings.selection_store}")
     print(f"\nOutput:")
     print(f"  Save visualization: {SAVE_VISUALIZATION}")
     print(f"  DPI: {VISUALIZATION_DPI}")

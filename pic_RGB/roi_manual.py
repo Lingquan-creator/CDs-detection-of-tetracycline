@@ -55,9 +55,15 @@ class ManualROITools:
         roi_width: Optional[float] = None,
         roi_height: Optional[float] = None,
         roi_angle: Optional[float] = None,
+        inner_offset: Optional[float] = None,
+        outer_offset: Optional[float] = None,
+        inner_offset_x: Optional[float] = None,
+        inner_offset_y: Optional[float] = None,
+        outer_offset_x: Optional[float] = None,
+        outer_offset_y: Optional[float] = None,
         exclude_mask: Optional[np.ndarray] = None,
     ) -> np.ndarray:
-        """创建空心矩形背景 ROI（与 ROI 同心、同角度）。"""
+        """创建空心矩形背景 ROI（支持独立中心与可调内外边距）。"""
         H, W = shape
         cx, cy = center
 
@@ -65,10 +71,31 @@ class ManualROITools:
         h = roi_height if roi_height is not None else self.settings.fixed_roi_height
         a = roi_angle if roi_angle is not None else self.settings.roi_angle_deg
 
-        outer_width = w + 2 * self.settings.bg_ring_outer
-        outer_height = h + 2 * self.settings.bg_ring_outer
-        inner_width = w + 2 * self.settings.bg_ring_inner
-        inner_height = h + 2 * self.settings.bg_ring_inner
+        inner_gap_x = (
+            inner_offset_x
+            if inner_offset_x is not None
+            else (inner_offset if inner_offset is not None else self.settings.bg_ring_inner_x)
+        )
+        inner_gap_y = (
+            inner_offset_y
+            if inner_offset_y is not None
+            else (inner_offset if inner_offset is not None else self.settings.bg_ring_inner_y)
+        )
+        outer_gap_x = (
+            outer_offset_x
+            if outer_offset_x is not None
+            else (outer_offset if outer_offset is not None else self.settings.bg_ring_outer_x)
+        )
+        outer_gap_y = (
+            outer_offset_y
+            if outer_offset_y is not None
+            else (outer_offset if outer_offset is not None else self.settings.bg_ring_outer_y)
+        )
+
+        outer_width = w + 2 * outer_gap_x
+        outer_height = h + 2 * outer_gap_y
+        inner_width = w + 2 * inner_gap_x
+        inner_height = h + 2 * inner_gap_y
 
         outer_mask = np.zeros((H, W), dtype=np.uint8)
         outer_rect = ((cx, cy), (outer_width, outer_height), a)

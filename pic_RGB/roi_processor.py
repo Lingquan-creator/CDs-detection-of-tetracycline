@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import rawpy
 
-from roi_auto import AutoROIFinder
 from roi_config import (
     DATA_DIR,
     OUTPUT_DIR,
@@ -22,6 +21,7 @@ from roi_config import (
     get_settings,
     print_config,
 )
+from roi_gui import BackgroundSelection, ROISelection, select_roi_with_gui
 from roi_manual import ManualROITools
 
 # 字体设置：尽量兼容中英文
@@ -44,6 +44,13 @@ class ROIResult:
     width: float
     height: float
     angle_deg: float
+    bg_center_x: float
+    bg_center_y: float
+    bg_inner_x: float
+    bg_inner_y: float
+    bg_outer_x: float
+    bg_outer_y: float
+    bg_angle_deg: float
     bbox: Tuple[int, int, int, int]
     area: int
     R_mean: float
@@ -100,7 +107,7 @@ class ROIResult:
 
 
 class ROIProcessor:
-    """封装自动/手动 ROI 处理流程。"""
+    """封装基于 GUI 的 ROI 处理流程。"""
 
     def __init__(
         self,
@@ -112,7 +119,6 @@ class ROIProcessor:
             base_settings = base_settings.with_overrides(roi_params)
         self.settings = base_settings
 
-        self.auto = AutoROIFinder(self.settings)
         self.manual = ManualROITools(self.settings)
 
     def load_raw_image(self, filepath: Path) -> Tuple[np.ndarray, Dict]:
@@ -229,41 +235,120 @@ class ROIProcessor:
         filepath: Path,
         save_visualization: bool = True,
         output_dir: Optional[Path] = None,
+        roi_selection: Optional[ROISelection] = None,
+        bg_selection: Optional[BackgroundSelection] = None,
+        interactive: bool = True,
     ) -> ROIResult:
         """处理单张图像，输出 ROIResult。"""
+        if output_dir is None:
+            output_dir = OUTPUT_DIR
+
         print(f"\n处理图像: {filepath.name}")
 
         raw_channels, metadata = self.load_raw_image(filepath)
         H, W = raw_channels.shape[:2]
         print(f"  图像尺寸: {W}x{H}")
 
-        Y = self.auto.create_intensity_map(raw_channels)
-        fluor_mask, props = self.auto.segment_fluorescence(Y)
-        center = (props["center_x"], props["center_y"])
-        detected_angle = props.get("angle_deg", self.settings.roi_angle_deg)
-
-        center_offset = np.sqrt((center[0] - W / 2) ** 2 + (center[1] - H / 2) ** 2)
-        center_offset_pct = center_offset / np.sqrt((W / 2) ** 2 + (H / 2) ** 2) * 100
-        print(
-            f"  荧光中心: ({center[0]:.1f}, {center[1]:.1f}), 偏移: {center_offset_pct:.1f}%, 角度: {detected_angle:.1f}°, 面积: {props['area']}"
+        roi_sel, bg_sel = self._resolve_selections(
+            raw_channels=raw_channels,
+            roi_selection=roi_selection,
+            bg_selection=bg_selection,
+            interactive=interactive,
         )
 
-        if self.settings.roi_mode in ["default", "auto"]:
-            roi_width, roi_height, roi_angle, adjusted_center, fluor_mask = self.auto.auto_detect_roi(
-                Y, raw_channels, fluor_mask, center
-            )
-            roi_mask = self.manual.create_fixed_roi(
-                adjusted_center, (H, W), roi_width, roi_height, roi_angle
-            )
-            center = adjusted_center
-        else:
-            roi_width = self.settings.fixed_roi_width
-            roi_height = self.settings.fixed_roi_height
-            roi_angle = detected_angle
-            roi_mask = self.manual.create_fixed_roi(center, (H, W), roi_width, roi_height, roi_angle)
+        print(
+            f"  ROI: center=({roi_sel.center[0]:.1f}, {roi_sel.center[1]:.1f}), size={roi_sel.width:.1f}x{roi_sel.height:.1f}, angle={roi_sel.angle_deg:.1f}°"
+        )
+        print(
+            f"  BG : center=({bg_sel.center[0]:.1f}, {bg_sel.center[1]:.1f}), inner=({bg_sel.inner_x:.1f},{bg_sel.inner_y:.1f})px, outer=({bg_sel.outer_x:.1f},{bg_sel.outer_y:.1f})px"
+        )
 
+        return self._process_loaded_image(
+            filepath=filepath,
+            raw_channels=raw_channels,
+            metadata=metadata,
+            roi_sel=roi_sel,
+            bg_sel=bg_sel,
+            save_visualization=save_visualization,
+            output_dir=output_dir,
+        )
+
+    def _resolve_selections(
+        self,
+        raw_channels: np.ndarray,
+        roi_selection: Optional[ROISelection],
+        bg_selection: Optional[BackgroundSelection],
+        interactive: bool,
+    ) -> Tuple[ROISelection, BackgroundSelection]:
+        H, W = raw_channels.shape[:2]
+        roi_sel = roi_selection or ROISelection(
+            center=(W / 2, H / 2),
+            width=float(self.settings.fixed_roi_width),
+            height=float(self.settings.fixed_roi_height),
+            angle_deg=float(self.settings.roi_angle_deg),
+        )
+        bg_sel = bg_selection or BackgroundSelection(
+            center=roi_sel.center,
+            inner_x=float(self.settings.bg_ring_inner_x),
+            inner_y=float(self.settings.bg_ring_inner_y),
+            outer_x=float(self.settings.bg_ring_outer_x),
+            outer_y=float(self.settings.bg_ring_outer_y),
+            angle_deg=float(roi_sel.angle_deg),
+        )
+
+        if bg_sel.outer_x <= bg_sel.inner_x:
+            bg_sel = BackgroundSelection(
+                center=bg_sel.center,
+                inner_x=bg_sel.inner_x,
+                inner_y=bg_sel.inner_y,
+                outer_x=bg_sel.inner_x + 1,
+                outer_y=bg_sel.outer_y,
+                angle_deg=bg_sel.angle_deg,
+            )
+        if bg_sel.outer_y <= bg_sel.inner_y:
+            bg_sel = BackgroundSelection(
+                center=bg_sel.center,
+                inner_x=bg_sel.inner_x,
+                inner_y=bg_sel.inner_y,
+                outer_x=bg_sel.outer_x,
+                outer_y=bg_sel.inner_y + 1,
+                angle_deg=bg_sel.angle_deg,
+            )
+
+        if interactive:
+            roi_sel, bg_sel = select_roi_with_gui(
+                raw_channels=raw_channels,
+                settings=self.settings,
+                initial_roi=roi_sel,
+                initial_bg=bg_sel,
+            )
+        return roi_sel, bg_sel
+
+    def _process_loaded_image(
+        self,
+        filepath: Path,
+        raw_channels: np.ndarray,
+        metadata: Dict,
+        roi_sel: ROISelection,
+        bg_sel: BackgroundSelection,
+        save_visualization: bool,
+        output_dir: Optional[Path],
+    ) -> ROIResult:
+        H, W = raw_channels.shape[:2]
+        roi_mask = self.manual.create_fixed_roi(
+            roi_sel.center, (H, W), roi_sel.width, roi_sel.height, roi_sel.angle_deg
+        )
         bg_mask = self.manual.create_background_roi(
-            center, (H, W), roi_width, roi_height, roi_angle, exclude_mask=fluor_mask
+            bg_sel.center,
+            (H, W),
+            roi_sel.width,
+            roi_sel.height,
+            bg_sel.angle_deg,
+            inner_offset_x=bg_sel.inner_x,
+            inner_offset_y=bg_sel.inner_y,
+            outer_offset_x=bg_sel.outer_x,
+            outer_offset_y=bg_sel.outer_y,
+            exclude_mask=roi_mask,
         )
 
         roi_stats = self.compute_roi_statistics(raw_channels, roi_mask, metadata)
@@ -275,15 +360,33 @@ class ROIProcessor:
         B_corrected = roi_stats["B_mean"] - bg_stats["B_mean"]
         G_display = (G1_corrected + G2_corrected) / 2
 
+        area = int(np.sum(roi_mask))
+        roi_box = self.manual.get_rotated_box(
+            roi_sel.center, roi_sel.width, roi_sel.height, roi_sel.angle_deg
+        )
+        bbox = (
+            int(np.clip(np.min(roi_box[:, 0]), 0, W - 1)),
+            int(np.clip(np.min(roi_box[:, 1]), 0, H - 1)),
+            int(np.clip(np.max(roi_box[:, 0]), 0, W - 1)),
+            int(np.clip(np.max(roi_box[:, 1]), 0, H - 1)),
+        )
+
         result = ROIResult(
             filename=filepath.name,
-            center_x=center[0],
-            center_y=center[1],
-            width=float(roi_width),
-            height=float(roi_height),
-            angle_deg=float(roi_angle),
-            bbox=props["bbox"],
-            area=props["area"],
+            center_x=roi_sel.center[0],
+            center_y=roi_sel.center[1],
+            width=float(roi_sel.width),
+            height=float(roi_sel.height),
+            angle_deg=float(roi_sel.angle_deg),
+            bg_center_x=bg_sel.center[0],
+            bg_center_y=bg_sel.center[1],
+            bg_inner_x=float(bg_sel.inner_x),
+            bg_inner_y=float(bg_sel.inner_y),
+            bg_outer_x=float(bg_sel.outer_x),
+            bg_outer_y=float(bg_sel.outer_y),
+            bg_angle_deg=float(bg_sel.angle_deg),
+            bbox=bbox,
+            area=area,
             R_mean=roi_stats["R_mean"],
             G1_mean=roi_stats["G1_mean"],
             G2_mean=roi_stats["G2_mean"],
@@ -309,7 +412,7 @@ class ROIProcessor:
 
         if save_visualization and output_dir is not None:
             self._save_visualization(
-                filepath, raw_channels, Y, roi_mask, bg_mask, fluor_mask, result, output_dir
+                filepath, raw_channels, roi_mask, bg_mask, result, output_dir
             )
 
         return result
@@ -318,14 +421,13 @@ class ROIProcessor:
         self,
         filepath: Path,
         raw_channels: np.ndarray,
-        Y: np.ndarray,
         roi_mask: np.ndarray,
         bg_mask: np.ndarray,
-        fluor_mask: np.ndarray,
         result: ROIResult,
         output_dir: Path,
     ):
         """保存可视化结果。"""
+        Y = np.max(raw_channels, axis=-1)
         fig, axes = plt.subplots(2, 3, figsize=VISUALIZATION_FIGSIZE)
 
         ax = axes[0, 0]
@@ -335,36 +437,16 @@ class ROIProcessor:
         plt.colorbar(im, ax=ax)
 
         ax = axes[0, 1]
-        ax.imshow(fluor_mask, cmap="gray")
-        ax.plot(result.center_x, result.center_y, "r+", markersize=20, markeredgewidth=2)
-        ax.set_title(f"荧光区域\n({result.center_x:.1f}, {result.center_y:.1f})")
+        ax.imshow(roi_mask, cmap="Reds")
+        ax.set_title("ROI mask")
         ax.axis("off")
 
         ax = axes[0, 2]
-        ax.imshow(Y, cmap="gray")
-        ax.imshow(roi_mask, cmap="Reds", alpha=0.3)
-        box = self.manual.get_rotated_box(
-            (result.center_x, result.center_y), result.width, result.height, result.angle_deg
-        )
-        poly = plt.Polygon(box, closed=True, fill=False, edgecolor="red", linewidth=2)
-        ax.add_patch(poly)
-        ax.plot(result.center_x, result.center_y, "r+", markersize=15, markeredgewidth=2)
-        if self.settings.roi_mode in ["default", "auto"]:
-            mode_label = "默认"
-        elif self.settings.roi_mode in ["advanced", "manual"]:
-            mode_label = "高级"
-        else:
-            mode_label = self.settings.roi_mode
-        ax.set_title(f"{mode_label} ROI ({result.width:.0f}x{result.height:.0f}px, {result.angle_deg:.1f}°)")
+        ax.imshow(bg_mask, cmap="Blues")
+        ax.set_title("背景环 mask")
         ax.axis("off")
 
         ax = axes[1, 0]
-        ax.imshow(Y, cmap="gray")
-        ax.imshow(bg_mask, cmap="Blues", alpha=0.3)
-        ax.set_title("背景环形 ROI")
-        ax.axis("off")
-
-        ax = axes[1, 1]
         rgb_image = np.stack(
             [
                 raw_channels[:, :, 0],
@@ -375,8 +457,34 @@ class ROIProcessor:
         )
         rgb_image = np.clip(rgb_image / np.percentile(rgb_image, 99.5), 0, 1)
         ax.imshow(rgb_image)
-        ax.imshow(roi_mask, cmap="Reds", alpha=0.3)
-        ax.set_title("RGB 伪彩 + ROI")
+        roi_box = self.manual.get_rotated_box(
+            (result.center_x, result.center_y), result.width, result.height, result.angle_deg
+        )
+        bg_outer_box = self.manual.get_rotated_box(
+            (result.bg_center_x, result.bg_center_y),
+            result.width + 2 * result.bg_outer_x,
+            result.height + 2 * result.bg_outer_y,
+            result.bg_angle_deg,
+        )
+        bg_inner_box = self.manual.get_rotated_box(
+            (result.bg_center_x, result.bg_center_y),
+            result.width + 2 * result.bg_inner_x,
+            result.height + 2 * result.bg_inner_y,
+            result.bg_angle_deg,
+        )
+        ax.add_patch(plt.Polygon(bg_outer_box, closed=True, fill=False, edgecolor="orange", linewidth=2))
+        ax.add_patch(plt.Polygon(bg_inner_box, closed=True, fill=False, edgecolor="orange", linewidth=1.5, linestyle="--"))
+        ax.add_patch(plt.Polygon(roi_box, closed=True, fill=False, edgecolor="red", linewidth=2))
+        ax.plot(result.center_x, result.center_y, "r+", markersize=12, markeredgewidth=2)
+        ax.plot(result.bg_center_x, result.bg_center_y, "yx", markersize=10, markeredgewidth=2)
+        ax.set_title("RGB 伪彩 + ROI/BG")
+        ax.axis("off")
+
+        ax = axes[1, 1]
+        ax.imshow(Y, cmap="gray")
+        ax.imshow(roi_mask, cmap="Reds", alpha=0.35)
+        ax.imshow(bg_mask, cmap="Blues", alpha=0.25)
+        ax.set_title("ROI + 背景叠加")
         ax.axis("off")
 
         ax = axes[1, 2]
@@ -410,6 +518,9 @@ class ROIProcessor:
         image_dir: Path,
         output_dir: Optional[Path] = None,
         save_visualization: bool = True,
+        roi_selection: Optional[ROISelection] = None,
+        bg_selection: Optional[BackgroundSelection] = None,
+        interactive: bool = True,
     ) -> List[ROIResult]:
         """批量处理文件夹中的 DNG 文件。"""
         if output_dir is None:
@@ -425,7 +536,14 @@ class ROIProcessor:
         failed_files: List[str] = []
         for filepath in image_files:
             try:
-                result = self.process_image(filepath, save_visualization, output_dir)
+                result = self.process_image(
+                    filepath,
+                    save_visualization,
+                    output_dir,
+                    roi_selection=roi_selection,
+                    bg_selection=bg_selection,
+                    interactive=interactive,
+                )
                 results.append(result)
             except Exception as exc:
                 print(f"  错误: {exc}")
@@ -452,7 +570,9 @@ class ROIProcessor:
 
         csv_path = output_dir / "roi_features.csv"
         with open(csv_path, "w", encoding="utf-8") as f:
-            f.write("filename,center_x,center_y,width,height,angle_deg,area,")
+            f.write(
+                "filename,center_x,center_y,width,height,angle_deg,bg_center_x,bg_center_y,bg_inner_x,bg_inner_y,bg_outer_x,bg_outer_y,bg_angle_deg,area,"
+            )
             f.write("R_mean,G1_mean,G2_mean,B_mean,")
             f.write("R_bg,G1_bg,G2_bg,B_bg,")
             f.write("R_corrected,G1_corrected,G2_corrected,B_corrected,")
@@ -460,7 +580,8 @@ class ROIProcessor:
             f.write("exposure_time,iso\n")
             for r in results:
                 f.write(
-                    f"{r.filename},{r.center_x:.2f},{r.center_y:.2f},{r.width:.2f},{r.height:.2f},{r.angle_deg:.2f},{r.area},"
+                    f"{r.filename},{r.center_x:.2f},{r.center_y:.2f},{r.width:.2f},{r.height:.2f},{r.angle_deg:.2f},"
+                    f"{r.bg_center_x:.2f},{r.bg_center_y:.2f},{r.bg_inner_x:.2f},{r.bg_inner_y:.2f},{r.bg_outer_x:.2f},{r.bg_outer_y:.2f},{r.bg_angle_deg:.2f},{r.area},"
                 )
                 f.write(
                     f"{r.R_mean:.2f},{r.G1_mean:.2f},{r.G2_mean:.2f},{r.B_mean:.2f},"
@@ -497,17 +618,35 @@ class ROIProcessor:
             try:
                 # 重新加载图像并计算详细统计
                 raw_channels, metadata = self.load_raw_image(filepath)
-                Y = self.auto.create_intensity_map(raw_channels)
-                fluor_mask, _ = self.auto.segment_fluorescence(Y)
-                
-                # 重建ROI mask
-                center = (result.center_x, result.center_y)
                 H, W = raw_channels.shape[:2]
+                roi_sel = ROISelection(
+                    center=(result.center_x, result.center_y),
+                    width=result.width,
+                    height=result.height,
+                    angle_deg=result.angle_deg,
+                )
+                bg_sel = BackgroundSelection(
+                    center=(result.bg_center_x, result.bg_center_y),
+                    inner_x=result.bg_inner_x,
+                    inner_y=result.bg_inner_y,
+                    outer_x=result.bg_outer_x,
+                    outer_y=result.bg_outer_y,
+                    angle_deg=result.bg_angle_deg,
+                )
                 roi_mask = self.manual.create_fixed_roi(
-                    center, (H, W), result.width, result.height, result.angle_deg
+                    roi_sel.center, (H, W), roi_sel.width, roi_sel.height, roi_sel.angle_deg
                 )
                 bg_mask = self.manual.create_background_roi(
-                    center, (H, W), result.width, result.height, result.angle_deg, exclude_mask=fluor_mask
+                    bg_sel.center,
+                    (H, W),
+                    roi_sel.width,
+                    roi_sel.height,
+                    bg_sel.angle_deg,
+                    inner_offset_x=bg_sel.inner_x,
+                    inner_offset_y=bg_sel.inner_y,
+                    outer_offset_x=bg_sel.outer_x,
+                    outer_offset_y=bg_sel.outer_y,
+                    exclude_mask=roi_mask,
                 )
                 
                 # 计算详细统计
