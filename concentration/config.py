@@ -3,20 +3,24 @@ Central configuration for the concentration pipeline (physics-informed Ridge reg
 
 - Paths: keep training/inference inputs and outputs in one place.
 - Defaults: share alpha / g-mode across scripts while allowing CLI overrides.
-- Target transform: log-target regression to emphasize low concentration accuracy and enforce non-negative outputs.
+- Target transform: log-target regression to emphasize low concentration accuracy and enforce non-negative outputs (used when no background subtraction).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Tuple
 
 from physics_features import DEFAULT_G_MODE
 
 # Training/inference defaults
 TARGET_TRANSFORM = "log"  # log-target regression (see improve2.md)
 TARGET_EPS = 1e-6         # small constant to avoid log(0) and for inverse transform
+DEFAULT_USE_BG = False    # background subtraction is optional; set True if bg_* columns are present
+ALPHAS: Tuple[float, ...] = (0.01, 0.1, 0.3, 0.5, 1.0, 3.0, 10.0, 30.0)
+WEIGHT_EPS = 2.0          # sample weight denominator: 1/(conc + WEIGHT_EPS)
+CLIP_MIN = 0.1            # minimum signal after background subtraction to avoid log of negative/zero
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent
@@ -38,6 +42,7 @@ class TrainConfig:
     output_dir: Path = OUTPUT_DIR
     alpha: float = 0.5
     g_mode: Literal["g1", "avg"] = DEFAULT_G_MODE
+    use_bg: bool = DEFAULT_USE_BG
 
     @property
     def model_path(self) -> Path:

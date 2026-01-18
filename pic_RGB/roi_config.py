@@ -9,8 +9,8 @@ from typing import Any, Dict, Optional
 # ============================================
 # Paths
 # ============================================
-DATA_DIR = Path(r"h:\000\CDs\pic_RGB\test_data")       # Input DNG directory
-OUTPUT_DIR = Path(r"h:\000\CDs\pic_RGB\roi_results\test")  # Output directory
+DATA_DIR = Path(r"h:\000\CDs\pic_RGB\data_pic")       # Input DNG directory
+OUTPUT_DIR = Path(r"h:\000\CDs\pic_RGB\roi_results")  # Output directory
 
 # ============================================
 # ROI parameters (dict form)

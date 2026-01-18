@@ -1,0 +1,508 @@
+{
+  "0.2.dng": {
+    "roi": {
+      "center": [
+        840.0,
+        836.0
+      ],
+      "width": 133.0,
+      "height": 376.0,
+      "angle_deg": 1.8
+    },
+    "bg": {
+      "center": [
+        838.0,
+        740.0
+      ],
+      "inner_x": 35.0,
+      "inner_y": 133.0,
+      "outer_x": 191.0,
+      "outer_y": 321.0,
+      "angle_deg": 1.8
+    }
+  },
+  "0.4.dng": {
+    "roi": {
+      "center": [
+        936.0,
+        831.0
+      ],
+      "width": 125.0,
+      "height": 343.0,
+      "angle_deg": 2.0
+    },
+    "bg": {
+      "center": [
+        939.0,
+        730.0
+      ],
+      "inner_x": 24.0,
+      "inner_y": 114.0,
+      "outer_x": 181.0,
+      "outer_y": 276.0,
+      "angle_deg": 2.0
+    }
+  },
+  "0.8.dng": {
+    "roi": {
+      "center": [
+        1003.0,
+        842.0
+      ],
+      "width": 129.0,
+      "height": 358.0,
+      "angle_deg": 5.0
+    },
+    "bg": {
+      "center": [
+        1005.0,
+        745.0
+      ],
+      "inner_x": 25.0,
+      "inner_y": 117.0,
+      "outer_x": 174.0,
+      "outer_y": 232.0,
+      "angle_deg": 5.0
+    }
+  },
+  "100.dng": {
+    "roi": {
+      "center": [
+        1052.0,
+        848.0
+      ],
+      "width": 137.0,
+      "height": 350.0,
+      "angle_deg": 5.0
+    },
+    "bg": {
+      "center": [
+        1058.0,
+        749.0
+      ],
+      "inner_x": 16.0,
+      "inner_y": 110.0,
+      "outer_x": 156.0,
+      "outer_y": 340.0,
+      "angle_deg": 5.0
+    }
+  },
+  "12.dng": {
+    "roi": {
+      "center": [
+        1036.0,
+        859.0
+      ],
+      "width": 121.0,
+      "height": 324.0,
+      "angle_deg": 1.0
+    },
+    "bg": {
+      "center": [
+        1038.0,
+        755.0
+      ],
+      "inner_x": 30.0,
+      "inner_y": 137.0,
+      "outer_x": 208.0,
+      "outer_y": 273.0,
+      "angle_deg": 1.0
+    }
+  },
+  "120.dng": {
+    "roi": {
+      "center": [
+        1061.0,
+        898.0
+      ],
+      "width": 133.0,
+      "height": 329.0,
+      "angle_deg": 2.0
+    },
+    "bg": {
+      "center": [
+        1066.0,
+        790.0
+      ],
+      "inner_x": 24.0,
+      "inner_y": 117.0,
+      "outer_x": 202.0,
+      "outer_y": 273.0,
+      "angle_deg": 2.0
+    }
+  },
+  "140.dng": {
+    "roi": {
+      "center": [
+        1009.0,
+        868.0
+      ],
+      "width": 129.0,
+      "height": 353.0,
+      "angle_deg": 3.0
+    },
+    "bg": {
+      "center": [
+        1011.0,
+        770.0
+      ],
+      "inner_x": 33.0,
+      "inner_y": 111.0,
+      "outer_x": 153.0,
+      "outer_y": 237.0,
+      "angle_deg": 3.0
+    }
+  },
+  "160.dng": {
+    "roi": {
+      "center": [
+        1021.0,
+        879.0
+      ],
+      "width": 129.0,
+      "height": 358.0,
+      "angle_deg": 4.0
+    },
+    "bg": {
+      "center": [
+        1019.0,
+        789.0
+      ],
+      "inner_x": 33.0,
+      "inner_y": 108.0,
+      "outer_x": 159.0,
+      "outer_y": 252.0,
+      "angle_deg": 4.0
+    }
+  },
+  "180.dng": {
+    "roi": {
+      "center": [
+        1056.0,
+        876.0
+      ],
+      "width": 133.0,
+      "height": 356.0,
+      "angle_deg": 4.0
+    },
+    "bg": {
+      "center": [
+        1056.0,
+        780.0
+      ],
+      "inner_x": 19.0,
+      "inner_y": 135.0,
+      "outer_x": 184.0,
+      "outer_y": 312.0,
+      "angle_deg": 4.0
+    }
+  },
+  "2.dng": {
+    "roi": {
+      "center": [
+        1034.0,
+        892.0
+      ],
+      "width": 123.0,
+      "height": 332.0,
+      "angle_deg": 2.0
+    },
+    "bg": {
+      "center": [
+        1032.0,
+        788.0
+      ],
+      "inner_x": 21.0,
+      "inner_y": 114.0,
+      "outer_x": 186.0,
+      "outer_y": 282.0,
+      "angle_deg": 2.0
+    }
+  },
+  "20.dng": {
+    "roi": {
+      "center": [
+        1021.0,
+        914.0
+      ],
+      "width": 129.0,
+      "height": 340.0,
+      "angle_deg": 1.0
+    },
+    "bg": {
+      "center": [
+        1023.0,
+        810.0
+      ],
+      "inner_x": 31.0,
+      "inner_y": 141.0,
+      "outer_x": 147.0,
+      "outer_y": 272.0,
+      "angle_deg": 1.0
+    }
+  },
+  "200.dng": {
+    "roi": {
+      "center": [
+        1108.0,
+        869.0
+      ],
+      "width": 131.0,
+      "height": 331.0,
+      "angle_deg": 2.0
+    },
+    "bg": {
+      "center": [
+        1106.0,
+        765.0
+      ],
+      "inner_x": 22.0,
+      "inner_y": 125.0,
+      "outer_x": 125.0,
+      "outer_y": 240.0,
+      "angle_deg": 2.0
+    }
+  },
+  "24.dng": {
+    "roi": {
+      "center": [
+        943.0,
+        874.0
+      ],
+      "width": 131.0,
+      "height": 349.0,
+      "angle_deg": 3.0
+    },
+    "bg": {
+      "center": [
+        943.0,
+        774.0
+      ],
+      "inner_x": 22.0,
+      "inner_y": 120.0,
+      "outer_x": 151.0,
+      "outer_y": 236.0,
+      "angle_deg": 3.0
+    }
+  },
+  "240.dng": {
+    "roi": {
+      "center": [
+        1087.0,
+        902.0
+      ],
+      "width": 131.0,
+      "height": 367.0,
+      "angle_deg": 3.0
+    },
+    "bg": {
+      "center": [
+        1086.0,
+        814.0
+      ],
+      "inner_x": 28.0,
+      "inner_y": 126.0,
+      "outer_x": 107.0,
+      "outer_y": 212.0,
+      "angle_deg": 3.0
+    }
+  },
+  "28.dng": {
+    "roi": {
+      "center": [
+        1002.0,
+        894.0
+      ],
+      "width": 130.0,
+      "height": 378.0,
+      "angle_deg": 3.0
+    },
+    "bg": {
+      "center": [
+        1000.0,
+        804.0
+      ],
+      "inner_x": 30.0,
+      "inner_y": 102.0,
+      "outer_x": 117.0,
+      "outer_y": 230.0,
+      "angle_deg": 3.0
+    }
+  },
+  "32.dng": {
+    "roi": {
+      "center": [
+        1059.0,
+        897.0
+      ],
+      "width": 129.0,
+      "height": 352.0,
+      "angle_deg": 1.0
+    },
+    "bg": {
+      "center": [
+        1050.0,
+        802.0
+      ],
+      "inner_x": 24.0,
+      "inner_y": 111.0,
+      "outer_x": 193.0,
+      "outer_y": 232.0,
+      "angle_deg": 1.0
+    }
+  },
+  "36.dng": {
+    "roi": {
+      "center": [
+        1024.0,
+        866.0
+      ],
+      "width": 133.0,
+      "height": 349.0,
+      "angle_deg": 1.0
+    },
+    "bg": {
+      "center": [
+        1021.0,
+        767.0
+      ],
+      "inner_x": 33.0,
+      "inner_y": 126.0,
+      "outer_x": 145.0,
+      "outer_y": 282.0,
+      "angle_deg": 1.0
+    }
+  },
+  "4.dng": {
+    "roi": {
+      "center": [
+        1062.0,
+        851.0
+      ],
+      "width": 139.0,
+      "height": 365.0,
+      "angle_deg": 5.0
+    },
+    "bg": {
+      "center": [
+        1064.0,
+        749.0
+      ],
+      "inner_x": 21.0,
+      "inner_y": 114.0,
+      "outer_x": 150.0,
+      "outer_y": 252.0,
+      "angle_deg": 5.0
+    }
+  },
+  "40.dng": {
+    "roi": {
+      "center": [
+        1081.0,
+        920.0
+      ],
+      "width": 127.0,
+      "height": 337.0,
+      "angle_deg": 2.0
+    },
+    "bg": {
+      "center": [
+        1081.0,
+        825.0
+      ],
+      "inner_x": 22.0,
+      "inner_y": 114.0,
+      "outer_x": 101.0,
+      "outer_y": 251.0,
+      "angle_deg": 2.0
+    }
+  },
+  "6.dng": {
+    "roi": {
+      "center": [
+        980.0,
+        867.0
+      ],
+      "width": 123.0,
+      "height": 321.0,
+      "angle_deg": 3.0
+    },
+    "bg": {
+      "center": [
+        983.0,
+        774.0
+      ],
+      "inner_x": 22.0,
+      "inner_y": 111.0,
+      "outer_x": 156.0,
+      "outer_y": 233.0,
+      "angle_deg": 3.0
+    }
+  },
+  "60.dng": {
+    "roi": {
+      "center": [
+        1012.0,
+        906.0
+      ],
+      "width": 129.0,
+      "height": 346.0,
+      "angle_deg": 3.0
+    },
+    "bg": {
+      "center": [
+        1001.0,
+        796.0
+      ],
+      "inner_x": 33.0,
+      "inner_y": 128.0,
+      "outer_x": 194.0,
+      "outer_y": 272.0,
+      "angle_deg": 3.0
+    }
+  },
+  "8.dng": {
+    "roi": {
+      "center": [
+        962.0,
+        854.0
+      ],
+      "width": 131.0,
+      "height": 350.0,
+      "angle_deg": 3.0
+    },
+    "bg": {
+      "center": [
+        961.0,
+        750.0
+      ],
+      "inner_x": 31.0,
+      "inner_y": 125.0,
+      "outer_x": 125.0,
+      "outer_y": 264.0,
+      "angle_deg": 3.0
+    }
+  },
+  "80.dng": {
+    "roi": {
+      "center": [
+        978.0,
+        867.0
+      ],
+      "width": 127.0,
+      "height": 352.0,
+      "angle_deg": 3.0
+    },
+    "bg": {
+      "center": [
+        981.0,
+        770.0
+      ],
+      "inner_x": 33.0,
+      "inner_y": 119.0,
+      "outer_x": 144.0,
+      "outer_y": 245.0,
+      "angle_deg": 3.0
+    }
+  }
+}

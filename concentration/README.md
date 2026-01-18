@@ -29,6 +29,8 @@ python concentration/rgb_exponential_fit.py
 - `concentration/rgb_fit_output/concentration_model_v1.pkl`
 - `concentration/rgb_fit_output/ridge_predictions.csv`
 - `concentration/rgb_fit_output/ridge_coefficients.csv`
+- é»˜è®¤æ£€æµ‹ bg_* åˆ—ï¼Œå¦‚å¯ç”¨åˆ™ä½¿ç”?ROI-BG çš„ ln(signal) ç‰¹å¾ï¼Œå¦åˆ™ä¿ç•™åŽŸå§‹ ln/ratio ç‰¹å¾ã€?
+- é‡‡ç”¨ RidgeCV è‡ªåŠ¨å¯»æ‰¾ alpha å¹¶ä½¿ç”¨æ ·æœ¬æƒé‡ 1/(conc+eps) å‡å°‘ä½Žæµ“åº¦è¯¯å·®ï¼ŒåŽç½® Isotonic è°ƒåº¦ä¿æŒå•è°ƒ/éžè´Ÿè¾“å‡ºã€?
 
 常用覆盖示例：
 ```bash
