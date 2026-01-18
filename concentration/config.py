@@ -3,6 +3,7 @@ Central configuration for the concentration pipeline (physics-informed Ridge reg
 
 - Paths: keep training/inference inputs and outputs in one place.
 - Defaults: share alpha / g-mode across scripts while allowing CLI overrides.
+- Target transform: log-target regression to emphasize low concentration accuracy and enforce non-negative outputs.
 """
 
 from __future__ import annotations
@@ -12,6 +13,10 @@ from pathlib import Path
 from typing import Literal
 
 from physics_features import DEFAULT_G_MODE
+
+# Training/inference defaults
+TARGET_TRANSFORM = "log"  # log-target regression (see improve2.md)
+TARGET_EPS = 1e-6         # small constant to avoid log(0) and for inverse transform
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent
@@ -58,4 +63,3 @@ class PredictConfig:
     def output_path_for(self, roi_csv: Path) -> Path:
         """Build default output path for a ROI CSV."""
         return roi_csv.with_name(roi_csv.stem + self.output_suffix)
-
