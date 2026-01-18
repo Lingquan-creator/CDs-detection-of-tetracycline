@@ -21,7 +21,7 @@ DEFAULT_USE_BG = False    # background subtraction is optional; set True if bg_*
 # Expanded alpha grid to include large regularization for smoothing low-concentration noise
 # REMOVED small alphas to force smoother models and avoid overfitting noise.
 # FORCED high alphas (starting at 50.0) to combat multicollinearity-induced oscillation.
-ALPHAS: Tuple[float, ...] = (100.0, 200.0, 500.0, 1000.0, 5000.0, 10000.0)
+ALPHAS: Tuple[float, ...] = (10000, 100000.0)
 # Increased epsilon to reduce sensitivity to noise in low concentrations (e.g. <10uM)
 # Higher eps (20 -> 50) means weights are flatter, preventing low-conc noise from dominating.
 WEIGHT_EPS = 50.0         # sample weight denominator: 1/(conc + WEIGHT_EPS)
