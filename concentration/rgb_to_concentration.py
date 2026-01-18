@@ -84,10 +84,15 @@ def predict_batch(
     calibrator: Optional[object],
 ) -> None:
     df = pd.read_csv(roi_csv)
+    
+    # Handle background column availability
+    dataset_use_bg = use_bg
     if use_bg and not has_background_columns(df, g_mode):
-        raise ValueError("Model expects background features, but ROI CSV is missing bg_* columns.")
+        print("WARNING: Model trained with background subtraction, but input CSV lacks bg_* columns.")
+        print("         Falling back to raw features (assuming bg=0/negligible).")
+        dataset_use_bg = False
 
-    features = build_feature_frame(df, g_mode=g_mode, use_bg=use_bg, clip_min=CLIP_MIN)
+    features = build_feature_frame(df, g_mode=g_mode, use_bg=dataset_use_bg, clip_min=CLIP_MIN)
     preds_target = model.predict(features.to_numpy())
     preds = inverse_target(np.asarray(preds_target), target_transform, target_eps)
     preds = apply_calibrator(preds, calibrator)

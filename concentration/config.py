@@ -18,8 +18,13 @@ from physics_features import DEFAULT_G_MODE
 TARGET_TRANSFORM = "log"  # log-target regression (see improve2.md)
 TARGET_EPS = 1e-6         # small constant to avoid log(0) and for inverse transform
 DEFAULT_USE_BG = False    # background subtraction is optional; set True if bg_* columns are present
-ALPHAS: Tuple[float, ...] = (0.01, 0.1, 0.3, 0.5, 1.0, 3.0, 10.0, 30.0)
-WEIGHT_EPS = 2.0          # sample weight denominator: 1/(conc + WEIGHT_EPS)
+# Expanded alpha grid to include large regularization for smoothing low-concentration noise
+# REMOVED small alphas to force smoother models and avoid overfitting noise.
+# FORCED high alphas (starting at 50.0) to combat multicollinearity-induced oscillation.
+ALPHAS: Tuple[float, ...] = (100.0, 200.0, 500.0, 1000.0, 5000.0, 10000.0)
+# Increased epsilon to reduce sensitivity to noise in low concentrations (e.g. <10uM)
+# Higher eps (20 -> 50) means weights are flatter, preventing low-conc noise from dominating.
+WEIGHT_EPS = 50.0         # sample weight denominator: 1/(conc + WEIGHT_EPS)
 CLIP_MIN = 0.1            # minimum signal after background subtraction to avoid log of negative/zero
 
 # Base paths

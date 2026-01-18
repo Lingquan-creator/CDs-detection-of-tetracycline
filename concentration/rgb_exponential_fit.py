@@ -122,9 +122,9 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
     )
     parser.add_argument(
         "--g-mode",
-        choices=["g1", "avg"],
-        default=default_cfg.g_mode,
-        help="Use G1 only (g1) or average G1/G2 (avg) when building green features.",
+        choices=["g1", "avg", "auto"],
+        default="auto",
+        help="Use G1 only (g1), average G1/G2 (avg), or auto-select best (auto).",
     )
     parser.add_argument("--model-out", type=Path, default=default_cfg.model_path, help="Path to save joblib model bundle.")
     parser.add_argument("--pred-out", type=Path, default=default_cfg.predictions_path, help="Path to save predictions CSV.")
@@ -161,6 +161,19 @@ def main() -> None:
     if df_raw.empty:
         raise ValueError("ROI CSV is empty.")
 
+    # Prepare data
+    df = df_raw.copy()
+    df["conc"] = df["filename"].apply(extract_concentration_from_name)
+    df = df.dropna(subset=["conc"]).sort_values("conc").reset_index(drop=True)
+    if df.empty:
+        raise ValueError("No valid samples found after parsing concentration numbers from filenames.")
+
+    y = df["conc"].to_numpy()
+
+    # Sample weights for low-concentration emphasis
+    sample_weights = 1.0 / (y + WEIGHT_EPS)
+    sample_weights = sample_weights / np.mean(sample_weights)
+
     use_bg_requested: Optional[bool]
     if args.use_bg == "true":
         use_bg_requested = True
@@ -169,39 +182,62 @@ def main() -> None:
     else:
         use_bg_requested = None
 
-    use_bg = decide_use_bg(df_raw, args.g_mode, use_bg_requested)
-    features_df = build_feature_frame(df_raw, g_mode=args.g_mode, use_bg=use_bg, clip_min=CLIP_MIN)
-
-    df = df_raw.copy()
-    df["conc"] = df["filename"].apply(extract_concentration_from_name)
-    df = df.dropna(subset=["conc"]).sort_values("conc").reset_index(drop=True)
-    features_df = features_df.loc[df.index].reset_index(drop=True)
-    if df.empty:
-        raise ValueError("No valid samples found after parsing concentration numbers from filenames.")
-
-    X = features_df.to_numpy()
-    y = df["conc"].to_numpy()
-
-    # Decide target transform
-    target_transform = args.target_transform or ("identity" if use_bg else TARGET_TRANSFORM)
-    y_target = transform_target(y, target_transform, TARGET_EPS)
-
-    # Sample weights for low-concentration emphasis
-    sample_weights = 1.0 / (y + WEIGHT_EPS)
-    sample_weights = sample_weights / np.mean(sample_weights)
-
     # Alpha grid selection
     if args.alpha is not None and args.alpha_grid:
         raise ValueError("Use either --alpha or --alpha-grid, not both.")
     if args.alpha_grid:
-        alpha_grid = args.alpha_grid
+        alpha_grid = tuple(args.alpha_grid)
     elif args.alpha is not None:
-        alpha_grid = [args.alpha]
+        alpha_grid = (args.alpha,)
     else:
         alpha_grid = ALPHAS
 
-    print(f"Training Ridge model (target={target_transform}, use_bg={use_bg}, alphas={alpha_grid}) on {len(df)} samples ...")
-    model = train_model(X, y_target, alphas=alpha_grid, sample_weight=sample_weights)
+    # g-mode Search
+    g_modes = ["g1", "avg"] if args.g_mode == "auto" else [args.g_mode]
+
+    best_result = None
+    best_score = -float("inf")
+
+    print(f"Starting training sweep. g_modes={g_modes}, use_bg_req={use_bg_requested}, alphas={alpha_grid}")
+
+    for g_mode in g_modes:
+        use_bg = decide_use_bg(df, g_mode, use_bg_requested)
+        features_df = build_feature_frame(df, g_mode=g_mode, use_bg=use_bg, clip_min=CLIP_MIN)
+
+        X = features_df.to_numpy()
+
+        # Decide target transform
+        target_transform = args.target_transform or ("identity" if use_bg else TARGET_TRANSFORM)
+        y_target = transform_target(y, target_transform, TARGET_EPS)
+
+        model = train_model(X, y_target, alphas=alpha_grid, sample_weight=sample_weights)
+
+        # Score: best mean cross-validated score (negative MSE) from RidgeCV
+        score = model.named_steps["regressor"].best_score_
+        
+        print(f"  [g_mode={g_mode}, use_bg={use_bg}] CV Score (neg MSE): {score:.4f}")
+
+        if score > best_score:
+            best_score = score
+            best_result = {
+                "model": model,
+                "g_mode": g_mode,
+                "use_bg": use_bg,
+                "target_transform": target_transform,
+                "X": X,
+            }
+
+    if best_result is None:
+        raise RuntimeError("Model training failed.")
+
+    # Unpack best result
+    model = best_result["model"]
+    g_mode = best_result["g_mode"]
+    use_bg = best_result["use_bg"]
+    target_transform = best_result["target_transform"]
+    X = best_result["X"]
+
+    print(f"Selected Best: g_mode={g_mode}, use_bg={use_bg}, target={target_transform}")
 
     # Predict and inverse-transform
     y_pred_target = model.predict(X)
@@ -215,8 +251,72 @@ def main() -> None:
     y_pred_calibrated = np.maximum(y_pred_calibrated, 0.0)
 
     r2, rmse = evaluate_predictions(y, y_pred_calibrated)
-    print(f"R2 on train (calibrated): {r2:.4f}")
+    print(f"R2 on train (calibrated): {r2:.4f}  <-- (Fitting Accuracy, biased high)")
     print(f"RMSE on train (calibrated): {rmse:.4f} uM")
+
+    # --- Leave-One-Out Cross-Validation for Unbiased Evaluation ---
+    print("\nRunning Leave-One-Out Cross-Validation (Unbiased Evaluation)...")
+    from sklearn.model_selection import LeaveOneOut
+    
+    cv = LeaveOneOut()
+    y_cv_preds = np.zeros_like(y)
+    
+    # Pre-calculate active features for CV to save time (using best settings)
+    X_cv = X
+    
+    for train_ix, test_ix in cv.split(X_cv):
+        X_train, X_test = X_cv[train_ix], X_cv[test_ix]
+        y_train, y_test = y[train_ix], y[test_ix]
+        
+        # 1. Transform Target
+        y_train_target = transform_target(y_train, target_transform, TARGET_EPS)
+        
+        # 2. Weights
+        w_train = 1.0 / (y_train + WEIGHT_EPS)
+        w_train = w_train / np.mean(w_train)
+        
+        # 3. Train Ridge (using passed alphas)
+        # Note: We use the same alpha_grid, RidgeCV will pick best alpha for this fold internally
+        model_fold = train_model(X_train, y_train_target, alphas=alpha_grid, sample_weight=w_train)
+        
+        # DEBUG: Print selected alpha for the first few folds to verify regularizer behavior
+        if test_ix[0] < 5:
+           best_alpha = model_fold.named_steps["regressor"].alpha_
+           print(f"    [LOO-CV via {g_mode}] Fold test_ix={test_ix[0]}: Selected alpha={best_alpha}")
+
+        # 4. Predict
+        pred_target = model_fold.predict(X_test)
+        pred_raw = inverse_target(pred_target, target_transform, TARGET_EPS)
+        pred_raw = np.maximum(pred_raw, 0.0)
+        
+        # 5. Calibrate (Isotonic) - key step: fit only on training fold!
+        # Predict on training set to feed calibrator
+        train_preds_target = model_fold.predict(X_train)
+        train_preds_raw = inverse_target(train_preds_target, target_transform, TARGET_EPS)
+        train_preds_raw = np.maximum(train_preds_raw, 0.0)
+        
+        calib_fold = IsotonicRegression(out_of_bounds="clip")
+        calib_fold.fit(train_preds_raw, y_train, sample_weight=w_train)
+        
+        # Apply calibration to test sample
+        pred_final = calib_fold.predict(pred_raw)
+        pred_final = np.maximum(pred_final, 0.0)
+        
+        y_cv_preds[test_ix] = pred_final
+
+    cv_r2, cv_rmse = evaluate_predictions(y, y_cv_preds)
+    print(f"LOO-CV R2 : {cv_r2:.4f}  <-- (True Prediction Ability)")
+    print(f"LOO-CV RMSE: {cv_rmse:.4f} uM")
+    
+    # Save CV predictions for inspection
+    cv_out = args.pred_out.with_name(args.pred_out.stem + "_LOO_CV.csv")
+    pd.DataFrame({
+        "filename": df["filename"], 
+        "conc_true": y, 
+        "conc_pred_cv": y_cv_preds,
+        "residual_cv": y_cv_preds - y
+    }).to_csv(cv_out, index=False)
+    print(f"Saved LOO-CV predictions -> {cv_out}")
 
     save_artifacts(
         df,
@@ -228,7 +328,7 @@ def main() -> None:
         model_out=args.model_out,
         pred_out=args.pred_out,
         coef_out=args.coef_out,
-        g_mode=args.g_mode,
+        g_mode=g_mode,
         alpha=model.named_steps["regressor"].alpha_ if hasattr(model.named_steps["regressor"], "alpha_") else (alpha_grid[0] if alpha_grid else 0.0),
         target_transform=target_transform,
         target_eps=TARGET_EPS,
