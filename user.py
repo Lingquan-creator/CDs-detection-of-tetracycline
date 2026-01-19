@@ -35,6 +35,15 @@ import numpy as np
 import pandas as pd
 import rawpy
 
+# PyInstaller hidden imports (needed for unpickling models)
+import sklearn.pipeline
+import sklearn.preprocessing
+import sklearn.linear_model
+import sklearn.neighbors
+import sklearn.tree
+import sklearn.utils._typedefs
+import sklearn.neighbors._partition_nodes
+
 import matplotlib
 # Use 'Agg' backend for non-interactive plotting in background threads
 matplotlib.use('Agg')
