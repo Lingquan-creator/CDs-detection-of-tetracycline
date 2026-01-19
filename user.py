@@ -9,6 +9,16 @@ import json
 
 # Setup paths to include workspace modules
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def get_base_path():
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return Path(base_path)
+
 # Assuming file is in root or we need to add relative paths to modules
 WORKSPACE_ROOT = CURRENT_DIR
 sys.path.append(CURRENT_DIR)
@@ -577,7 +587,14 @@ class LabAnalyzerWindow(QMainWindow):
 
         # Load Model
         try:
-            model_path = Path(WORKSPACE_ROOT) / "concentration" / "rgb_fit_output" / "concentration_model_v1.pkl"
+            base_model_dir = get_base_path()
+            model_path = base_model_dir / "concentration" / "rgb_fit_output" / "concentration_model_v1.pkl"
+            
+            # Fallback for dev mode if the structure is slightly different or if run from root
+            if not model_path.exists():
+                 # Try typical dev path relative to WORKSPACE_ROOT (current dir)
+                 model_path = Path(WORKSPACE_ROOT) / "concentration" / "rgb_fit_output" / "concentration_model_v1.pkl"
+
             if not model_path.exists():
                 QMessageBox.critical(self, "Model Error", f"Model file not found at {model_path}")
                 return
