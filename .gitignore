@@ -2,3 +2,11 @@
 __pycache__/
 *.pyc
 .vscode/
+
+# Ignore images in roi_results
+pic_RGB/roi_results/*.png
+pic_RGB/roi_results/*.jpg
+pic_RGB/roi_results/*.jpeg
+pic_RGB/roi_results/*.tif
+pic_RGB/roi_results/*.tiff
+pic_RGB/roi_results/*.dng
