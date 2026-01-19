@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import cv2
 import numpy as np
-from PySide6.QtCore import Qt, Signal, QPointF, QRectF, QEvent
+from PySide6.QtCore import Qt, Signal, QPointF, QRectF, QEvent, QEventLoop
 from PySide6.QtGui import (
     QImage,
     QPixmap,
@@ -455,6 +455,8 @@ class ControlsWidget(QWidget):
 
 
 class ROISelectorWindow(QMainWindow):
+    finished = Signal()
+
     def __init__(
         self,
         raw_channels: np.ndarray,
@@ -640,6 +642,10 @@ class ROISelectorWindow(QMainWindow):
     def _confirm_selection(self):
         self.result = (self.roi, self.bg)
         self.close()
+
+    def closeEvent(self, event):
+        self.finished.emit()
+        super().closeEvent(event)
 
     def keyPressEvent(self, event: QKeyEvent):
         # Fallback for keys not handled by eventFilter or child widgets
@@ -830,7 +836,12 @@ def select_roi_with_gui(
     window.show()
     
     # Run the event loop
-    app.exec()
+    if own_app:
+        app.exec()
+    else:
+        loop = QEventLoop()
+        window.finished.connect(loop.quit)
+        loop.exec()
     
     if window.result:
         return window.result

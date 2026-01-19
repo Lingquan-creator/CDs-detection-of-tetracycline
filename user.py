@@ -28,7 +28,7 @@ sys.path.append(os.path.join(CURRENT_DIR, 'concentration'))
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                                QHBoxLayout, QLabel, QPushButton, QFileDialog, 
                                QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
-                               QGroupBox, QLineEdit)
+                               QGroupBox, QLineEdit, QComboBox)
 from PySide6.QtCore import Qt, QThread, Signal
 
 import numpy as np
@@ -39,6 +39,69 @@ import matplotlib
 # Use 'Agg' backend for non-interactive plotting in background threads
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
+# Translations
+TRANSLATIONS = {
+    "en": {
+        "window_title": "Quantum Dot Concentration Analyzer",
+        "config_group": "Configuration",
+        "input_label": "Input Dir:",
+        "output_label": "Output Dir:",
+        "select_input": "Select Input Folder",
+        "select_output": "Select Output Folder",
+        "roi_group": "ROI & Background Selection",
+        "set_roi_btn": "Set ROI / BG ROI on First Image",
+        "roi_status_not_set": "ROI Status: Not Set",
+        "roi_status_set": "ROI Set (Center: {:.1f}, {:.1f})",
+        "roi_status_loaded": "ROI Loaded from JSON (Center: {:.1f}, {:.1f})",
+        "analysis_group": "Analysis",
+        "run_btn": "Calculate Concentrations (Batch)",
+        "headers": ["Filename", "Predicted Conc.", "Status"],
+        "status_found_images": "Found {} images.",
+        "msg_no_images": "No images found in input directory.",
+        "msg_missing_config": "Please select input and output directories.",
+        "msg_missing_roi": "Please set ROI and Background first.",
+        "msg_model_error": "Model file not found at {}",
+        "msg_load_model_fail": "Failed to load model: {}",
+        "msg_save_success": "Results saved to {}",
+        "msg_analysis_complete": "Analysis Complete.",
+        "msg_analysis_failed": "Analysis Failed",
+        "msg_error": "Error",
+        "msg_success": "Success",
+        "msg_roi_cancelled": "ROI selection cancelled.",
+        "lang_label": "Language:",
+    },
+    "zh": {
+        "window_title": "量子点浓度分析仪",
+        "config_group": "配置",
+        "input_label": "输入目录:",
+        "output_label": "输出目录:",
+        "select_input": "选择输入文件夹",
+        "select_output": "选择输出文件夹",
+        "roi_group": "ROI 与 背景选择",
+        "set_roi_btn": "在第一张图上设置 ROI / 背景",
+        "roi_status_not_set": "ROI 状态: 未设置",
+        "roi_status_set": "ROI 已设置 (中心: {:.1f}, {:.1f})",
+        "roi_status_loaded": "ROI 已从 JSON 加载 (中心: {:.1f}, {:.1f})",
+        "analysis_group": "分析",
+        "run_btn": "计算浓度 (批量)",
+        "headers": ["文件名", "预测浓度", "状态"],
+        "status_found_images": "发现 {} 张图片。",
+        "msg_no_images": "输入目录中未找到图片。",
+        "msg_missing_config": "请选择输入和输出目录。",
+        "msg_missing_roi": "请先设置 ROI 和背景。",
+        "msg_model_error": "模型文件未找到: {}",
+        "msg_load_model_fail": "加载模型失败: {}",
+        "msg_save_success": "结果已保存至 {}",
+        "msg_analysis_complete": "分析完成。",
+        "msg_analysis_failed": "分析失败",
+        "msg_error": "错误",
+        "msg_success": "成功",
+        "msg_roi_cancelled": "ROI 选择已取消。",
+        "lang_label": "语言:",
+    }
+}
+
 
 # Import modules from workspace
 try:
@@ -321,6 +384,7 @@ class AnalysisWorker(QThread):
 class LabAnalyzerWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.current_lang = "en"
         self.setWindowTitle("Quantum Dot Concentration Analyzer")
         self.resize(1000, 700)
         
@@ -331,39 +395,54 @@ class LabAnalyzerWindow(QMainWindow):
         self.roi_selection = None
         self.bg_selection = None
         self.roi_cache = {}  # Cache mapping filename -> (roi, bg)
+        self.roi_loaded_source = None # To track where ROI came from for status text
         
         # UI Setup
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
+        # Language Selection
+        lang_layout = QHBoxLayout()
+        self.lbl_lang = QLabel("Language:")
+        self.combo_lang = QComboBox()
+        self.combo_lang.addItems(["English", "中文"])
+        self.combo_lang.currentIndexChanged.connect(self.change_language)
+        lang_layout.addStretch()
+        lang_layout.addWidget(self.lbl_lang)
+        lang_layout.addWidget(self.combo_lang)
+        main_layout.addLayout(lang_layout)
+
         # 1. Configuration Section
-        config_group = QGroupBox("Configuration")
+        self.group_config = QGroupBox("Configuration")
         config_layout = QGridLayout()
         
         self.input_edit = QLineEdit()
         self.input_edit.setReadOnly(True)
-        btn_input = QPushButton("Select Input Folder")
-        btn_input.clicked.connect(self.select_input_dir)
+        self.btn_input = QPushButton("Select Input Folder")
+        self.btn_input.clicked.connect(self.select_input_dir)
         
         self.output_edit = QLineEdit()
         self.output_edit.setReadOnly(True)
-        btn_output = QPushButton("Select Output Folder")
-        btn_output.clicked.connect(self.select_output_dir)
+        self.btn_output = QPushButton("Select Output Folder")
+        self.btn_output.clicked.connect(self.select_output_dir)
         
-        config_layout.addWidget(QLabel("Input Dir:"), 0, 0)
+        self.lbl_input = QLabel("Input Dir:")
+        self.lbl_output = QLabel("Output Dir:")
+        
+        config_layout.addWidget(self.lbl_input, 0, 0)
         config_layout.addWidget(self.input_edit, 0, 1)
-        config_layout.addWidget(btn_input, 0, 2)
+        config_layout.addWidget(self.btn_input, 0, 2)
         
-        config_layout.addWidget(QLabel("Output Dir:"), 1, 0)
+        config_layout.addWidget(self.lbl_output, 1, 0)
         config_layout.addWidget(self.output_edit, 1, 1)
-        config_layout.addWidget(btn_output, 1, 2)
+        config_layout.addWidget(self.btn_output, 1, 2)
         
-        config_group.setLayout(config_layout)
-        main_layout.addWidget(config_group)
+        self.group_config.setLayout(config_layout)
+        main_layout.addWidget(self.group_config)
 
         # 2. ROI/BG Setup
-        roi_group = QGroupBox("ROI & Background Selection")
+        self.group_roi = QGroupBox("ROI & Background Selection")
         roi_layout = QHBoxLayout()
         
         self.btn_set_roi = QPushButton("Set ROI / BG ROI on First Image")
@@ -375,11 +454,11 @@ class LabAnalyzerWindow(QMainWindow):
         
         roi_layout.addWidget(self.btn_set_roi)
         roi_layout.addWidget(self.lbl_roi_status)
-        roi_group.setLayout(roi_layout)
-        main_layout.addWidget(roi_group)
+        self.group_roi.setLayout(roi_layout)
+        main_layout.addWidget(self.group_roi)
 
         # 3. Action
-        action_group = QGroupBox("Analysis")
+        self.group_action = QGroupBox("Analysis")
         action_layout = QHBoxLayout()
         
         self.btn_run = QPushButton("Calculate Concentrations (Batch)")
@@ -388,8 +467,8 @@ class LabAnalyzerWindow(QMainWindow):
         self.btn_run.setStyleSheet("font-weight: bold; font-size: 14px; padding: 10px;")
         
         action_layout.addWidget(self.btn_run)
-        action_group.setLayout(action_layout)
-        main_layout.addWidget(action_group)
+        self.group_action.setLayout(action_layout)
+        main_layout.addWidget(self.group_action)
         
         # 4. Results
         self.table = QTableWidget()
@@ -400,10 +479,42 @@ class LabAnalyzerWindow(QMainWindow):
         
         self.status_bar = self.statusBar()
 
-        # Defaults (Optional)
-        # self.input_dir = r"H:\000\CDs\user\test_pic"
-        # self.input_edit.setText(self.input_dir)
-        # self.refresh_file_list()
+        self.update_ui_text()
+
+    def change_language(self, index):
+        self.current_lang = "en" if index == 0 else "zh"
+        self.update_ui_text()
+
+    def update_ui_text(self):
+        t = TRANSLATIONS[self.current_lang]
+        self.setWindowTitle(t["window_title"])
+        
+        self.lbl_lang.setText(t["lang_label"])
+        
+        self.group_config.setTitle(t["config_group"])
+        self.lbl_input.setText(t["input_label"])
+        self.lbl_output.setText(t["output_label"])
+        self.btn_input.setText(t["select_input"])
+        self.btn_output.setText(t["select_output"])
+        
+        self.group_roi.setTitle(t["roi_group"])
+        self.btn_set_roi.setText(t["set_roi_btn"])
+        
+        # Update ROI Status
+        if self.roi_selection is None:
+             self.lbl_roi_status.setText(t["roi_status_not_set"])
+        else:
+             cx, cy = self.roi_selection.center
+             if self.roi_loaded_source: 
+                 self.lbl_roi_status.setText(t["roi_status_loaded"].format(cx, cy))
+             else:
+                 self.lbl_roi_status.setText(t["roi_status_set"].format(cx, cy))
+
+        self.group_action.setTitle(t["analysis_group"])
+        self.btn_run.setText(t["run_btn"])
+        
+        # Preserve header state if needed, but here labels are fine
+        self.table.setHorizontalHeaderLabels(t["headers"])
 
     def select_input_dir(self):
         d = QFileDialog.getExistingDirectory(self, "Select Input Directory")
@@ -519,7 +630,10 @@ class LabAnalyzerWindow(QMainWindow):
             print(f"Failed to load roi_results.json: {e}")
             
     def _update_roi_status_ui(self, source_path):
-        self.lbl_roi_status.setText(f"ROI Loaded from JSON (Center: {self.roi_selection.center[0]:.1f}, {self.roi_selection.center[1]:.1f})")
+        self.roi_loaded_source = source_path
+        t = TRANSLATIONS[self.current_lang]
+        cx, cy = self.roi_selection.center
+        self.lbl_roi_status.setText(t["roi_status_loaded"].format(cx, cy))
         self.lbl_roi_status.setStyleSheet("color: blue")
         self.btn_run.setEnabled(True)
         self.status_bar.showMessage(f"Loaded ROI settings from {os.path.basename(source_path)}")
@@ -533,7 +647,8 @@ class LabAnalyzerWindow(QMainWindow):
         for t in types:
             self.file_list.extend(glob.glob(os.path.join(self.input_dir, t)))
         
-        self.status_bar.showMessage(f"Found {len(self.file_list)} images.")
+        t = TRANSLATIONS[self.current_lang]
+        self.status_bar.showMessage(t["status_found_images"].format(len(self.file_list)))
         
         # Update table preliminary
         self.table.setRowCount(len(self.file_list))
@@ -543,8 +658,9 @@ class LabAnalyzerWindow(QMainWindow):
             self.table.setItem(i, 2, QTableWidgetItem("Pending"))
 
     def set_roi_bg(self):
+        t = TRANSLATIONS[self.current_lang]
         if not self.file_list:
-            QMessageBox.warning(self, "No Images", "No images found in input directory.")
+            QMessageBox.warning(self, "No Images", t["msg_no_images"])
             return
 
         # Load first image
@@ -569,20 +685,27 @@ class LabAnalyzerWindow(QMainWindow):
             
             self.roi_selection = roi
             self.bg_selection = bg
-            self.lbl_roi_status.setText(f"ROI Set (Center: {roi.center[0]:.1f}, {roi.center[1]:.1f})")
+            
+            self.roi_loaded_source = None
+            cx, cy = roi.center
+            self.lbl_roi_status.setText(t["roi_status_set"].format(cx, cy))
             self.lbl_roi_status.setStyleSheet("color: green")
             self.btn_run.setEnabled(True)
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to open ROI selector: {str(e)}\n{traceback.format_exc()}")
+            if "cancelled by user" in str(e):
+                self.status_bar.showMessage(t["msg_roi_cancelled"])
+                return
+            QMessageBox.critical(self, t["msg_error"], f"Failed to open ROI selector: {str(e)}\n{traceback.format_exc()}")
 
     def run_analysis(self):
+        t = TRANSLATIONS[self.current_lang]
         if not self.input_dir or not self.output_dir:
-            QMessageBox.warning(self, "Missing Config", "Please select input and output directories.")
+            QMessageBox.warning(self, t["config_group"], t["msg_missing_config"])
             return
         
         if not self.roi_selection:
-            QMessageBox.warning(self, "Missing ROI", "Please set ROI and Background first.")
+            QMessageBox.warning(self, t["roi_group"], t["msg_missing_roi"])
             return
 
         # Load Model
@@ -596,13 +719,13 @@ class LabAnalyzerWindow(QMainWindow):
                  model_path = Path(WORKSPACE_ROOT) / "concentration" / "rgb_fit_output" / "concentration_model_v1.pkl"
 
             if not model_path.exists():
-                QMessageBox.critical(self, "Model Error", f"Model file not found at {model_path}")
+                QMessageBox.critical(self, t["msg_error"], t["msg_model_error"].format(model_path))
                 return
             
             model_bundle = rtc.load_model_bundle(model_path, None)
             
         except Exception as e:
-            QMessageBox.critical(self, "Model Error", f"Failed to load model: {str(e)}")
+            QMessageBox.critical(self, t["msg_error"], t["msg_load_model_fail"].format(str(e)))
             return
 
         # Disable UI
@@ -617,7 +740,8 @@ class LabAnalyzerWindow(QMainWindow):
         self.worker.start()
 
     def on_analysis_finished(self, results):
-        self.status_bar.showMessage("Analysis Complete.")
+        t = TRANSLATIONS[self.current_lang]
+        self.status_bar.showMessage(t["msg_analysis_complete"])
         self.btn_run.setEnabled(True)
         self.btn_set_roi.setEnabled(True)
         
@@ -633,7 +757,7 @@ class LabAnalyzerWindow(QMainWindow):
             ])
             out_path = os.path.join(self.output_dir, "concentration_results.csv")
             out_df.to_csv(out_path, index=False)
-            QMessageBox.information(self, "Success", f"Results saved to {out_path}")
+            QMessageBox.information(self, t["msg_success"], t["msg_save_success"].format(out_path))
         except Exception as e:
             QMessageBox.warning(self, "Save Error", f"Could not save CSV: {str(e)}")
 
@@ -645,10 +769,11 @@ class LabAnalyzerWindow(QMainWindow):
             self.table.setItem(i, 2, QTableWidgetItem("Done"))
 
     def on_analysis_error(self, err_msg):
-        QMessageBox.critical(self, "Analysis Failed", err_msg)
+        t = TRANSLATIONS[self.current_lang]
+        QMessageBox.critical(self, t["msg_analysis_failed"], err_msg)
         self.btn_run.setEnabled(True)
         self.btn_set_roi.setEnabled(True)
-        self.status_bar.showMessage("Error occurred.")
+        self.status_bar.showMessage(t["msg_error"])
 
 from PySide6.QtWidgets import QGridLayout
 
