@@ -2,7 +2,7 @@
 __pycache__/
 *.pyc
 .vscode/
-
+backup/
 # Ignore images in roi_results
 pic_RGB/roi_results/*.png
 pic_RGB/roi_results/*.jpg
