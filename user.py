@@ -25,6 +25,9 @@ import numpy as np
 import pandas as pd
 import rawpy
 
+import matplotlib
+# Use 'Agg' backend for non-interactive plotting in background threads
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 # Import modules from workspace
@@ -35,9 +38,12 @@ try:
     from roi_manual import ManualROITools
     import rgb_to_concentration as rtc
     import physics_features as pf
-    from config import CLIP_MIN
+    # from config import CLIP_MIN # Avoid direct import to prevent path issues
+    CLIP_MIN = rtc.CLIP_MIN
 except ImportError as e:
     print(f"Error importing modules: {e}")
+    # Print sys.path to help debug
+    print(f"sys.path: {sys.path}")
     traceback.print_exc()
 
 class AnalysisWorker(QThread):
