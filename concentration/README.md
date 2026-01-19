@@ -4,8 +4,8 @@
 
 ## 核心改进 (v4)
 1. **真实评估 (LOO-CV)**：输出留一法交叉验证结果 (`_LOO_CV.csv`)，杜绝因极高拟合精度产生的“过拟合错觉”，真实反映模型对未知样品的预测能力。
-2. **低浓度优化**：通过 `WEIGHT_EPS=20.0` 平滑样本权重，并扩展 `ALPHAS` 到 1000.0，有效抑制低浓度段因噪声导致的剧烈震荡。
-3. **双策略兼容**：自动适配有/无背景数据，利用 `ln(Signal)` 或 `ln(Raw)` + `Log-Target` 进行建模。
+2. **低浓度优化**：通过 `WEIGHT_EPS` (默认50.0) 平滑样本权重，并使用大数值 Alpha 正则化，有效抑制低浓度段因噪声导致的剧烈震荡。
+3. **背景扣除 (强制)**：始终采用背景扣除模式 (`Signal = ROI - BG`)，直接建立信号与浓度的映射，不再支持无背景模式。
 4. **单调性约束**：集成 `IsotonicRegression`，强制输出非负且单调递增。
 
 ---
@@ -17,17 +17,17 @@
 必需列（由 `pic_RGB` 流程生成）：
 - **基础列**：`filename` (必须包含浓度数值，如 `12.0.dng`)
 - **ROI 统计**：`roi_R_mean`, `roi_G1_mean`, `roi_B_mean`, `roi_G1_var`
-- **背景统计 (可选)**：`bg_R_mean`, `bg_G1_mean`, `bg_B_mean`
-  - *注：若存在背景列且配置允许，模型会自动进行信号扣除。*
+- **背景统计 (必需)**：`bg_R_mean`, `bg_G1_mean`, `bg_B_mean`
+  - *注：必须存在背景列，模型会自动进行信号扣除 (Signal = ROI - BG)。*
 
 ### 2. 参数配置 (`config.py`)
 主要超参数均在 `concentration/config.py` 中定义，修改此处即可影响训练行为：
 
 | 参数 | 默认值 | 说明 |
 | :--- | :--- | :--- |
-| `ALPHAS` | `(..., 1000.0)` | 正则化网格。包含大数值以抑制低浓度噪声震荡。 |
-| `WEIGHT_EPS` | `20.0` | 权重平滑项。权重 $w = 1/(y + \epsilon)$。值越大，低浓度样本被“特殊对待”的程度越低，曲线越平滑。 |
-| `TARGET_TRANSFORM` | `"log"` | 目标变换。无背景模式下，对浓度取 Log 训练，优化相对误差。 |
+| `ALPHAS` | `(10000, 100000.0)` | 正则化网格。强制使用高正则化项以应对共线性并平滑模型。 |
+| `WEIGHT_EPS` | `50.0` | 权重平滑项。权重 $w = 1/(y + \epsilon)$。值越大，低浓度样本被“特殊对待”的程度越低，曲线越平滑。 |
+| `TARGET_TRANSFORM` | `"identity"` | 目标变换。默认直接预测浓度，配合背景扣除物理模型。 |
 | `CLIP_MIN` | `0.1` | 信号阈值。防止 `log(Signal)` 出现负无穷。 |
 
 ---
@@ -71,7 +71,7 @@ python concentration/rgb_exponential_fit.py
 # 读取 ROI 统计 CSV，生成预测结果
 python concentration/rgb_to_concentration.py --roi-csv pic_RGB/roi_results/roi_detailed_statistics.csv
 ```
-*注：即使输入 CSV 缺少背景列，若模型需要背景，脚本也会自动降级策略运行，不会报错。*
+*注：输入 CSV 必须包含背景统计列 (bg_*)，否则脚本会报错。*
 
 **单点预测 (Single Mode, 调试用)**：
 ```bash

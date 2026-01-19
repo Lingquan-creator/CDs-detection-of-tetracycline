@@ -2,8 +2,8 @@
 Train a physics-informed Ridge regression model that maps ROI RGB statistics to concentration.
 
 Improvement highlights (see improve4.md):
-- 可选背景扣除：有 bg_* 列时使用信号=ROI-BG 的 ln(signal) 特征。
-- 目标可切换：背景模式下直接预测浓度；无背景时使用 log-target，推理时 exp 逆变换并裁剪非负。
+- 背景扣除：始终使用信号=ROI-BG 的 ln(signal) 特征 (bg_* 列必须存在)。
+- 目标：直接预测浓度 (Identity fit)。
 - 低浓度加权：样本权重 1/(conc+eps) 强调低浓度精度。
 - 调参与单调校准：RidgeCV 搜索 alpha（并可扫 g-mode），后置 IsotonicRegression 保证非负、单调输出。
 
@@ -131,22 +131,26 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
     parser.add_argument("--coef-out", type=Path, default=default_cfg.coefficients_path, help="Path to save coefficients CSV.")
     parser.add_argument(
         "--use-bg",
-        choices=["auto", "true", "false"],
+        choices=["auto", "true"],
         default="auto",
-        help="Use background-subtracted features if bg_* columns exist (auto), force on, or force off.",
+        help="Use background-subtracted features (bg_* columns must exist).",
     )
     parser.add_argument(
         "--target-transform",
         choices=["identity", "log"],
-        help="Override target transform. Defaults to identity when use-bg, else config.TARGET_TRANSFORM.",
+        help="Override target transform. Defaults to 'identity' (Strategy B removed).",
     )
     return parser.parse_args()
 
 
 def decide_use_bg(df: pd.DataFrame, g_mode: str, requested: Optional[bool]) -> bool:
-    if requested is not None:
-        return requested
-    return has_background_columns(df, g_mode)
+    if requested is False:
+        raise ValueError("Strategy B (No BG mode) has been removed. Background subtraction is required.")
+
+    if not has_background_columns(df, g_mode):
+        raise ValueError(f"Background columns (bg_*) are missing for g_mode='{g_mode}'. Background subtraction is required.")
+
+    return True
 
 
 def main() -> None:
@@ -177,9 +181,7 @@ def main() -> None:
     use_bg_requested: Optional[bool]
     if args.use_bg == "true":
         use_bg_requested = True
-    elif args.use_bg == "false":
-        use_bg_requested = False
-    else:
+    else:  # auto
         use_bg_requested = None
 
     # Alpha grid selection
@@ -207,7 +209,7 @@ def main() -> None:
         X = features_df.to_numpy()
 
         # Decide target transform
-        target_transform = args.target_transform or ("identity" if use_bg else TARGET_TRANSFORM)
+        target_transform = args.target_transform or "identity"
         y_target = transform_target(y, target_transform, TARGET_EPS)
 
         model = train_model(X, y_target, alphas=alpha_grid, sample_weight=sample_weights)

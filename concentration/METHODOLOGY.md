@@ -85,7 +85,7 @@ $$ w_i = \frac{1}{y_i + \epsilon} $$
 
 ## 6. 推理流水线 (Inference Pipeline)
 
-1.  **特征提取**：根据模型元数据（Use BG? G-Mode?）从图像中提取对应特征。
+1.  **特征提取**：根据模型元数据从图像中提取对应特征。
     - *自适应回退*：若模型需要 BG 但输入没有，自动回退到 Raw 模式并警告。
 2.  **线性预测**：$y_{raw} = \mathbf{w} \cdot X + b$。
 3.  **空间逆变换**：若使用策略 B，计算 $y_{linear} = \exp(y_{raw}) - \epsilon$。
