@@ -10,3 +10,7 @@ pic_RGB/roi_results/*.jpeg
 pic_RGB/roi_results/*.tif
 pic_RGB/roi_results/*.tiff
 pic_RGB/roi_results/*.dng
+concentration/*.png
+concentration_exp/*.png
+test data/
+rep/
