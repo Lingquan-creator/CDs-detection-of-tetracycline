@@ -105,6 +105,79 @@ class AdvancedKmeansSegmentation:
         
         return gray_norm
     
+    def _enhance_for_dim_liquid(self, image: np.ndarray) -> np.ndarray:
+        """Boost dim liquids so the whole bottle is visible instead of only a highlight line."""
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        enhanced = clahe.apply(image)
+        
+        gamma = 0.8
+        lut = np.array([((i / 255.0) ** gamma) * 255 for i in range(256)], dtype=np.uint8)
+        enhanced = cv2.LUT(enhanced, lut)
+        
+        enhanced = cv2.GaussianBlur(enhanced, (3, 3), 0)
+        return enhanced
+    
+    def _run_level1_clustering(self, image: np.ndarray, use_position_weight: bool = False):
+        """First-stage clustering with optional position prior to keep dim bottles intact."""
+        h, w = image.shape
+        
+        if use_position_weight:
+            y_coords, x_coords = np.indices(image.shape)
+            distances = np.sqrt((y_coords - h / 2) ** 2 + (x_coords - w / 2) ** 2)
+            normalized_distances = (distances / distances.max()).reshape(-1, 1)
+            intensities = image.reshape(-1, 1) / 255.0
+            features = np.column_stack([
+                intensities,
+                normalized_distances * POSITION_WEIGHT_FACTOR
+            ])
+        else:
+            features = image.reshape(-1, 1)
+        
+        kmeans = KMeans(
+            n_clusters=N_CLUSTERS_LEVEL1,
+            random_state=self.random_state,
+            n_init=self.n_init
+        )
+        labels_flat = kmeans.fit_predict(features)
+        labels_image = labels_flat.reshape(image.shape)
+        
+        centers = kmeans.cluster_centers_
+        intensity_centers = centers[:, 0] * 255 if centers.shape[1] > 1 else centers.flatten()
+        
+        bright_region_label = int(np.argmax(intensity_centers))
+        background_label = int(np.argmin(intensity_centers))
+        bright_region_mask = labels_image == bright_region_label
+        
+        return labels_image, intensity_centers, bright_region_label, background_label, bright_region_mask, kmeans
+    
+    def _expand_small_liquid_mask(self, liquid_mask: np.ndarray, support_mask: np.ndarray, total_pixels: int) -> np.ndarray:
+        """Grow a too-small liquid mask so dim liquids are not reduced to a thin line."""
+        min_pixels = int(MIN_LIQUID_AREA_RATIO * total_pixels)
+        max_pixels = int(MAX_LIQUID_AREA_RATIO * total_pixels)
+        current_pixels = int(np.sum(liquid_mask > 0))
+        if current_pixels >= min_pixels:
+            return liquid_mask
+        
+        support_pixels = int(np.sum(support_mask)) if support_mask is not None else 0
+        constrain_to_support = support_mask is not None and support_pixels > min_pixels
+        expanded = liquid_mask.copy()
+        if current_pixels == 0 and support_pixels > 0:
+            expanded = (support_mask.astype(np.uint8)) * 255
+        
+        kernel_size = max(3, MORPHOLOGY_KERNEL_SIZE)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+        
+        iterations = 0
+        while np.sum(expanded > 0) < min_pixels and iterations < 6:
+            expanded = cv2.dilate(expanded, kernel, iterations=1)
+            iterations += 1
+            if constrain_to_support:
+                expanded = cv2.bitwise_and(expanded, (support_mask.astype(np.uint8) * 255))
+            if np.sum(expanded > 0) >= max_pixels:
+                break
+        
+        return expanded
+    
     def segment_kmeans_nested(self, image: np.ndarray) -> Tuple[np.ndarray, Dict, Dict]:
         """
         使用嵌套K-means进行图像分割，结合位置、形状和亮度信息
@@ -125,40 +198,37 @@ class AdvancedKmeansSegmentation:
         
         # ============ 第一层K-means: 背景 vs 高亮区域 ============
         print(f"  Stage 1: Clustering into {N_CLUSTERS_LEVEL1} regions...")
-        pixels = image.reshape((-1, 1))
+        labels_level1_image, centers_level1, bright_region_label, background_label, bright_region_mask, kmeans_level1 = \
+            self._run_level1_clustering(image)
         
-        # 第一次聚类: k=N_CLUSTERS_LEVEL1
-        kmeans_level1 = KMeans(
-            n_clusters=N_CLUSTERS_LEVEL1, 
-            random_state=self.random_state,
-            n_init=self.n_init
-        )
-        labels_level1 = kmeans_level1.fit_predict(pixels)
-        labels_level1_image = labels_level1.reshape(image.shape)
+        print(f"    Level 1 centers: Background={float(centers_level1[background_label]):.1f}, Bright={float(centers_level1[bright_region_label]):.1f}")
         
-        # 识别哪个是高亮区域（亮度更高的那个）
-        centers_level1 = kmeans_level1.cluster_centers_.flatten()
-        bright_region_label = np.argmax(centers_level1)
-        background_label = np.argmin(centers_level1)
-        
-        print(f"    Level 1 centers: Background={centers_level1[background_label]:.1f}, Bright={centers_level1[bright_region_label]:.1f}")
-        
-        # 创建高亮区域掩码
-        bright_region_mask = (labels_level1_image == bright_region_label)
-        
-        # 统计第一层结果
         bright_region_pixels = np.sum(bright_region_mask)
-        print(f"    Bright region: {bright_region_pixels} pixels ({bright_region_pixels/total_pixels:.1%})")
+        bright_area_ratio = bright_region_pixels / total_pixels
+        print(f"    Bright region: {bright_region_pixels} pixels ({bright_area_ratio:.1%})")
+        
+        image_for_level2 = image
+        if bright_area_ratio < MIN_LIQUID_AREA_RATIO:
+            print("    Bright region too small, boosting contrast and re-clustering with position prior")
+            enhanced_image = self._enhance_for_dim_liquid(image)
+            labels_level1_image, centers_level1, bright_region_label, background_label, bright_region_mask, kmeans_level1 = \
+                self._run_level1_clustering(enhanced_image, use_position_weight=True)
+            bright_region_pixels = np.sum(bright_region_mask)
+            bright_area_ratio = bright_region_pixels / total_pixels
+            image_for_level2 = enhanced_image
+            print(f"    After enhancement: Background={float(centers_level1[background_label]):.1f}, Bright={float(centers_level1[bright_region_label]):.1f}")
+            print(f"    Bright region: {bright_region_pixels} pixels ({bright_area_ratio:.1%})")
         
         # ============ 第二层K-means: 瓶体 vs 高亮液体 (加入位置权重) ============
         print(f"  Stage 2: Clustering bright region into {N_CLUSTERS_LEVEL2} sub-regions...")
         
         # 提取高亮区域的像素值和位置
         bright_indices = np.where(bright_region_mask)
-        bright_region_values = image[bright_indices]
+        bright_region_values = image_for_level2[bright_indices]
         
         if len(bright_region_values) < 10:
             print("    Warning: Bright region too small, skipping level 2 clustering")
+            final_liquid_mask = np.zeros_like(image, dtype=np.uint8)
             final_labels = np.zeros_like(image, dtype=np.int32)
             final_labels[bright_region_mask] = 1
             
@@ -296,6 +366,10 @@ class AdvancedKmeansSegmentation:
                 final_liquid_mask = filled_mask | filled_mask_inv
                 
                 print(f"    Filled holes in liquid region")
+            
+            final_liquid_mask = self._expand_small_liquid_mask(
+                final_liquid_mask, bright_region_mask, total_pixels
+            )
             
             # 构建最终标签
             final_labels = np.zeros_like(image, dtype=np.int32)
