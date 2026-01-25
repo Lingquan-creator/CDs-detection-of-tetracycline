@@ -1,0 +1,1232 @@
+[
+  {
+    "filename": "100.dng",
+    "metadata": {
+      "width": 4096,
+      "height": 3072,
+      "channels": 3
+    },
+    "kmeans_method": "nested",
+    "level1_centers": [
+      11.448701874919353,
+      104.7387930358745
+    ],
+    "level2_centers": [
+      99.99709131315772,
+      75.58062689127304
+    ],
+    "region_stats": {
+      "background_pixels": 12350195,
+      "bottle_pixels": 33924,
+      "liquid_pixels": 198793,
+      "total_pixels": 12582912
+    },
+    "background_stats": {
+      "area": 12360104,
+      "mean_intensity": 1710.210503487673,
+      "std_intensity": 1944.7993836429291,
+      "min_intensity": 0.0,
+      "max_intensity": 42214.0,
+      "median_intensity": 1026.0,
+      "R_mean": 1416.6297770633646,
+      "R_std": 1337.8683762381124,
+      "R_min": 0.0,
+      "R_max": 14945.0,
+      "G_mean": 356.2381811674077,
+      "G_std": 526.4981342881689,
+      "G_min": 0.0,
+      "G_max": 12070.0,
+      "B_mean": 3357.7635522322466,
+      "B_std": 2155.4071794772594,
+      "B_min": 0.0,
+      "B_max": 42214.0
+    },
+    "bottle_stats": {
+      "area": 39368,
+      "mean_intensity": 9288.606838041049,
+      "std_intensity": 4102.730739127324,
+      "min_intensity": 0.0,
+      "max_intensity": 21339.0,
+      "median_intensity": 9241.0,
+      "R_mean": 9283.233336720179,
+      "R_std": 4475.816576881411,
+      "R_min": 0.0,
+      "R_max": 21339.0,
+      "G_mean": 9773.573181263971,
+      "G_std": 4645.381161336265,
+      "G_min": 0.0,
+      "G_max": 18849.0,
+      "B_mean": 8809.013996138996,
+      "B_std": 2901.6319316510985,
+      "B_min": 0.0,
+      "B_max": 18060.0
+    },
+    "bright_region_stats": {
+      "area": 197333,
+      "mean_intensity": 8822.615823675378,
+      "std_intensity": 2477.884799950589,
+      "min_intensity": 0.0,
+      "max_intensity": 26019.0,
+      "median_intensity": 8799.0,
+      "R_mean": 8810.543897878206,
+      "R_std": 2678.35791299031,
+      "R_min": 0.0,
+      "R_max": 26019.0,
+      "G_mean": 9174.7556465467,
+      "G_std": 2209.718609597425,
+      "G_min": 760.0,
+      "G_max": 23003.0,
+      "B_mean": 8482.547926601228,
+      "B_std": 2474.56813220707,
+      "B_min": 0.0,
+      "B_max": 22301.0
+    },
+    "bright_components": {
+      "num_components": 1,
+      "components": [
+        {
+          "label": 1,
+          "area": 197042,
+          "left": 1817,
+          "top": 1026,
+          "width": 319,
+          "height": 1111,
+          "centroid_x": 1970.4428192974087,
+          "centroid_y": 1625.0682392586352
+        }
+      ],
+      "largest_component_area": 197042
+    },
+    "bottle_components": {
+      "num_components": 5,
+      "components": [
+        {
+          "label": 2,
+          "area": 673,
+          "left": 1936,
+          "top": 1026,
+          "width": 63,
+          "height": 22,
+          "centroid_x": 1966.5631500742943,
+          "centroid_y": 1037.4650817236256
+        },
+        {
+          "label": 12,
+          "area": 19368,
+          "left": 2034,
+          "top": 1079,
+          "width": 77,
+          "height": 614,
+          "centroid_x": 2070.25795125981,
+          "centroid_y": 1355.8746385790996
+        },
+        {
+          "label": 45,
+          "area": 1272,
+          "left": 2015,
+          "top": 1716,
+          "width": 40,
+          "height": 48,
+          "centroid_x": 2034.946540880503,
+          "centroid_y": 1741.439465408805
+        },
+        {
+          "label": 48,
+          "area": 1846,
+          "left": 1851,
+          "top": 1761,
+          "width": 53,
+          "height": 106,
+          "centroid_x": 1873.2654387865655,
+          "centroid_y": 1808.0812567713976
+        },
+        {
+          "label": 51,
+          "area": 10386,
+          "left": 1797,
+          "top": 1882,
+          "width": 237,
+          "height": 261,
+          "centroid_x": 1858.2771037935684,
+          "centroid_y": 2031.526670518005
+        }
+      ],
+      "largest_component_area": 19368
+    },
+    "background_ratio": 0.9822928110758463,
+    "bottle_ratio": 0.003128687540690104,
+    "bright_ratio": 0.01568261782328288,
+    "intensity_contrast_bright_bg": 7112.405320187705,
+    "intensity_contrast_bright_bottle": -465.9910143656707
+  },
+  {
+    "filename": "120.dng",
+    "metadata": {
+      "width": 4096,
+      "height": 3072,
+      "channels": 3
+    },
+    "kmeans_method": "nested",
+    "level1_centers": [
+      11.75358446431963,
+      109.79192496383885
+    ],
+    "level2_centers": [
+      129.65740032463293,
+      103.32641272089984
+    ],
+    "region_stats": {
+      "background_pixels": 12372465,
+      "bottle_pixels": 63211,
+      "liquid_pixels": 147236,
+      "total_pixels": 12582912
+    },
+    "background_stats": {
+      "area": 12383963,
+      "mean_intensity": 1693.1550273257976,
+      "std_intensity": 1919.210900301471,
+      "min_intensity": 0.0,
+      "max_intensity": 46476.0,
+      "median_intensity": 1026.0,
+      "R_mean": 1401.1557534530748,
+      "R_std": 1322.9253969885935,
+      "R_min": 0.0,
+      "R_max": 14774.0,
+      "G_mean": 357.224758342705,
+      "G_std": 526.4076219336597,
+      "G_min": 0.0,
+      "G_max": 15040.0,
+      "B_mean": 3321.084570181613,
+      "B_std": 2121.967717249839,
+      "B_min": 0.0,
+      "B_max": 46476.0
+    },
+    "bottle_stats": {
+      "area": 72199,
+      "mean_intensity": 6994.101954320697,
+      "std_intensity": 2392.485587332303,
+      "min_intensity": 0.0,
+      "max_intensity": 21610.0,
+      "median_intensity": 6964.0,
+      "R_mean": 6828.233271928974,
+      "R_std": 2626.101384180748,
+      "R_min": 0.0,
+      "R_max": 21610.0,
+      "G_mean": 6996.198465352706,
+      "G_std": 2139.4816813958614,
+      "G_min": 54.0,
+      "G_max": 19383.0,
+      "B_mean": 7157.874125680411,
+      "B_std": 2375.675350818191,
+      "B_min": 0.0,
+      "B_max": 18060.0
+    },
+    "bright_region_stats": {
+      "area": 146200,
+      "mean_intensity": 9826.195497036024,
+      "std_intensity": 2749.757752568663,
+      "min_intensity": 0.0,
+      "max_intensity": 24176.0,
+      "median_intensity": 9669.0,
+      "R_mean": 9713.352400820793,
+      "R_std": 2588.629699253269,
+      "R_min": 0.0,
+      "R_max": 22464.0,
+      "G_mean": 10673.448098495212,
+      "G_std": 2486.4527308553825,
+      "G_min": 2587.0,
+      "G_max": 24176.0,
+      "B_mean": 9091.785991792065,
+      "B_std": 2920.6376588622984,
+      "B_min": 0.0,
+      "B_max": 23939.0
+    },
+    "bright_components": {
+      "num_components": 1,
+      "components": [
+        {
+          "label": 2,
+          "area": 146052,
+          "left": 1852,
+          "top": 997,
+          "width": 245,
+          "height": 1011,
+          "centroid_x": 1980.6411072768603,
+          "centroid_y": 1480.393962424342
+        }
+      ],
+      "largest_component_area": 146052
+    },
+    "bottle_components": {
+      "num_components": 7,
+      "components": [
+        {
+          "label": 1,
+          "area": 5193,
+          "left": 1861,
+          "top": 957,
+          "width": 237,
+          "height": 65,
+          "centroid_x": 1972.1600231080301,
+          "centroid_y": 993.1864047756595
+        },
+        {
+          "label": 4,
+          "area": 4025,
+          "left": 2078,
+          "top": 1010,
+          "width": 30,
+          "height": 295,
+          "centroid_x": 2091.0337888198756,
+          "centroid_y": 1149.2862111801242
+        },
+        {
+          "label": 17,
+          "area": 27456,
+          "left": 1850,
+          "top": 1239,
+          "width": 132,
+          "height": 539,
+          "centroid_x": 1922.4706803613053,
+          "centroid_y": 1549.477309149184
+        },
+        {
+          "label": 24,
+          "area": 1593,
+          "left": 2073,
+          "top": 1306,
+          "width": 20,
+          "height": 136,
+          "centroid_x": 2081.13684871312,
+          "centroid_y": 1370.2743251726304
+        },
+        {
+          "label": 36,
+          "area": 3453,
+          "left": 2046,
+          "top": 1443,
+          "width": 40,
+          "height": 311,
+          "centroid_x": 2067.740805097017,
+          "centroid_y": 1593.2583260932522
+        },
+        {
+          "label": 44,
+          "area": 25626,
+          "left": 1813,
+          "top": 1774,
+          "width": 266,
+          "height": 242,
+          "centroid_x": 1891.4705377351129,
+          "centroid_y": 1896.183173339577
+        },
+        {
+          "label": 45,
+          "area": 597,
+          "left": 2065,
+          "top": 1789,
+          "width": 36,
+          "height": 45,
+          "centroid_x": 2087.4204355108877,
+          "centroid_y": 1808.4187604690117
+        }
+      ],
+      "largest_component_area": 27456
+    },
+    "background_ratio": 0.984188954035441,
+    "bottle_ratio": 0.005737860997517903,
+    "bright_ratio": 0.011618932088216146,
+    "intensity_contrast_bright_bg": 8133.040469710226,
+    "intensity_contrast_bright_bottle": 2832.093542715327
+  },
+  {
+    "filename": "140.dng",
+    "metadata": {
+      "width": 4096,
+      "height": 3072,
+      "channels": 3
+    },
+    "kmeans_method": "nested",
+    "level1_centers": [
+      10.333826262862592,
+      94.2180181731261
+    ],
+    "level2_centers": [
+      148.04582901682207,
+      88.91181700516518
+    ],
+    "region_stats": {
+      "background_pixels": 12362146,
+      "bottle_pixels": 183876,
+      "liquid_pixels": 36890,
+      "total_pixels": 12582912
+    },
+    "background_stats": {
+      "area": 12372313,
+      "mean_intensity": 1776.483380512601,
+      "std_intensity": 1982.6416872867383,
+      "min_intensity": 0.0,
+      "max_intensity": 57477.0,
+      "median_intensity": 1089.0,
+      "R_mean": 1450.5987963608745,
+      "R_std": 1341.4908431086835,
+      "R_min": 0.0,
+      "R_max": 23258.0,
+      "G_mean": 348.27347602667345,
+      "G_std": 519.9696884750501,
+      "G_min": 0.0,
+      "G_max": 22273.0,
+      "B_mean": 3530.577869150255,
+      "B_std": 2121.2746764377125,
+      "B_min": 0.0,
+      "B_max": 57477.0
+    },
+    "bottle_stats": {
+      "area": 192030,
+      "mean_intensity": 8338.379147355448,
+      "std_intensity": 2493.5721020791198,
+      "min_intensity": 0.0,
+      "max_intensity": 47905.0,
+      "median_intensity": 8337.0,
+      "R_mean": 8250.980607196792,
+      "R_std": 2560.4012745270834,
+      "R_min": 0.0,
+      "R_max": 18285.0,
+      "G_mean": 8614.300104150394,
+      "G_std": 2089.116907931046,
+      "G_min": 0.0,
+      "G_max": 20356.0,
+      "B_mean": 8149.856730719159,
+      "B_std": 2759.407502056132,
+      "B_min": 0.0,
+      "B_max": 47905.0
+    },
+    "bright_region_stats": {
+      "area": 36144,
+      "mean_intensity": 12934.650223181348,
+      "std_intensity": 2977.8156733915775,
+      "min_intensity": 0.0,
+      "max_intensity": 26243.0,
+      "median_intensity": 12981.0,
+      "R_mean": 12286.347471226207,
+      "R_std": 2980.622578169635,
+      "R_min": 0.0,
+      "R_max": 26243.0,
+      "G_mean": 14403.861470783533,
+      "G_std": 2230.8142497016115,
+      "G_min": 6135.0,
+      "G_max": 25310.0,
+      "B_mean": 12113.741727534307,
+      "B_std": 3080.3808981073057,
+      "B_min": 891.0,
+      "B_max": 23164.0
+    },
+    "bright_components": {
+      "num_components": 3,
+      "components": [
+        {
+          "label": 2,
+          "area": 20581,
+          "left": 2096,
+          "top": 1040,
+          "width": 92,
+          "height": 675,
+          "centroid_x": 2149.0992177250864,
+          "centroid_y": 1371.338710461105
+        },
+        {
+          "label": 12,
+          "area": 3388,
+          "left": 2006,
+          "top": 1769,
+          "width": 139,
+          "height": 81,
+          "centroid_x": 2102.9601534828807,
+          "centroid_y": 1803.6213105076743
+        },
+        {
+          "label": 14,
+          "area": 10826,
+          "left": 2084,
+          "top": 1911,
+          "width": 100,
+          "height": 160,
+          "centroid_x": 2134.315721411417,
+          "centroid_y": 1995.5759283207094
+        }
+      ],
+      "largest_component_area": 20581
+    },
+    "bottle_components": {
+      "num_components": 1,
+      "components": [
+        {
+          "label": 2,
+          "area": 190599,
+          "left": 1900,
+          "top": 984,
+          "width": 315,
+          "height": 1101,
+          "centroid_x": 2049.303385642107,
+          "centroid_y": 1573.127109795959
+        }
+      ],
+      "largest_component_area": 190599
+    },
+    "background_ratio": 0.98326309521993,
+    "bottle_ratio": 0.015261173248291016,
+    "bright_ratio": 0.002872467041015625,
+    "intensity_contrast_bright_bg": 11158.166842668747,
+    "intensity_contrast_bright_bottle": 4596.2710758259
+  },
+  {
+    "filename": "160.dng",
+    "metadata": {
+      "width": 4096,
+      "height": 3072,
+      "channels": 3
+    },
+    "kmeans_method": "nested",
+    "level1_centers": [
+      101.9308934909393,
+      11.411449723179217
+    ],
+    "level2_centers": [
+      124.07323701081236,
+      72.75406270766628
+    ],
+    "region_stats": {
+      "background_pixels": 12364069,
+      "bottle_pixels": 89079,
+      "liquid_pixels": 129764,
+      "total_pixels": 12582912
+    },
+    "background_stats": {
+      "area": 12373025,
+      "mean_intensity": 1739.65669128339,
+      "std_intensity": 1944.6166320455695,
+      "min_intensity": 0.0,
+      "max_intensity": 45924.0,
+      "median_intensity": 1066.0,
+      "R_mean": 1418.8378841067565,
+      "R_std": 1315.0223573969902,
+      "R_min": 0.0,
+      "R_max": 18826.0,
+      "G_mean": 341.09167248914474,
+      "G_std": 503.0048689272462,
+      "G_min": 0.0,
+      "G_max": 14689.0,
+      "B_mean": 3459.0405172542687,
+      "B_std": 2084.973447893965,
+      "B_min": 0.0,
+      "B_max": 45924.0
+    },
+    "bottle_stats": {
+      "area": 96764,
+      "mean_intensity": 6772.165426536039,
+      "std_intensity": 2262.4159605182153,
+      "min_intensity": 0.0,
+      "max_intensity": 21838.0,
+      "median_intensity": 6779.0,
+      "R_mean": 6816.817793807614,
+      "R_std": 2541.489833827136,
+      "R_min": 0.0,
+      "R_max": 21838.0,
+      "G_mean": 6980.220991277748,
+      "G_std": 1928.5173173677329,
+      "G_min": 306.0,
+      "G_max": 21252.0,
+      "B_mean": 6519.457494522756,
+      "B_std": 2251.2410056596295,
+      "B_min": 0.0,
+      "B_max": 17423.0
+    },
+    "bright_region_stats": {
+      "area": 128973,
+      "mean_intensity": 10093.620078104203,
+      "std_intensity": 2916.9085104016626,
+      "min_intensity": 0.0,
+      "max_intensity": 26208.0,
+      "median_intensity": 9900.0,
+      "R_mean": 9663.709621393626,
+      "R_std": 2902.717017546801,
+      "R_min": 0.0,
+      "R_max": 24814.0,
+      "G_mean": 10777.418451924046,
+      "G_std": 2550.6537971725706,
+      "G_min": 796.0,
+      "G_max": 26208.0,
+      "B_mean": 9839.732160994938,
+      "B_std": 3142.7062551076056,
+      "B_min": 0.0,
+      "B_max": 22861.0
+    },
+    "bright_components": {
+      "num_components": 2,
+      "components": [
+        {
+          "label": 2,
+          "area": 127690,
+          "left": 1916,
+          "top": 1004,
+          "width": 257,
+          "height": 1049,
+          "centroid_x": 2066.6253739525414,
+          "centroid_y": 1578.7882371368157
+        },
+        {
+          "label": 5,
+          "area": 564,
+          "left": 1944,
+          "top": 1866,
+          "width": 29,
+          "height": 42,
+          "centroid_x": 1955.25,
+          "centroid_y": 1882.936170212766
+        }
+      ],
+      "largest_component_area": 127690
+    },
+    "bottle_components": {
+      "num_components": 6,
+      "components": [
+        {
+          "label": 1,
+          "area": 518,
+          "left": 1959,
+          "top": 956,
+          "width": 31,
+          "height": 36,
+          "centroid_x": 1971.96138996139,
+          "centroid_y": 975.6196911196911
+        },
+        {
+          "label": 5,
+          "area": 4791,
+          "left": 1958,
+          "top": 980,
+          "width": 238,
+          "height": 42,
+          "centroid_x": 2078.3638071383843,
+          "centroid_y": 1004.0006261740764
+        },
+        {
+          "label": 6,
+          "area": 68280,
+          "left": 1919,
+          "top": 1025,
+          "width": 178,
+          "height": 793,
+          "centroid_x": 2014.0265231400117,
+          "centroid_y": 1441.4998974809607
+        },
+        {
+          "label": 15,
+          "area": 506,
+          "left": 872,
+          "top": 1430,
+          "width": 22,
+          "height": 39,
+          "centroid_x": 884.49604743083,
+          "centroid_y": 1450.9466403162055
+        },
+        {
+          "label": 20,
+          "area": 891,
+          "left": 2124,
+          "top": 1645,
+          "width": 25,
+          "height": 95,
+          "centroid_x": 2135.1649831649834,
+          "centroid_y": 1689.9753086419753
+        },
+        {
+          "label": 22,
+          "area": 18685,
+          "left": 1871,
+          "top": 1793,
+          "width": 236,
+          "height": 264,
+          "centroid_x": 1934.3599678886808,
+          "centroid_y": 1918.01873160289
+        }
+      ],
+      "largest_component_area": 68280
+    },
+    "background_ratio": 0.9833196798960367,
+    "bottle_ratio": 0.007690111796061198,
+    "bright_ratio": 0.010249853134155273,
+    "intensity_contrast_bright_bg": 8353.963386820813,
+    "intensity_contrast_bright_bottle": 3321.454651568163
+  },
+  {
+    "filename": "180.dng",
+    "metadata": {
+      "width": 4096,
+      "height": 3072,
+      "channels": 3
+    },
+    "kmeans_method": "nested",
+    "level1_centers": [
+      8.490768115397874,
+      71.20745163706958
+    ],
+    "level2_centers": [
+      52.45563210617524,
+      114.69164906891918
+    ],
+    "region_stats": {
+      "background_pixels": 12355982,
+      "bottle_pixels": 178408,
+      "liquid_pixels": 48522,
+      "total_pixels": 12582912
+    },
+    "background_stats": {
+      "area": 12378838,
+      "mean_intensity": 1727.879336870445,
+      "std_intensity": 1959.4107136005205,
+      "min_intensity": 0.0,
+      "max_intensity": 48326.0,
+      "median_intensity": 1039.0,
+      "R_mean": 1423.770271813881,
+      "R_std": 1347.119220174688,
+      "R_min": 0.0,
+      "R_max": 14314.0,
+      "G_mean": 364.34511874216304,
+      "G_std": 561.2965121838726,
+      "G_min": 0.0,
+      "G_max": 10853.0,
+      "B_mean": 3395.522620055291,
+      "B_std": 2157.624865067106,
+      "B_min": 0.0,
+      "B_max": 48326.0
+    },
+    "bottle_stats": {
+      "area": 196742,
+      "mean_intensity": 6763.849515270422,
+      "std_intensity": 2303.817618905393,
+      "min_intensity": 0.0,
+      "max_intensity": 39695.0,
+      "median_intensity": 6712.0,
+      "R_mean": 6798.262008112147,
+      "R_std": 2422.5117158307603,
+      "R_min": 0.0,
+      "R_max": 17520.0,
+      "G_mean": 6901.95176932226,
+      "G_std": 1829.179459092765,
+      "G_min": 0.0,
+      "G_max": 14480.0,
+      "B_mean": 6591.334768376859,
+      "B_std": 2580.3582244523764,
+      "B_min": 0.0,
+      "B_max": 39695.0
+    },
+    "bright_region_stats": {
+      "area": 48122,
+      "mean_intensity": 12863.543528254575,
+      "std_intensity": 4530.097559254152,
+      "min_intensity": 0.0,
+      "max_intensity": 35713.0,
+      "median_intensity": 12112.0,
+      "R_mean": 12012.623519388222,
+      "R_std": 3144.2198809343718,
+      "R_min": 0.0,
+      "R_max": 24953.0,
+      "G_mean": 14798.093616225427,
+      "G_std": 5422.6711183738,
+      "G_min": 4176.0,
+      "G_max": 35713.0,
+      "B_mean": 11779.913449150077,
+      "B_std": 4078.3658392395077,
+      "B_min": 0.0,
+      "B_max": 27872.0
+    },
+    "bright_components": {
+      "num_components": 3,
+      "components": [
+        {
+          "label": 2,
+          "area": 906,
+          "left": 1905,
+          "top": 1014,
+          "width": 26,
+          "height": 83,
+          "centroid_x": 1913.7693156732892,
+          "centroid_y": 1047.4006622516556
+        },
+        {
+          "label": 3,
+          "area": 21010,
+          "left": 2010,
+          "top": 1020,
+          "width": 93,
+          "height": 712,
+          "centroid_x": 2063.6685863874345,
+          "centroid_y": 1357.2091385054737
+        },
+        {
+          "label": 5,
+          "area": 26145,
+          "left": 1867,
+          "top": 1781,
+          "width": 236,
+          "height": 313,
+          "centroid_x": 2031.981870338497,
+          "centroid_y": 1951.6193536048959
+        }
+      ],
+      "largest_component_area": 26145
+    },
+    "bottle_components": {
+      "num_components": 2,
+      "components": [
+        {
+          "label": 2,
+          "area": 194911,
+          "left": 1798,
+          "top": 966,
+          "width": 332,
+          "height": 1142,
+          "centroid_x": 1954.018546926546,
+          "centroid_y": 1553.8941876035728
+        },
+        {
+          "label": 10,
+          "area": 971,
+          "left": 1050,
+          "top": 1365,
+          "width": 30,
+          "height": 45,
+          "centroid_x": 1066.247167868177,
+          "centroid_y": 1386.2533470648816
+        }
+      ],
+      "largest_component_area": 194911
+    },
+    "background_ratio": 0.983781655629476,
+    "bottle_ratio": 0.01563564936319987,
+    "bright_ratio": 0.0038243929545084634,
+    "intensity_contrast_bright_bg": 11135.66419138413,
+    "intensity_contrast_bright_bottle": 6099.694012984153
+  },
+  {
+    "filename": "200.dng",
+    "metadata": {
+      "width": 4096,
+      "height": 3072,
+      "channels": 3
+    },
+    "kmeans_method": "nested",
+    "level1_centers": [
+      10.151049623979429,
+      78.54523929241121
+    ],
+    "level2_centers": [
+      57.25111377151492,
+      115.30284186668216
+    ],
+    "region_stats": {
+      "background_pixels": 12364120,
+      "bottle_pixels": 137943,
+      "liquid_pixels": 80849,
+      "total_pixels": 12582912
+    },
+    "background_stats": {
+      "area": 12399236,
+      "mean_intensity": 1697.0134129769501,
+      "std_intensity": 1917.2136222560428,
+      "min_intensity": 0.0,
+      "max_intensity": 47295.0,
+      "median_intensity": 1030.0,
+      "R_mean": 1407.1429030788672,
+      "R_std": 1332.2345086431935,
+      "R_min": 0.0,
+      "R_max": 14043.0,
+      "G_mean": 376.9501359599898,
+      "G_std": 578.3144329853712,
+      "G_min": 0.0,
+      "G_max": 11173.0,
+      "B_mean": 3306.9471998919935,
+      "B_std": 2121.166915776669,
+      "B_min": 0.0,
+      "B_max": 47295.0
+    },
+    "bottle_stats": {
+      "area": 165807,
+      "mean_intensity": 5798.37435894343,
+      "std_intensity": 2131.929587510763,
+      "min_intensity": 0.0,
+      "max_intensity": 47295.0,
+      "median_intensity": 5746.0,
+      "R_mean": 5785.882363229538,
+      "R_std": 2310.864545329927,
+      "R_min": 0.0,
+      "R_max": 15730.0,
+      "G_mean": 5874.090346004692,
+      "G_std": 1669.2931082009381,
+      "G_min": 0.0,
+      "G_max": 14273.0,
+      "B_mean": 5735.15036759606,
+      "B_std": 2344.9628220135874,
+      "B_min": 0.0,
+      "B_max": 47295.0
+    },
+    "bright_region_stats": {
+      "area": 80314,
+      "mean_intensity": 10277.826240339999,
+      "std_intensity": 3378.1582948806913,
+      "min_intensity": 0.0,
+      "max_intensity": 31039.0,
+      "median_intensity": 9975.0,
+      "R_mean": 9136.024964514281,
+      "R_std": 3197.6034650230918,
+      "R_min": 0.0,
+      "R_max": 23913.0,
+      "G_mean": 10889.877281669447,
+      "G_std": 2951.9781062117236,
+      "G_min": 1962.0,
+      "G_max": 26686.0,
+      "B_mean": 10807.576474836267,
+      "B_std": 3652.1316782276717,
+      "B_min": 0.0,
+      "B_max": 31039.0
+    },
+    "bright_components": {
+      "num_components": 4,
+      "components": [
+        {
+          "label": 2,
+          "area": 22950,
+          "left": 1905,
+          "top": 1050,
+          "width": 73,
+          "height": 679,
+          "centroid_x": 1946.6029193899783,
+          "centroid_y": 1377.4407843137255
+        },
+        {
+          "label": 3,
+          "area": 1369,
+          "left": 1794,
+          "top": 1052,
+          "width": 33,
+          "height": 84,
+          "centroid_x": 1805.5171658144632,
+          "centroid_y": 1088.8897005113222
+        },
+        {
+          "label": 9,
+          "area": 42133,
+          "left": 1782,
+          "top": 1753,
+          "width": 225,
+          "height": 317,
+          "centroid_x": 1910.7865331213063,
+          "centroid_y": 1929.3915932879215
+        },
+        {
+          "label": 10,
+          "area": 13282,
+          "left": 2099,
+          "top": 2919,
+          "width": 218,
+          "height": 139,
+          "centroid_x": 2200.254856196356,
+          "centroid_y": 2984.481102243638
+        }
+      ],
+      "largest_component_area": 42133
+    },
+    "bottle_components": {
+      "num_components": 10,
+      "components": [
+        {
+          "label": 2,
+          "area": 144641,
+          "left": 1721,
+          "top": 1006,
+          "width": 283,
+          "height": 1067,
+          "centroid_x": 1847.4595930614419,
+          "centroid_y": 1514.097697056851
+        },
+        {
+          "label": 3,
+          "area": 4317,
+          "left": 1987,
+          "top": 1052,
+          "width": 34,
+          "height": 286,
+          "centroid_x": 2000.929580727357,
+          "centroid_y": 1188.004169562196
+        },
+        {
+          "label": 5,
+          "area": 695,
+          "left": 1006,
+          "top": 1077,
+          "width": 19,
+          "height": 64,
+          "centroid_x": 1015.2,
+          "centroid_y": 1107.0014388489208
+        },
+        {
+          "label": 9,
+          "area": 966,
+          "left": 1021,
+          "top": 1311,
+          "width": 30,
+          "height": 47,
+          "centroid_x": 1036.644927536232,
+          "centroid_y": 1334.4824016563148
+        },
+        {
+          "label": 10,
+          "area": 1636,
+          "left": 1982,
+          "top": 1338,
+          "width": 21,
+          "height": 118,
+          "centroid_x": 1991.4352078239608,
+          "centroid_y": 1396.309902200489
+        },
+        {
+          "label": 11,
+          "area": 953,
+          "left": 1979,
+          "top": 1460,
+          "width": 19,
+          "height": 70,
+          "centroid_x": 1987.4270724029382,
+          "centroid_y": 1494.186778593914
+        },
+        {
+          "label": 13,
+          "area": 646,
+          "left": 1977,
+          "top": 1531,
+          "width": 17,
+          "height": 54,
+          "centroid_x": 1983.9938080495356,
+          "centroid_y": 1559.595975232198
+        },
+        {
+          "label": 18,
+          "area": 914,
+          "left": 1991,
+          "top": 1903,
+          "width": 19,
+          "height": 112,
+          "centroid_x": 2001.2505470459519,
+          "centroid_y": 1963.6192560175054
+        },
+        {
+          "label": 21,
+          "area": 4419,
+          "left": 2091,
+          "top": 2912,
+          "width": 124,
+          "height": 108,
+          "centroid_x": 2140.8424983027835,
+          "centroid_y": 2958.4125367730257
+        },
+        {
+          "label": 23,
+          "area": 4265,
+          "left": 2093,
+          "top": 2941,
+          "width": 239,
+          "height": 131,
+          "centroid_x": 2204.737162954279,
+          "centroid_y": 3025.1805392731535
+        }
+      ],
+      "largest_component_area": 144641
+    },
+    "background_ratio": 0.9854027430216471,
+    "bottle_ratio": 0.013177156448364258,
+    "bright_ratio": 0.00638278325398763,
+    "intensity_contrast_bright_bg": 8580.812827363048,
+    "intensity_contrast_bright_bottle": 4479.451881396569
+  },
+  {
+    "filename": "240.dng",
+    "metadata": {
+      "width": 4096,
+      "height": 3072,
+      "channels": 3
+    },
+    "kmeans_method": "nested",
+    "level1_centers": [
+      12.77605903299127,
+      88.51070217830352
+    ],
+    "level2_centers": [
+      62.2468258870359,
+      114.40735382492377
+    ],
+    "region_stats": {
+      "background_pixels": 12360707,
+      "bottle_pixels": 101226,
+      "liquid_pixels": 120979,
+      "total_pixels": 12582912
+    },
+    "background_stats": {
+      "area": 12403940,
+      "mean_intensity": 1748.55430755604,
+      "std_intensity": 1949.1223307184719,
+      "min_intensity": 0.0,
+      "max_intensity": 41537.0,
+      "median_intensity": 1075.0,
+      "R_mean": 1430.6849215652446,
+      "R_std": 1340.0461945483084,
+      "R_min": 0.0,
+      "R_max": 13806.0,
+      "G_mean": 362.11162872442145,
+      "G_std": 562.1040561501278,
+      "G_min": 0.0,
+      "G_max": 10700.0,
+      "B_mean": 3452.866372378454,
+      "B_std": 2087.487711177534,
+      "B_min": 0.0,
+      "B_max": 41537.0
+    },
+    "bottle_stats": {
+      "area": 129791,
+      "mean_intensity": 4832.275994997085,
+      "std_intensity": 1887.5862507157785,
+      "min_intensity": 0.0,
+      "max_intensity": 42668.0,
+      "median_intensity": 4765.0,
+      "R_mean": 4898.691288301962,
+      "R_std": 2120.795978740564,
+      "R_min": 0.0,
+      "R_max": 18299.0,
+      "G_mean": 4815.211540091378,
+      "G_std": 1384.8337015840657,
+      "G_min": 0.0,
+      "G_max": 16202.0,
+      "B_mean": 4782.925156597915,
+      "B_std": 2065.494590922928,
+      "B_min": 0.0,
+      "B_max": 42668.0
+    },
+    "bright_region_stats": {
+      "area": 120316,
+      "mean_intensity": 8372.13185278766,
+      "std_intensity": 2775.0699774654254,
+      "min_intensity": 0.0,
+      "max_intensity": 22686.0,
+      "median_intensity": 8141.0,
+      "R_mean": 7939.010006981615,
+      "R_std": 2774.7686506948194,
+      "R_min": 0.0,
+      "R_max": 21571.0,
+      "G_mean": 8768.072941254695,
+      "G_std": 2626.8457283973603,
+      "G_min": 1408.0,
+      "G_max": 22686.0,
+      "B_mean": 8409.312610126666,
+      "B_std": 2856.157262169654,
+      "B_min": 0.0,
+      "B_max": 19919.0
+    },
+    "bright_components": {
+      "num_components": 2,
+      "components": [
+        {
+          "label": 1,
+          "area": 12147,
+          "left": 1797,
+          "top": 929,
+          "width": 114,
+          "height": 706,
+          "centroid_x": 1830.550670947559,
+          "centroid_y": 1234.6590104552565
+        },
+        {
+          "label": 2,
+          "area": 107718,
+          "left": 1773,
+          "top": 945,
+          "width": 273,
+          "height": 1087,
+          "centroid_x": 1944.9604987095936,
+          "centroid_y": 1661.0549676005867
+        }
+      ],
+      "largest_component_area": 107718
+    },
+    "bottle_components": {
+      "num_components": 6,
+      "components": [
+        {
+          "label": 4,
+          "area": 902,
+          "left": 1810,
+          "top": 899,
+          "width": 38,
+          "height": 43,
+          "centroid_x": 1827.8470066518846,
+          "centroid_y": 919.7039911308204
+        },
+        {
+          "label": 6,
+          "area": 116513,
+          "left": 1732,
+          "top": 923,
+          "width": 327,
+          "height": 1110,
+          "centroid_x": 1878.3060345197532,
+          "centroid_y": 1415.6834001356071
+        },
+        {
+          "label": 19,
+          "area": 799,
+          "left": 969,
+          "top": 1062,
+          "width": 25,
+          "height": 61,
+          "centroid_x": 982.3854818523154,
+          "centroid_y": 1088.342928660826
+        },
+        {
+          "label": 45,
+          "area": 1368,
+          "left": 978,
+          "top": 1296,
+          "width": 36,
+          "height": 64,
+          "centroid_x": 995.828216374269,
+          "centroid_y": 1328.2777777777778
+        },
+        {
+          "label": 75,
+          "area": 1321,
+          "left": 1987,
+          "top": 1606,
+          "width": 33,
+          "height": 121,
+          "centroid_x": 2006.5071915215747,
+          "centroid_y": 1657.569265707797
+        },
+        {
+          "label": 81,
+          "area": 3187,
+          "left": 2221,
+          "top": 2807,
+          "width": 73,
+          "height": 92,
+          "centroid_x": 2259.3266394728585,
+          "centroid_y": 2853.1139002196423
+        }
+      ],
+      "largest_component_area": 116513
+    },
+    "background_ratio": 0.9857765833536783,
+    "bottle_ratio": 0.010314861933390299,
+    "bright_ratio": 0.009561856587727865,
+    "intensity_contrast_bright_bg": 6623.577545231619,
+    "intensity_contrast_bright_bottle": 3539.855857790574
+  }
+]

@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import rawpy
 
-from roi_config import (
+from ..config.roi_config import (
     DATA_DIR,
     OUTPUT_DIR,
     SAVE_VISUALIZATION,
@@ -23,8 +23,8 @@ from roi_config import (
     REUSE_LAST_SELECTION,
     SELECTION_CACHE_PATH,
 )
-from roi_gui import BackgroundSelection, ROISelection, select_roi_with_gui
-from roi_manual import ManualROITools
+from .roi_gui import BackgroundSelection, ROISelection, select_roi_with_gui
+from ..processing.roi_manual import ManualROITools
 
 # 字体设置：尽量兼容中英文
 matplotlib.rcParams["font.sans-serif"] = [

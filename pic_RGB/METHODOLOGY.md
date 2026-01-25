@@ -1,6 +1,6 @@
 # pic_RGB 方法说明 (Methodology)
 
-本文档对应 `roi_processor.py` 的实现，说明 RAW 读取、ROI/BG 定义、统计量与输出字段。
+本文档对应 `extraction/roi_processor.py` 的实现，说明 RAW 读取、ROI/BG 定义、统计量与输出字段。
 
 ## 1. 数据读取与预处理
 
@@ -106,5 +106,5 @@ JSON 为列表，每个元素对应一张图，字段基本与 `roi_features.csv
 
 - 历史选择从 `roi_results.json` 与 `roi_selection_cache.json` 读取（按文件名匹配）。
 - `REUSE_LAST_SELECTION=True` 时，若存在同名文件历史选择则跳过 GUI。
-- 若需要“一次选区复用整批”，可参考 `test_detailed_stats.py`：先 `select_roi_with_gui()` 得到 `(roi_sel, bg_sel)`，再对每张图调用 `process_image(..., roi_selection=roi_sel, bg_selection=bg_sel, interactive=False)`。
+- ?????????????????????????????????????????`select_roi_with_gui()` ??? `(roi_sel, bg_sel)`???????????? `process_image(..., roi_selection=roi_sel, bg_selection=bg_sel, interactive=False)`??
 

@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 
-from roi_config import ROISettings
+from ..config.roi_config import ROISettings
 
 
 class ManualROITools:

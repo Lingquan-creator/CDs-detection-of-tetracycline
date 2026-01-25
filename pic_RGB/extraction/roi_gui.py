@@ -34,8 +34,8 @@ from PySide6.QtWidgets import (
     QGridLayout,
 )
 
-from roi_config import ROISettings
-from roi_manual import ManualROITools
+from ..config.roi_config import ROISettings
+from ..processing.roi_manual import ManualROITools
 
 
 @dataclass
