@@ -7,8 +7,8 @@ from pathlib import Path
 # ============================================
 # 路径配置
 # ============================================
-DATA_DIR = Path(r"h:\000\CDs\pic_Kmeans\a")       # 输入DNG文件目录
-OUTPUT_DIR = Path(r"h:\000\CDs\pic_Kmeans\roi_results")  # 输出结果目录
+DATA_DIR = Path(r"h:\000\CDs\pic_RGB\data_pic")       # 输入DNG文件目录
+OUTPUT_DIR = Path(r"h:\000\CDs\pic_RGB\roi_results")  # 输出结果目录
 
 # ============================================
 # K-means 参数

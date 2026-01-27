@@ -62,21 +62,11 @@ BG 的中心允许独立于 ROI（便于避开局部杂散光）；GUI 中按 `B
 
 ## 5. 输出文件与字段
 
-### 5.1 `roi_features.csv`
+### 5.1 `roi_results.json`
 
-表头（与代码一致）：
+JSON list；每个元素对应一张图，包含几何信息、ROI/BG 均值与扣除值、显示值，以及可选元数据（`exposure_time`, `iso`）。默认不再输出额外 CSV。
 
-`filename,center_x,center_y,width,height,angle_deg,bg_center_x,bg_center_y,bg_inner_x,bg_inner_y,bg_outer_x,bg_outer_y,bg_angle_deg,area,R_mean,G1_mean,G2_mean,B_mean,R_bg,G1_bg,G2_bg,B_bg,R_corrected,G1_corrected,G2_corrected,B_corrected,R_display,G_display,B_display,exposure_time,iso`
-
-### 5.2 `feature_matrix.npy`
-
-形状 `(N, 4)`，每行对应一张图的背景扣除特征向量 `[R_corrected, G1_corrected, G2_corrected, B_corrected]`。
-
-### 5.3 `roi_results.json`
-
-JSON 为列表，每个元素对应一张图，字段基本与 `roi_features.csv` 一一对应（包含几何、均值/背景/扣除值、显示值与可选元数据）。
-
-### 5.4 `roi_detailed_statistics.csv`
+### 5.2 `roi_detailed_statistics.csv`
 
 每行对应一张图，包含：
 
@@ -86,9 +76,9 @@ JSON 为列表，每个元素对应一张图，字段基本与 `roi_features.csv
 
 浮点数按 `%.6f` 写入。
 
-### 5.5 `*_roi.png`
+### 5.3（可选）`*_roi.png`
 
-当 `SAVE_VISUALIZATION=True` 时生成，包含：
+开启 `SAVE_VISUALIZATION=True` 时才生成；默认关闭以精简输出。
 
 - 强度图 `Y = max(R, G1, G2, B)`
 - ROI/BG mask 可视化

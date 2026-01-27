@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+# Allow running this file directly (python pic_RGB/extraction/roi_processor.py)
+import sys
+from pathlib import Path as _Path
+_PROJECT_ROOT = _Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -11,7 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import rawpy
 
-from ..config.roi_config import (
+from pic_RGB.config.roi_config import (
     DATA_DIR,
     OUTPUT_DIR,
     SAVE_VISUALIZATION,
@@ -23,8 +30,8 @@ from ..config.roi_config import (
     REUSE_LAST_SELECTION,
     SELECTION_CACHE_PATH,
 )
-from .roi_gui import BackgroundSelection, ROISelection, select_roi_with_gui
-from ..processing.roi_manual import ManualROITools
+from pic_RGB.extraction.roi_gui import BackgroundSelection, ROISelection, select_roi_with_gui
+from pic_RGB.processing.roi_manual import ManualROITools
 
 # 字体设置：尽量兼容中英文
 matplotlib.rcParams["font.sans-serif"] = [
@@ -70,8 +77,14 @@ class ROIResult:
     R_display: float
     G_display: float
     B_display: float
+    R_var: float = 0.0
+    G1_var: float = 0.0
+    G2_var: float = 0.0
+    B_var: float = 0.0
+    RGB_mse: float = 0.0
     exposure_time: Optional[float] = None
     iso: Optional[int] = None
+    aperture: Optional[float] = None
 
     def to_dict(self) -> Dict:
         data = asdict(self)
@@ -221,6 +234,7 @@ class ROIProcessor:
             metadata = {
                 "exposure_time": None,
                 "iso": None,
+                "aperture": None,
                 "black_level": None,
                 "white_level": None,
             }
@@ -230,6 +244,19 @@ class ROIProcessor:
                     metadata["white_level"] = raw.white_level
                 elif hasattr(raw, "camera_white_level_per_channel"):
                     metadata["white_level"] = raw.camera_white_level_per_channel
+            except Exception:
+                pass
+
+            # Try to read exposure / ISO / aperture when available
+            try:
+                md = getattr(raw, "metadata", None)
+                if md:
+                    if hasattr(md, "shutter"):
+                        metadata["exposure_time"] = float(md.shutter)
+                    if hasattr(md, "iso_speed"):
+                        metadata["iso"] = int(md.iso_speed)
+                    if hasattr(md, "aperture"):
+                        metadata["aperture"] = float(md.aperture)
             except Exception:
                 pass
 
@@ -321,13 +348,17 @@ class ROIProcessor:
         stats["B_G_ratio"] = stats["B_mean"] / (G_mean + epsilon)
         stats["R_B_ratio"] = stats["R_mean"] / (stats["B_mean"] + epsilon)
         stats["G1_G2_ratio"] = stats["G1_mean"] / (stats["G2_mean"] + epsilon)
-        
+        # Overall RGB MSE: average of per-channel variances (mean squared error to channel means)
+        stats["RGB_mse"] = float(
+            (stats["R_var"] + stats["G1_var"] + stats["G2_var"] + stats["B_var"]) / len(channel_names)
+        )
+
         return stats
 
     def process_image(
         self,
         filepath: Path,
-        save_visualization: bool = True,
+        save_visualization: bool = False,
         output_dir: Optional[Path] = None,
         roi_selection: Optional[ROISelection] = None,
         bg_selection: Optional[BackgroundSelection] = None,
@@ -502,6 +533,11 @@ class ROIProcessor:
             G1_mean=roi_stats["G1_mean"],
             G2_mean=roi_stats["G2_mean"],
             B_mean=roi_stats["B_mean"],
+            R_var=roi_stats["R_var"],
+            G1_var=roi_stats["G1_var"],
+            G2_var=roi_stats["G2_var"],
+            B_var=roi_stats["B_var"],
+            RGB_mse=roi_stats["RGB_mse"],
             R_bg=bg_stats["R_mean"],
             G1_bg=bg_stats["G1_mean"],
             G2_bg=bg_stats["G2_mean"],
@@ -515,6 +551,7 @@ class ROIProcessor:
             B_display=max(0, B_corrected),
             exposure_time=metadata.get("exposure_time"),
             iso=metadata.get("iso"),
+            aperture=metadata.get("aperture"),
         )
 
         print(
@@ -628,7 +665,7 @@ class ROIProcessor:
         self,
         image_dir: Path,
         output_dir: Optional[Path] = None,
-        save_visualization: bool = True,
+        save_visualization: bool = False,
         roi_selection: Optional[ROISelection] = None,
         bg_selection: Optional[BackgroundSelection] = None,
         interactive: bool = True,
@@ -671,46 +708,13 @@ class ROIProcessor:
         return results
 
     def _save_results(self, results: List[ROIResult], output_dir: Path):
-        """保存 JSON/CSV/NPY 结果。"""
+        """Save minimal JSON output only."""
         output_dir.mkdir(parents=True, exist_ok=True)
 
         json_path = output_dir / "roi_results.json"
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump([r.to_dict() for r in results], f, indent=2, ensure_ascii=False)
-        print(f"\nJSON 结果已保存: {json_path}")
-
-        csv_path = output_dir / "roi_features.csv"
-        with open(csv_path, "w", encoding="utf-8") as f:
-            f.write(
-                "filename,center_x,center_y,width,height,angle_deg,bg_center_x,bg_center_y,bg_inner_x,bg_inner_y,bg_outer_x,bg_outer_y,bg_angle_deg,area,"
-            )
-            f.write("R_mean,G1_mean,G2_mean,B_mean,")
-            f.write("R_bg,G1_bg,G2_bg,B_bg,")
-            f.write("R_corrected,G1_corrected,G2_corrected,B_corrected,")
-            f.write("R_display,G_display,B_display,")
-            f.write("exposure_time,iso\n")
-            for r in results:
-                f.write(
-                    f"{r.filename},{r.center_x:.2f},{r.center_y:.2f},{r.width:.2f},{r.height:.2f},{r.angle_deg:.2f},"
-                    f"{r.bg_center_x:.2f},{r.bg_center_y:.2f},{r.bg_inner_x:.2f},{r.bg_inner_y:.2f},{r.bg_outer_x:.2f},{r.bg_outer_y:.2f},{r.bg_angle_deg:.2f},{r.area},"
-                )
-                f.write(
-                    f"{r.R_mean:.2f},{r.G1_mean:.2f},{r.G2_mean:.2f},{r.B_mean:.2f},"
-                )
-                f.write(
-                    f"{r.R_bg:.2f},{r.G1_bg:.2f},{r.G2_bg:.2f},{r.B_bg:.2f},"
-                )
-                f.write(
-                    f"{r.R_corrected:.2f},{r.G1_corrected:.2f},{r.G2_corrected:.2f},{r.B_corrected:.2f},"
-                )
-                f.write(f"{r.R_display:.2f},{r.G_display:.2f},{r.B_display:.2f},")
-                f.write(f"{r.exposure_time},{r.iso}\n")
-        print(f"CSV 特征已保存: {csv_path}")
-
-        features_path = output_dir / "feature_matrix.npy"
-        feature_matrix = np.array([r.get_feature_vector() for r in results])
-        np.save(features_path, feature_matrix)
-        print(f"特征矩阵已保存: {features_path} (shape: {feature_matrix.shape})")
+        print(f"\nJSON saved: {json_path}")
 
     def _save_detailed_statistics(self, results: List[ROIResult], output_dir: Path):
         """保存详细的统计信息到单独的CSV文件，包括均值、方差、分位数、饱和比例和通道比值。"""

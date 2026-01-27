@@ -71,7 +71,7 @@ class ROISettings:
 # ============================================
 # Output control
 # ============================================
-SAVE_VISUALIZATION = True
+SAVE_VISUALIZATION = False  # Default off: keep outputs minimal (JSON + one CSV)
 VISUALIZATION_DPI = 150
 VISUALIZATION_FIGSIZE = (15, 10)
 

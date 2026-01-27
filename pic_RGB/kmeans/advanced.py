@@ -14,7 +14,7 @@ import rawpy
 from scipy import ndimage
 from sklearn.cluster import KMeans
 
-from config import (
+from .config import (
     ANALYZE_COLOR_CHANNELS,
     ANALYZE_CONNECTED_COMPONENTS,
     APPLY_MORPHOLOGY,
