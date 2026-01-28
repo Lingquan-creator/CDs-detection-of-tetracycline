@@ -5,13 +5,13 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 
-from ..config.roi_config import ROISettings
+from ..config import settings as config
 
 
 class ManualROITools:
     """固定尺寸 ROI 及背景环的生成工具。"""
 
-    def __init__(self, settings: ROISettings):
+    def __init__(self, settings: config.ROISettings):
         self.settings = settings
 
     def get_rotated_box(

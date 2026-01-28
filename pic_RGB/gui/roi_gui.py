@@ -34,7 +34,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
 )
 
-from ..config.roi_config import ROISettings
+from ..config import settings as config
 from ..processing.roi_manual import ManualROITools
 
 
@@ -306,17 +306,14 @@ class ImageWidget(QWidget):
             angle_deg=self.roi.angle_deg
         )
         
-        # Update BG center if BG is active, allowing split centers
-        new_bg_center = new_roi.center if self.active_region == "roi" else self.bg.center
-        if self.active_region == "bg":
-            # If we are dragging while BG is active, we don't move BG center by drag usually,
-            # but users might expect to draw a new BG region?
-            # For simplicity, drag always defines the main ROI box.
-            pass
+        payload = {}
+        if self.active_region == "roi":
+            payload["roi"] = new_roi
         else:
-             new_bg_center = new_roi.center
+            payload["bg_center"] = (cx, cy)
 
-        self.roi_updated.emit({"roi": new_roi, "bg_center": new_bg_center, "active_region": self.active_region})
+        if payload:
+            self.roi_updated.emit(payload)
 
 
 class ControlsWidget(QWidget):
@@ -324,7 +321,7 @@ class ControlsWidget(QWidget):
     
     values_changed = Signal(object) # Emit full state or partial
     
-    def __init__(self, settings: ROISettings, parent=None):
+    def __init__(self, settings: config.ROISettings, parent=None):
         super().__init__(parent)
         self.layout = QVBoxLayout(self)
         
@@ -363,6 +360,7 @@ class ControlsWidget(QWidget):
         self.spin_bg_in_y = self._create_spinbox(0, 1000, "Inner Y Offset")
         self.spin_bg_out_x = self._create_spinbox(0, 1000, "Outer X Offset")
         self.spin_bg_out_y = self._create_spinbox(0, 1000, "Outer Y Offset")
+        self.spin_bg_angle = self._create_double_spinbox(0, 360, "BG Angle")
 
         bg_layout.addWidget(QLabel("Center X:"), 0, 0)
         bg_layout.addWidget(self.spin_bg_cx, 0, 1)
@@ -376,9 +374,11 @@ class ControlsWidget(QWidget):
         bg_layout.addWidget(self.spin_bg_out_x, 4, 1)
         bg_layout.addWidget(QLabel("Outer Y:"), 5, 0)
         bg_layout.addWidget(self.spin_bg_out_y, 5, 1)
+        bg_layout.addWidget(QLabel("Angle:"), 6, 0)
+        bg_layout.addWidget(self.spin_bg_angle, 6, 1)
         
         self.btn_align_bg = QPushButton("Align BG to ROI Center")
-        bg_layout.addWidget(self.btn_align_bg, 6, 0, 1, 2)
+        bg_layout.addWidget(self.btn_align_bg, 7, 0, 1, 2)
         
         self.bg_group.setLayout(bg_layout)
         self.layout.addWidget(self.bg_group)
@@ -396,6 +396,7 @@ class ControlsWidget(QWidget):
         
         for spin in [self.spin_bg_cx, self.spin_bg_cy, self.spin_bg_in_x, self.spin_bg_in_y, self.spin_bg_out_x, self.spin_bg_out_y]:
             spin.valueChanged.connect(self._on_bg_changed)
+        self.spin_bg_angle.valueChanged.connect(self._on_bg_changed)
             
         self.btn_align_bg.clicked.connect(self._on_align_bg)
 
@@ -426,6 +427,7 @@ class ControlsWidget(QWidget):
         self.spin_bg_in_y.setValue(int(bg.inner_y))
         self.spin_bg_out_x.setValue(int(bg.outer_x))
         self.spin_bg_out_y.setValue(int(bg.outer_y))
+        self.spin_bg_angle.setValue(bg.angle_deg)
         self.blockSignals(False)
 
     def _on_roi_changed(self):
@@ -444,8 +446,7 @@ class ControlsWidget(QWidget):
             inner_y=self.spin_bg_in_y.value(),
             outer_x=self.spin_bg_out_x.value(),
             outer_y=self.spin_bg_out_y.value(),
-            # Usually BG angle is same as ROI, but if we want to allow decoupled angle we could add control
-            angle_deg=self.spin_roi_a.value() 
+            angle_deg=self.spin_bg_angle.value(),
         )
         self.values_changed.emit({"bg": bg})
 
@@ -460,7 +461,7 @@ class ROISelectorWindow(QMainWindow):
     def __init__(
         self,
         raw_channels: np.ndarray,
-        settings: ROISettings,
+        settings: config.ROISettings,
         initial_roi: Optional[ROISelection] = None,
         initial_bg: Optional[BackgroundSelection] = None,
     ):
@@ -548,95 +549,58 @@ class ROISelectorWindow(QMainWindow):
         if "roi" in data:
             self.roi = data["roi"]
         if "bg_center" in data:
-            old_bg = self.bg
             self.bg = BackgroundSelection(
                 center=data["bg_center"],
-                inner_x=old_bg.inner_x,
-                inner_y=old_bg.inner_y,
-                outer_x=old_bg.outer_x,
-                outer_y=old_bg.outer_y,
-                angle_deg=old_bg.angle_deg
+                inner_x=self.bg.inner_x,
+                inner_y=self.bg.inner_y,
+                outer_x=self.bg.outer_x,
+                outer_y=self.bg.outer_y,
+                angle_deg=self.bg.angle_deg,
             )
-            # Ensure ROI angle updates BG
-            self.bg.angle_deg = self.roi.angle_deg
 
         self.canvas.set_data(self.roi, self.bg)
         self.controls.update_from_selection(self.roi, self.bg)
 
     def _on_controls_interaction(self, data):
-        # Handle logic for anchored resizing if parameters changed via spinbox
-        # However, spinbox interaction is absolute. We need to detect delta.
-        # This function receives the *new* ROI/BG object constructed from spinbox values.
-        # It's easier to just apply them directly.
-        # Use helper for anchored resizing only if needed.
-        # But wait, user requested "In adjusting roi and bg ring" -> likely meaning all adjustments?
-        # If user types in a number, do they expect the box to grow from center or corner?
-        # Usually from center is standard for spinboxes unless specified. 
-        # But for consistency, let's try to apply the anchor logic here too if we can transform the event.
-        # But we receive the final object here. We need the old one to compute delta.
+        # When user changes values in spinboxes, keep center fixed when only size changes.
+        # Only update center if the user explicitly changed center coordinates.
         
-        # Current logic replaces self.roi / self.bg.
         if "roi" in data:
             new_roi = data["roi"]
-            # Detect dimension change
-            d_w = new_roi.width - self.roi.width
-            d_h = new_roi.height - self.roi.height
-            d_a = new_roi.angle_deg - self.roi.angle_deg
-            
-            # If size changed, we might want to shift center to maintain anchor
-            # UNLESS the center was ALSO changed by the user (spinbox).
-            # If user edits Width, center remains same in 'new_roi' (as constructed in _on_roi_changed).
-            # So d_center is 0.
-            if abs(d_w) > 1e-4 or abs(d_h) > 1e-4:
-                 # Calculate shift needed to keep anchor
-                 # shift logic matches _handle_global_key logic
-                 angle_rad = math.radians(self.roi.angle_deg)
-                 # dx local = d_w / 2
-                 # dy local = -d_h / 2
-                 # Global shift:
-                 shift_x = (d_w / 2) * math.cos(angle_rad) + (d_h / 2) * math.sin(angle_rad)
-                 shift_y = (d_w / 2) * math.sin(angle_rad) - (d_h / 2) * math.cos(angle_rad)
-                 
-                 # Apply shift to the NEW center
-                 new_cx = new_roi.center[0] + shift_x
-                 new_cy = new_roi.center[1] + shift_y
-                 
-                 new_roi.center = (new_cx, new_cy)
-
-            self.roi = new_roi
-            # Also sync angle to BG if needed
-            self.bg = BackgroundSelection(
-                center=self.bg.center, # BG center kept separate unless aligned
-                inner_x=self.bg.inner_x,
-                inner_y=self.bg.inner_y,
-                outer_x=self.bg.outer_x, # BG outer kept same
-                outer_y=self.bg.outer_y,
-                angle_deg=self.roi.angle_deg
-            )
+            # Check if only size/angle changed (center unchanged) -> preserve center
+            if (abs(new_roi.center[0] - self.roi.center[0]) < 0.01 and
+                abs(new_roi.center[1] - self.roi.center[1]) < 0.01):
+                # User didn't change center, so keep the original center
+                self.roi = ROISelection(
+                    center=self.roi.center,
+                    width=new_roi.width,
+                    height=new_roi.height,
+                    angle_deg=new_roi.angle_deg
+                )
+            else:
+                # User changed center, so use the new center
+                self.roi = new_roi
             
         if "bg" in data:
-            # Similar logic for BG?
             new_bg = data["bg"]
-            # Check for Outer Offset change
-            d_ox = new_bg.outer_x - self.bg.outer_x
-            d_oy = new_bg.outer_y - self.bg.outer_y
-            
-            if abs(d_ox) > 1e-4 or abs(d_oy) > 1e-4:
-                 # For BG, width change = 2 * d_ox
-                 # So d_w_bg = 2 * d_ox
-                 angle_rad = math.radians(self.bg.angle_deg)
-                 # shift = (d_w_bg / 2) = d_ox
-                 shift_x = d_ox * math.cos(angle_rad) + d_oy * math.sin(angle_rad)
-                 shift_y = d_ox * math.sin(angle_rad) - d_oy * math.cos(angle_rad)
-                 
-                 new_cx = new_bg.center[0] + shift_x
-                 new_cy = new_bg.center[1] + shift_y
-                 new_bg.center = (new_cx, new_cy)
-
-            self.bg = new_bg
+            # Check if only size/angle changed (center unchanged) -> preserve center
+            if (abs(new_bg.center[0] - self.bg.center[0]) < 0.01 and
+                abs(new_bg.center[1] - self.bg.center[1]) < 0.01):
+                # User didn't change center, so keep the original center
+                self.bg = BackgroundSelection(
+                    center=self.bg.center,
+                    inner_x=new_bg.inner_x,
+                    inner_y=new_bg.inner_y,
+                    outer_x=new_bg.outer_x,
+                    outer_y=new_bg.outer_y,
+                    angle_deg=new_bg.angle_deg
+                )
+            else:
+                # User changed center, so use the new center
+                self.bg = new_bg
             
         self.canvas.set_data(self.roi, self.bg)
-        # Update spinboxes again to reflect the shifted center
+        # Update spinboxes to ensure they reflect current state
         self.controls.update_from_selection(self.roi, self.bg)
 
     def _confirm_selection(self):
@@ -710,9 +674,10 @@ class ROISelectorWindow(QMainWindow):
         elif key == Qt.Key_Q: d_angle = -angle_step
         
         if d_angle != 0:
-            new_angle = (self.roi.angle_deg + d_angle) % 360
-            self.roi.angle_deg = new_angle
-            self.bg.angle_deg = new_angle
+            if self.active_region_mode == "roi":
+                self.roi.angle_deg = (self.roi.angle_deg + d_angle) % 360
+            else:
+                self.bg.angle_deg = (self.bg.angle_deg + d_angle) % 360
             self.canvas.set_data(self.roi, self.bg)
             self.controls.update_from_selection(self.roi, self.bg)
             return
@@ -814,7 +779,7 @@ class ROISelectorWindow(QMainWindow):
 
 def select_roi_with_gui(
     raw_channels: np.ndarray,
-    settings: ROISettings,
+    settings: config.ROISettings,
     initial_roi: Optional[ROISelection] = None,
     initial_bg: Optional[BackgroundSelection] = None,
 ) -> Tuple[ROISelection, BackgroundSelection]:

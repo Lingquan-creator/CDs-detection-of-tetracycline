@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 from typing import Iterable, List
 
-from pic_RGB.extraction.roi_processor import ROIResult
+from pic_RGB.pipeline.roi_processor import ROIResult
 
 
 def build_feature_vectors(results: Iterable[ROIResult]) -> np.ndarray:

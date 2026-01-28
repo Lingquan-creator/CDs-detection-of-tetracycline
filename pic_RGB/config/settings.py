@@ -1,5 +1,6 @@
 """
-ROI extractor configuration for GUI-driven manual selection.
+Unified configuration for the ROI + K-means workflow.
+Keeps a single source of truth for paths, ROI defaults, and output switches.
 """
 
 from dataclasses import asdict, dataclass
@@ -9,8 +10,32 @@ from typing import Any, Dict, Optional
 # ============================================
 # Paths
 # ============================================
-DATA_DIR = Path(r"h:\000\CDs\pic_RGB\data_pic")       # Input DNG directory
-OUTPUT_DIR = Path(r"h:\000\CDs\pic_RGB\roi_results")  # Output directory
+DATA_DIR = Path(r"H:\000\CDs\pic_RGB\data_set_2")  # Input DNG directory
+OUTPUT_DIR = Path(r"H:\000\CDs\pic_RGB\data_set_2\roi_results")  # Output directory
+IMAGE_EXTENSION = "*.dng"
+
+# ============================================
+# Output switches
+# ============================================
+EXPORT_JSON = True  # Always keep JSON output
+EXPORT_CSV = True   # Detailed CSV statistics
+EXPORT_PNG = False  # Visualization PNGs
+
+# ============================================
+# Workflow toggles
+# ============================================
+DEFAULT_INTERACTIVE = True
+OVERWRITE_SELECTION = True
+REUSE_LAST_SELECTION = False
+
+# Selection cache path for persisted ROI/BG choices
+SELECTION_CACHE_PATH = OUTPUT_DIR / "roi_selection_cache.json"
+
+# ============================================
+# Visualization
+# ============================================
+VISUALIZATION_DPI = 150
+VISUALIZATION_FIGSIZE = (15, 10)
 
 # ============================================
 # ROI parameters (dict form)
@@ -28,7 +53,7 @@ DEFAULT_PARAMS: Dict[str, Any] = {
     "angle_step_deg": 0.5,
 }
 
-CURRENT_CONFIG: Dict[str, Any] = DEFAULT_PARAMS
+CURRENT_CONFIG: Dict[str, Any] = DEFAULT_PARAMS.copy()
 
 
 # ============================================
@@ -45,7 +70,7 @@ class ROISettings:
     bg_ring_inner_y: int = 80
     bg_ring_outer_x: int = 240
     bg_ring_outer_y: int = 240
-    move_step: int = 5
+    move_step: int = 2
     size_step: int = 5
     angle_step_deg: float = 0.5
 
@@ -69,41 +94,20 @@ class ROISettings:
 
 
 # ============================================
-# Output control
-# ============================================
-SAVE_VISUALIZATION = False  # Default off: keep outputs minimal (JSON + one CSV)
-VISUALIZATION_DPI = 150
-VISUALIZATION_FIGSIZE = (15, 10)
-
-# ============================================
-# Selection persistence
-# ============================================
-# When True, reuse cached ROI/BG selections for images with the same filename.
-# Sources: existing `roi_results/roi_results.json` (previous runs) + a lightweight cache file
-# for single-image runs. With reuse enabled and a match found, GUI is skipped.
-REUSE_LAST_SELECTION = False
-# JSON file to store per-image ROI/BG selections (used as a lightweight cache for single runs).
-SELECTION_CACHE_PATH = OUTPUT_DIR / "roi_selection_cache.json"
-
-# ============================================
 # GUI shortcuts (for quick reference / help screens)
 # ============================================
 GUI_SHORTCUTS = [
-    "Mouse drag: draw ROI (keeps current angle)",
+    "Mouse drag: ROI active -> draw ROI; BG active -> move BG center",
     "Tab: toggle ROI / BG ring",
     "W/A/S/D: move active region center",
-    "Arrows (BG active): adjust outer ring X/Y",
-    "E/R: rotate +/- (step=angle_step_deg); B: align BG center to ROI",
+    "Arrows: active=BG adjust outer_x/outer_y; active=ROI adjust width/height",
+    "Q/E: rotate active region (step=angle_step_deg); B: align BG center to ROI",
     "Enter: confirm | Q/ESC: cancel",
 ]
 
 # ============================================
-# Misc
+# Helpers
 # ============================================
-VERBOSE = True
-IMAGE_EXTENSION = "*.dng"
-
-
 def get_config_dict() -> Dict[str, Any]:
     """Return a shallow copy of the active config."""
     return dict(CURRENT_CONFIG)
@@ -130,12 +134,10 @@ def print_config():
     print(f"  BG ring outer: ({settings.bg_ring_outer_x}, {settings.bg_ring_outer_y}) px")
     print(f"  Move step: {settings.move_step}px | Size step: {settings.size_step}px | Angle step: {settings.angle_step_deg} deg")
     print(f"\nSelection cache: reuse={REUSE_LAST_SELECTION} -> {SELECTION_CACHE_PATH}")
-    print("\nGUI shortcuts:")
-    for line in GUI_SHORTCUTS:
-        print(f"  - {line}")
-    print(f"\nOutput:")
-    print(f"  Save visualization: {SAVE_VISUALIZATION}")
-    print(f"  DPI: {VISUALIZATION_DPI}")
+    print("\nOutput:")
+    print(f"  JSON: always on")
+    print(f"  CSV enabled: {EXPORT_CSV}")
+    print(f"  PNG enabled: {EXPORT_PNG} (dpi={VISUALIZATION_DPI}, size={VISUALIZATION_FIGSIZE})")
     print("=" * 50)
 
 

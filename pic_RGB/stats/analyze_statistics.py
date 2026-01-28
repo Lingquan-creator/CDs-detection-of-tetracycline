@@ -5,16 +5,16 @@ from pathlib import Path
 
 import pandas as pd
 
-from ..config.roi_config import OUTPUT_DIR
+from ..config import settings as config
 
 
 def analyze_detailed_statistics():
     """Load roi_detailed_statistics.csv and print key stats."""
-    csv_path = Path(OUTPUT_DIR) / "roi_detailed_statistics.csv"
+    csv_path = Path(config.OUTPUT_DIR) / "roi_detailed_statistics.csv"
 
     if not csv_path.exists():
         print(f"CSV not found: {csv_path}")
-        print("Generate it by running ROI processing first: python -m pic_RGB.extraction.roi_processor")
+        print("Generate it by running ROI processing first: python -m pic_RGB.pipeline.roi_processor")
         return
 
     df = pd.read_csv(csv_path)

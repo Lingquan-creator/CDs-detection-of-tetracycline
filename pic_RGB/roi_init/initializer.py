@@ -12,9 +12,9 @@ from typing import Dict, Optional, Tuple
 import cv2
 import numpy as np
 
-from pic_RGB.extraction.roi_gui import BackgroundSelection, ROISelection
+from pic_RGB.gui.roi_gui import BackgroundSelection, ROISelection
 from pic_RGB.kmeans import KMeansAlgorithm
-from pic_RGB.config import app_config
+from pic_RGB.config import settings as config
 
 
 def build_preview_from_raw(raw_channels: np.ndarray) -> np.ndarray:
@@ -69,41 +69,42 @@ def _bbox_from_mask(mask: np.ndarray) -> Optional[Tuple[Tuple[float, float], flo
 
 def _load_saved_selection(filename: str, output_dir: Path) -> Optional[Tuple[ROISelection, BackgroundSelection]]:
     """
-    Try to reuse existing ROI/BG from roi_results.json located in output_dir.
+    Try to reuse existing ROI/BG from cached JSON (prefer roi_results.json, fallback results.json).
     """
-    results_path = output_dir / "roi_results.json"
-    if not results_path.exists():
-        return None
-    try:
-        data = json.loads(results_path.read_text(encoding="utf-8"))
-    except Exception:
-        return None
-    if not isinstance(data, list):
-        return None
+    for candidate in ("roi_results.json", "results.json"):
+        results_path = output_dir / candidate
+        if not results_path.exists():
+            continue
+        try:
+            data = json.loads(results_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(data, list):
+            continue
 
-    for entry in data:
-        if isinstance(entry, dict) and entry.get("filename") == filename:
-            try:
-                roi_sel = ROISelection(
-                    center=(float(entry["center_x"]), float(entry["center_y"])),
-                    width=float(entry["width"]),
-                    height=float(entry["height"]),
-                    angle_deg=float(entry.get("angle_deg", 0.0)),
-                )
-                bg_sel = BackgroundSelection(
-                    center=(
-                        float(entry.get("bg_center_x", roi_sel.center[0])),
-                        float(entry.get("bg_center_y", roi_sel.center[1])),
-                    ),
-                    inner_x=float(entry.get("bg_inner_x", 0)),
-                    inner_y=float(entry.get("bg_inner_y", 0)),
-                    outer_x=float(entry.get("bg_outer_x", 0)),
-                    outer_y=float(entry.get("bg_outer_y", 0)),
-                    angle_deg=float(entry.get("bg_angle_deg", roi_sel.angle_deg)),
-                )
-                return roi_sel, bg_sel
-            except Exception:
-                return None
+        for entry in data:
+            if isinstance(entry, dict) and entry.get("filename") == filename:
+                try:
+                    roi_sel = ROISelection(
+                        center=(float(entry["center_x"]), float(entry["center_y"])),
+                        width=float(entry["width"]),
+                        height=float(entry["height"]),
+                        angle_deg=float(entry.get("angle_deg", 0.0)),
+                    )
+                    bg_sel = BackgroundSelection(
+                        center=(
+                            float(entry.get("bg_center_x", roi_sel.center[0])),
+                            float(entry.get("bg_center_y", roi_sel.center[1])),
+                        ),
+                        inner_x=float(entry.get("bg_inner_x", 0)),
+                        inner_y=float(entry.get("bg_inner_y", 0)),
+                        outer_x=float(entry.get("bg_outer_x", 0)),
+                        outer_y=float(entry.get("bg_outer_y", 0)),
+                        angle_deg=float(entry.get("bg_angle_deg", roi_sel.angle_deg)),
+                    )
+                    return roi_sel, bg_sel
+                except Exception:
+                    continue
     return None
 
 
@@ -121,7 +122,7 @@ def initialize_selections(
       1) Reuse saved ROI/BG from `output_dir/roi_results.json` (by filename match).
       2) Fall back to K-means based automatic guess.
     """
-    out_dir = output_dir or app_config.OUTPUT_DIR
+    out_dir = output_dir or config.OUTPUT_DIR
 
     if filename:
         saved = _load_saved_selection(filename, out_dir)

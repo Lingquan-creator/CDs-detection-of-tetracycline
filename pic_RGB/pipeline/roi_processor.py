@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# Allow running this file directly (python pic_RGB/extraction/roi_processor.py)
+# Allow running this file directly (python pic_RGB/pipeline/roi_processor.py)
 import sys
 from pathlib import Path as _Path
 _PROJECT_ROOT = _Path(__file__).resolve().parents[2]
@@ -18,19 +18,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import rawpy
 
-from pic_RGB.config.roi_config import (
-    DATA_DIR,
-    OUTPUT_DIR,
-    SAVE_VISUALIZATION,
-    VISUALIZATION_DPI,
-    VISUALIZATION_FIGSIZE,
-    ROISettings,
-    get_settings,
-    print_config,
-    REUSE_LAST_SELECTION,
-    SELECTION_CACHE_PATH,
-)
-from pic_RGB.extraction.roi_gui import BackgroundSelection, ROISelection, select_roi_with_gui
+from pic_RGB.config import settings as config
+from pic_RGB.gui.roi_gui import BackgroundSelection, ROISelection, select_roi_with_gui
 from pic_RGB.processing.roi_manual import ManualROITools
 
 # 字体设置：尽量兼容中英文
@@ -126,20 +115,20 @@ class ROIProcessor:
 
     def __init__(
         self,
-        settings: Optional[ROISettings] = None,
+        settings: Optional[config.ROISettings] = None,
         roi_params: Optional[Dict[str, float]] = None,
         reuse_last_selection: Optional[bool] = None,
         selection_cache_path: Optional[Path] = None,
     ):
-        base_settings = settings or get_settings()
+        base_settings = settings or config.get_settings()
         if roi_params:
             base_settings = base_settings.with_overrides(roi_params)
         self.settings = base_settings
 
         self.reuse_last_selection = (
-            REUSE_LAST_SELECTION if reuse_last_selection is None else reuse_last_selection
+            config.REUSE_LAST_SELECTION if reuse_last_selection is None else reuse_last_selection
         )
-        self.selection_cache_path = selection_cache_path or SELECTION_CACHE_PATH
+        self.selection_cache_path = selection_cache_path or config.SELECTION_CACHE_PATH
         self.selection_cache: Dict[str, Tuple[ROISelection, BackgroundSelection]] = (
             self._load_selection_cache()
         )
@@ -198,8 +187,9 @@ class ROIProcessor:
                     except Exception:
                         continue
 
-        # 1) load from previous roi_results.json as baseline
-        load_from_path(OUTPUT_DIR / "roi_results.json", "roi_results.json")
+        # 1) load from previous roi_results.json/results.json as baseline
+        load_from_path(config.OUTPUT_DIR / "roi_results.json", "roi_results.json")
+        load_from_path(config.OUTPUT_DIR / "results.json", "results.json")
         # 2) overlay with dedicated selection cache (latest GUI choices in单张处理)
         if self.selection_cache_path:
             load_from_path(self.selection_cache_path, str(self.selection_cache_path))
@@ -366,7 +356,7 @@ class ROIProcessor:
     ) -> ROIResult:
         """处理单张图像，输出 ROIResult。"""
         if output_dir is None:
-            output_dir = OUTPUT_DIR
+            output_dir = config.OUTPUT_DIR
 
         print(f"\n处理图像: {filepath.name}")
 
@@ -576,7 +566,7 @@ class ROIProcessor:
     ):
         """保存可视化结果。"""
         Y = np.max(raw_channels, axis=-1)
-        fig, axes = plt.subplots(2, 3, figsize=VISUALIZATION_FIGSIZE)
+        fig, axes = plt.subplots(2, 3, figsize=config.VISUALIZATION_FIGSIZE)
 
         ax = axes[0, 0]
         im = ax.imshow(Y, cmap="gray")
@@ -657,7 +647,7 @@ class ROIProcessor:
 
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / f"{filepath.stem}_roi.png"
-        plt.savefig(output_path, dpi=VISUALIZATION_DPI, bbox_inches="tight")
+        plt.savefig(output_path, dpi=config.VISUALIZATION_DPI, bbox_inches="tight")
         plt.close()
         print(f"  可视化已保存: {output_path}")
 
@@ -666,6 +656,7 @@ class ROIProcessor:
         image_dir: Path,
         output_dir: Optional[Path] = None,
         save_visualization: bool = False,
+        export_csv: bool = True,
         roi_selection: Optional[ROISelection] = None,
         bg_selection: Optional[BackgroundSelection] = None,
         interactive: bool = True,
@@ -703,7 +694,7 @@ class ROIProcessor:
 
         if results:
             self._save_results(results, output_dir)
-            self._save_detailed_statistics(results, output_dir)
+            self._save_detailed_statistics(results, output_dir, export_csv=export_csv)
 
         return results
 
@@ -716,8 +707,11 @@ class ROIProcessor:
             json.dump([r.to_dict() for r in results], f, indent=2, ensure_ascii=False)
         print(f"\nJSON saved: {json_path}")
 
-    def _save_detailed_statistics(self, results: List[ROIResult], output_dir: Path):
+    def _save_detailed_statistics(self, results: List[ROIResult], output_dir: Path, export_csv: bool = True):
         """保存详细的统计信息到单独的CSV文件，包括均值、方差、分位数、饱和比例和通道比值。"""
+        if not export_csv:
+            print("详细统计 CSV 未启用 (export_csv=False)")
+            return
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # 重新处理图像以获取详细统计信息
@@ -725,7 +719,7 @@ class ROIProcessor:
         
         for result in results:
             # 构建完整路径
-            filepath = DATA_DIR / result.filename
+            filepath = config.DATA_DIR / result.filename
             if not filepath.exists():
                 print(f"  警告: 找不到文件 {filepath}，跳过详细统计")
                 continue
@@ -806,25 +800,4 @@ class ROIProcessor:
         print(f"  包含列: 均值、方差、分位数(p10/p50/p90)、饱和比例、通道比值(R/G, B/G, R/B, G1/G2)")
 
 
-def main():
-    print_config()
-    processor = ROIProcessor()
-    print("\n开始批量处理...")
-    results = processor.batch_process(
-        image_dir=DATA_DIR,
-        output_dir=OUTPUT_DIR,
-        save_visualization=SAVE_VISUALIZATION,
-    )
-
-    if results:
-        feature_matrix = np.array([r.get_feature_vector() for r in results])
-        print("\n=== 统计摘要 ===")
-        print(f"特征向量维度: {feature_matrix.shape}")
-        print(f"R 范围: [{feature_matrix[:,0].min():.1f}, {feature_matrix[:,0].max():.1f}]")
-        print(f"G1 范围: [{feature_matrix[:,1].min():.1f}, {feature_matrix[:,1].max():.1f}]")
-        print(f"G2 范围: [{feature_matrix[:,2].min():.1f}, {feature_matrix[:,2].max():.1f}]")
-        print(f"B 范围: [{feature_matrix[:,3].min():.1f}, {feature_matrix[:,3].max():.1f}]")
-
-
-if __name__ == "__main__":
-    main()
+# CLI entry point moved to pic_RGB.main.batch_process.batch_process

@@ -6,13 +6,13 @@ from typing import Optional, Tuple
 
 import numpy as np
 
-from pic_RGB.config.roi_config import ROISettings
-from pic_RGB.extraction.roi_gui import BackgroundSelection, ROISelection, select_roi_with_gui
+from pic_RGB.config import settings as config
+from pic_RGB.gui.roi_gui import BackgroundSelection, ROISelection, select_roi_with_gui
 
 
 def launch_roi_gui(
     raw_channels: np.ndarray,
-    settings: ROISettings,
+    settings: config.ROISettings,
     initial_roi: Optional[ROISelection] = None,
     initial_bg: Optional[BackgroundSelection] = None,
     interactive: bool = True,

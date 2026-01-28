@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Dict
 
-from pic_RGB.extraction.roi_gui import BackgroundSelection, ROISelection
+from pic_RGB.gui.roi_gui import BackgroundSelection, ROISelection
 
 
 def selection_to_dict(filename: str, roi: ROISelection, bg: BackgroundSelection) -> Dict:

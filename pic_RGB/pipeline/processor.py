@@ -14,18 +14,17 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 import numpy as np
 
-from pic_RGB.config.roi_config import ROISettings, get_settings
-from pic_RGB.config.app_config import OUTPUT_DIR
-from pic_RGB.extraction.roi_gui import BackgroundSelection, ROISelection
-from pic_RGB.extraction.roi_processor import ROIProcessor, ROIResult
+from pic_RGB.config import settings as config
+from pic_RGB.gui.roi_gui import BackgroundSelection, ROISelection
+from pic_RGB.pipeline.roi_processor import ROIProcessor, ROIResult
 
 
 class ROIWorkflow:
     """Orchestrates loading, processing, and saving ROI/BG results."""
 
-    def __init__(self, settings: Optional[ROISettings] = None, output_dir: Optional[Path] = None):
-        self.settings = settings or get_settings()
-        self.output_dir = output_dir or OUTPUT_DIR
+    def __init__(self, settings: Optional[config.ROISettings] = None, output_dir: Optional[Path] = None):
+        self.settings = settings or config.get_settings()
+        self.output_dir = output_dir or config.OUTPUT_DIR
         self.processor = ROIProcessor(settings=self.settings)
 
     def load_raw(self, filepath: Path):
@@ -55,4 +54,8 @@ class ROIWorkflow:
         if not results_list:
             return
         self.processor._save_results(results_list, self.output_dir)
-        self.processor._save_detailed_statistics(results_list, self.output_dir)
+        self.processor._save_detailed_statistics(
+            results_list,
+            self.output_dir,
+            export_csv=config.EXPORT_CSV,
+        )

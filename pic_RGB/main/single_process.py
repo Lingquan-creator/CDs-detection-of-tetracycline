@@ -14,8 +14,7 @@ _PROJECT_ROOT = _Path(__file__).resolve().parents[2]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from pic_RGB.config import app_config
-from pic_RGB.config.roi_config import get_settings, SAVE_VISUALIZATION
+from pic_RGB.config import settings as config
 from pic_RGB.features import build_feature_vectors, build_rgb_vectors
 from pic_RGB.gui import launch_roi_gui
 from pic_RGB.kmeans import KMeansAlgorithm
@@ -25,8 +24,8 @@ from pic_RGB.roi_init import initialize_selections
 
 
 def _process_one(filepath: Path, interactive: bool = True):
-    settings = get_settings()
-    workflow = ROIWorkflow(settings=settings, output_dir=app_config.OUTPUT_DIR)
+    settings = config.get_settings()
+    workflow = ROIWorkflow(settings=settings, output_dir=config.OUTPUT_DIR)
     algo = KMeansAlgorithm()
 
     raw_channels, metadata = workflow.load_raw(filepath)
@@ -35,7 +34,7 @@ def _process_one(filepath: Path, interactive: bool = True):
         settings,
         algorithm=algo,
         filename=filepath.name,
-        output_dir=app_config.OUTPUT_DIR,
+        output_dir=config.OUTPUT_DIR,
     )
     roi_sel, bg_sel = launch_roi_gui(
         raw_channels=raw_channels,
@@ -51,17 +50,23 @@ def _process_one(filepath: Path, interactive: bool = True):
         metadata=metadata,
         roi_sel=roi_sel,
         bg_sel=bg_sel,
-        save_visualization=SAVE_VISUALIZATION,
+        save_visualization=config.EXPORT_PNG,
     )
-    save_selection(app_config.SELECTION_CACHE_PATH, filepath.name, roi_sel, bg_sel, overwrite=app_config.OVERWRITE_SELECTION)
+    save_selection(
+        config.SELECTION_CACHE_PATH,
+        filepath.name,
+        roi_sel,
+        bg_sel,
+        overwrite=config.OVERWRITE_SELECTION,
+    )
     return result
 
 
 def run_single(image_path: Optional[Path] = None, interactive: bool = True):
     if image_path is None:
-        candidates = sorted(app_config.DATA_DIR.glob(app_config.IMAGE_EXTENSION))
+        candidates = sorted(config.DATA_DIR.glob(config.IMAGE_EXTENSION))
         if not candidates:
-            raise FileNotFoundError(f"No images found under {app_config.DATA_DIR}")
+            raise FileNotFoundError(f"No images found under {config.DATA_DIR}")
         image_path = candidates[0]
     result = _process_one(image_path, interactive=interactive)
     print(f"Processed single image: {image_path.name}")
@@ -70,8 +75,8 @@ def run_single(image_path: Optional[Path] = None, interactive: bool = True):
 
 
 def run_batch(image_dir: Optional[Path] = None, interactive: bool = True):
-    base_dir = image_dir or app_config.DATA_DIR
-    files: List[Path] = sorted(base_dir.glob(app_config.IMAGE_EXTENSION))
+    base_dir = image_dir or config.DATA_DIR
+    files: List[Path] = sorted(base_dir.glob(config.IMAGE_EXTENSION))
     if not files:
         raise FileNotFoundError(f"No images found under {base_dir}")
 
@@ -80,7 +85,7 @@ def run_batch(image_dir: Optional[Path] = None, interactive: bool = True):
         print(f"=== {fp.name} ===")
         results.append(_process_one(fp, interactive=interactive))
 
-    workflow = ROIWorkflow(settings=get_settings(), output_dir=app_config.OUTPUT_DIR)
+    workflow = ROIWorkflow(settings=config.get_settings(), output_dir=config.OUTPUT_DIR)
     workflow.save_results(results)
 
     feature_matrix = build_feature_vectors(results)

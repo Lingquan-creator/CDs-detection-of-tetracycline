@@ -1,6 +1,6 @@
 # pic_RGB 方法说明 (Methodology)
 
-本文档对应 `extraction/roi_processor.py` 的实现，说明 RAW 读取、ROI/BG 定义、统计量与输出字段。
+本文档对应 `pipeline/roi_processor.py` 的实现，说明 RAW 读取、ROI/BG 定义、统计量与输出字段。
 
 ## 1. 数据读取与预处理
 

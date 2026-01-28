@@ -1,0 +1,38 @@
+{
+  "n_samples": 1,
+  "feature_names": [
+    "R",
+    "G1",
+    "G2",
+    "B"
+  ],
+  "metrics": [
+    {
+      "channel": "R",
+      "alpha": 10.0,
+      "rmse": 0.0,
+      "r2": NaN
+    },
+    {
+      "channel": "G1",
+      "alpha": 10.0,
+      "rmse": 0.0,
+      "r2": NaN
+    },
+    {
+      "channel": "G2",
+      "alpha": 10.0,
+      "rmse": 0.0,
+      "r2": NaN
+    },
+    {
+      "channel": "B",
+      "alpha": 10.0,
+      "rmse": 0.0,
+      "r2": NaN
+    }
+  ],
+  "concentrations": [
+    40.0
+  ]
+}
