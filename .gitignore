@@ -3,18 +3,11 @@ __pycache__/
 *.pyc
 .vscode/
 backup/
-# Ignore images in roi_results
-pic_RGB/roi_results/*.png
-pic_RGB/roi_results/*.jpg
-pic_RGB/roi_results/*.jpeg
-pic_RGB/roi_results/*.tif
-pic_RGB/roi_results/*.tiff
-pic_RGB/roi_results/*.dng
-concentration/*.png
-concentration_exp/*.png
+*.png
+*.jpg
+*.jpeg
+*.tif
+*.tiff
+*.dng
 test data/
 rep/
-*.png
-*.dng
-pic_RGB\data_set_2/*.dng
-pic_RGB\data_pic/*.dng
