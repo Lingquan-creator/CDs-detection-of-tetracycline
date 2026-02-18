@@ -26,7 +26,14 @@ Y_COLUMNS = "all"  # "all"表示处理所有强度列，或指定列表如[2,3,4
 
 N_PEAKS = 3  # 拟合峰数量 / Number of peaks to fit
 
+# Enable second-stage k fitting.
+# False: keep k fixed at 0 for all peaks.
+# True: run a second-stage fit with k enabled after the initial fit.
+FIT_K = True
+
 # 峰参数预设 / Peak parameter presets: list of (k_m, lambda0_m, sigma_E_m)
+# Note: k_m in this tuple is ignored by the new two-stage workflow.
+# k fitting is controlled only by FIT_K.
 # 使用 math.nan 表示该参数需要自动拟合 / Use math.nan for parameters to be fitted
 #
 # 示例 / Examples:

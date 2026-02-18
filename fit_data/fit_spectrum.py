@@ -14,6 +14,7 @@ Configure parameters in fit_config.py
 from __future__ import annotations
 
 import csv
+import math
 from pathlib import Path
 from typing import List
 
@@ -75,6 +76,92 @@ def load_batch_data(path: Path, skip_rows: int, x_col: int) -> tuple[np.ndarray,
 # ============================================================================
 # 结果输出 / Results Output
 # ============================================================================
+
+def build_peak_params_with_fixed_k(
+    n_peaks: int,
+    peak_params: list[tuple[float, float, float]] | tuple[tuple[float, float, float], ...],
+) -> list[tuple[float, float, float]]:
+    """Build stage-1 peak presets: force all peaks to k=0."""
+    stage_params: list[tuple[float, float, float]] = []
+    for i in range(n_peaks):
+        if i < len(peak_params):
+            _, lambda0_m, sigma_E_m = peak_params[i]
+        else:
+            lambda0_m, sigma_E_m = math.nan, math.nan
+        stage_params.append((0.0, lambda0_m, sigma_E_m))
+    return stage_params
+
+
+def build_peak_params_with_free_k(
+    n_peaks: int,
+    peak_params: list[tuple[float, float, float]] | tuple[tuple[float, float, float], ...],
+) -> list[tuple[float, float, float]]:
+    """Build stage-2 peak presets: free all k values."""
+    stage_params: list[tuple[float, float, float]] = []
+    for i in range(n_peaks):
+        if i < len(peak_params):
+            _, lambda0_m, sigma_E_m = peak_params[i]
+        else:
+            lambda0_m, sigma_E_m = math.nan, math.nan
+        stage_params.append((math.nan, lambda0_m, sigma_E_m))
+    return stage_params
+
+
+def build_second_stage_initials(
+    params_fit_stage1: np.ndarray,
+    n_peaks: int,
+) -> list[tuple[float, float, float, float]]:
+    """
+    Build stage-2 manual initials from stage-1 fit.
+    Use fitted A' and lambda0, and start k from 0.
+    """
+    initials: list[tuple[float, float, float, float]] = []
+    for i in range(n_peaks):
+        idx = i * 4
+        initials.append(
+            (
+                float(params_fit_stage1[idx]),      # A'
+                0.0,                                # k initial
+                float(params_fit_stage1[idx + 2]),  # lambda0
+                float(params_fit_stage1[idx + 3]),  # sigma_E
+            )
+        )
+    return initials
+
+
+def run_fit(
+    lambda_valid: np.ndarray,
+    I_valid: np.ndarray,
+    peak_params: list[tuple[float, float, float]] | tuple[tuple[float, float, float], ...],
+    manual_initials: list[tuple[float, float, float, float]] | tuple[tuple[float, float, float, float], ...] | None,
+):
+    """Run single-start or multi-start fit based on config."""
+    if cfg.N_MULTI_START > 1:
+        from spectrum_fitter import fit_spectrum_multistart
+
+        return fit_spectrum_multistart(
+            lambda_valid, I_valid,
+            cfg.N_PEAKS, peak_params, manual_initials, cfg.C_EV_NM,
+            cfg.MAX_FUNCTION_EVALS, cfg.DISPLAY_ITER,
+            cfg.B_INITIAL, cfg.A_MIN, cfg.A_MAX, cfg.ALLOW_NEGATIVE_A,
+            cfg.K_MIN, cfg.K_MAX,
+            cfg.SIGMA_E_MIN, cfg.SIGMA_E_MAX,
+            cfg.B_MIN, cfg.B_MAX_RATIO,
+            cfg.N_MULTI_START,
+            getattr(cfg, 'PEAK_SPECIFIC_BOUNDS', None)
+        )
+
+    return fit_spectrum(
+        lambda_valid, I_valid,
+        cfg.N_PEAKS, peak_params, manual_initials, cfg.C_EV_NM,
+        cfg.MAX_FUNCTION_EVALS, cfg.DISPLAY_ITER,
+        cfg.B_INITIAL, cfg.A_MIN, cfg.A_MAX, cfg.ALLOW_NEGATIVE_A,
+        cfg.K_MIN, cfg.K_MAX,
+        cfg.SIGMA_E_MIN, cfg.SIGMA_E_MAX,
+        cfg.B_MIN, cfg.B_MAX_RATIO,
+        getattr(cfg, 'PEAK_SPECIFIC_BOUNDS', None)
+    )
+
 
 def save_batch_results_csv(output_path: Path, results: List[dict]) -> None:
     """将批量拟合结果保存为CSV / Save batch fitting results to CSV"""
@@ -294,29 +381,22 @@ def main() -> None:
                         print(f"⚠ 预处理移除过多数据，使用原始数据 / Too much data removed, using original")
                 
                 # 执行拟合（多起点或单起点）/ Perform fitting (multi-start or single-start)
-                if cfg.N_MULTI_START > 1:
-                    from spectrum_fitter import fit_spectrum_multistart
-                    params_fit, I_fit, residuals, param_info = fit_spectrum_multistart(
-                        lambda_valid, I_valid,
-                        cfg.N_PEAKS, cfg.PEAK_PARAMS, cfg.MANUAL_INITIAL_GUESSES, cfg.C_EV_NM,
-                        cfg.MAX_FUNCTION_EVALS, cfg.DISPLAY_ITER,
-                        cfg.B_INITIAL, cfg.A_MIN, cfg.A_MAX, cfg.ALLOW_NEGATIVE_A,
-                        cfg.K_MIN, cfg.K_MAX,
-                        cfg.SIGMA_E_MIN, cfg.SIGMA_E_MAX,
-                        cfg.B_MIN, cfg.B_MAX_RATIO,
-                        cfg.N_MULTI_START,
-                        getattr(cfg, 'PEAK_SPECIFIC_BOUNDS', None)
-                    )
-                else:
-                    params_fit, I_fit, residuals, param_info = fit_spectrum(
-                        lambda_valid, I_valid,
-                        cfg.N_PEAKS, cfg.PEAK_PARAMS, cfg.MANUAL_INITIAL_GUESSES, cfg.C_EV_NM,
-                        cfg.MAX_FUNCTION_EVALS, cfg.DISPLAY_ITER,
-                        cfg.B_INITIAL, cfg.A_MIN, cfg.A_MAX, cfg.ALLOW_NEGATIVE_A,
-                        cfg.K_MIN, cfg.K_MAX,
-                        cfg.SIGMA_E_MIN, cfg.SIGMA_E_MAX,
-                        cfg.B_MIN, cfg.B_MAX_RATIO,
-                        getattr(cfg, 'PEAK_SPECIFIC_BOUNDS', None)
+                peak_params_stage1 = build_peak_params_with_fixed_k(cfg.N_PEAKS, cfg.PEAK_PARAMS)
+                params_fit, I_fit, residuals, param_info = run_fit(
+                    lambda_valid,
+                    I_valid,
+                    peak_params_stage1,
+                    cfg.MANUAL_INITIAL_GUESSES,
+                )
+
+                if getattr(cfg, "FIT_K", False):
+                    peak_params_stage2 = build_peak_params_with_free_k(cfg.N_PEAKS, cfg.PEAK_PARAMS)
+                    manual_initials_stage2 = build_second_stage_initials(params_fit, cfg.N_PEAKS)
+                    params_fit, I_fit, residuals, param_info = run_fit(
+                        lambda_valid,
+                        I_valid,
+                        peak_params_stage2,
+                        manual_initials_stage2,
                     )
                 
                 # 计算指标 / Calculate metrics

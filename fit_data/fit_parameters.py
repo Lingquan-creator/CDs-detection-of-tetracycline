@@ -38,7 +38,6 @@ IGNORE_CONCENTRATIONS = [0, 0.2]  # 要忽略的特定浓度值列表（0对应�
 # 要绘制的参数列表 / Parameters to plot
 PARAMETERS = [
     'A_prime',
-    'k',
     'lambda0_nm',
     'sigma_E_eV',
     'peak_position_nm',
@@ -53,11 +52,6 @@ PARAM_INFO = {
         'label': "A' (Amplitude)",
         'unit': 'a.u.',
         'ylabel': "A' (a.u.)",
-    },
-    'k': {
-        'label': 'k (Position-Intensity Slope)',
-        'unit': '',
-        'ylabel': 'k',
     },
     'lambda0_nm': {
         'label': 'λ₀ (Center Wavelength)',
@@ -105,7 +99,6 @@ PEAK_STYLES = [
 # 只使用指数函数和线性函数进行拟合
 BEST_FIT_MODELS = {
     'A_prime': 'exponential',              # 振幅：指数增长
-    'k': 'linear',                         # 斜率：线性关系
     'lambda0_nm': 'linear',                # 中心波长：线性
     'sigma_E_eV': 'linear',                # 能量展宽：线性
     'peak_position_nm': 'linear',          # 峰位置：线性
