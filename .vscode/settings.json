@@ -3,8 +3,7 @@
         "./pic_RGB",
         "./concentration"
     ],
-    "python-envs.defaultEnvManager": "ms-python.python:system",
-    "python-envs.pythonProjects": [],
+    "python-envs.defaultEnvManager": "ms-python.python:venv",
     "chat.agent.enabled": true,
     "chat.agent.maxRequests": 200,
     "github.copilot.chat.agent.autoFix": true,

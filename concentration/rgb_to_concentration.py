@@ -1,223 +1,465 @@
-"""
-Predict concentration from ROI RGB statistics using the physics-informed Ridge model.
+﻿"""
+Train a Ridge regression model from ROI statistics and evaluate with Leave-One-Out.
 
-Key behaviors (see improve4.md):
-- 自动读取模型元数据：背景模式(use_bg)、目标变换(target_transform)、alpha 与单调校准器。
-- 有 bg_* 列时使用背景扣除特征；否则退回原始 ln/ratio 特征。
-- 非负约束：log-target 逆变换 + 单调校准器后再裁剪到 0 以上。
-
-Usage examples:
-- Batch mode:   python rgb_to_concentration.py --roi-csv pic_RGB/roi_results/roi_detailed_statistics.csv
-- Single point: python rgb_to_concentration.py --model concentration/rgb_fit_output/concentration_model_v1.pkl --r 20 --g1 45 --b 10 --var-g 300
-  (背景模式下可额外传入 --bg-r --bg-g1 --bg-b 等)
+Default data source:
+`pic_RGB/roi_results/roi_detailed_statistics.csv` (from config.TrainConfig).
 """
 
 from __future__ import annotations
 
 import argparse
+import platform
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Dict, Iterable, Optional, Tuple
 
 import joblib
+import matplotlib
 import numpy as np
 import pandas as pd
+from sklearn import __version__ as sklearn_version
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import RidgeCV
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import LeaveOneOut
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
-from config import CLIP_MIN, PredictConfig, TARGET_EPS
-from physics_features import (
-    DEFAULT_G_MODE,
-    build_feature_frame,
-    build_feature_vector,
-    extract_concentration_from_name,
-    has_background_columns,
-)
+from config import ALPHAS, CLIP_MIN, TARGET_EPS, TARGET_TRANSFORM, WEIGHT_EPS, TrainConfig
+from physics_features import build_feature_frame, extract_concentration_from_name, feature_names, has_background_columns
 
-
-def load_model_bundle(path: Path, g_mode_override: Optional[str]) -> Tuple[object, str, str, float, bool, Optional[object]]:
-    obj = joblib.load(path)
-    target_transform: str = "identity"
-    target_eps: float = TARGET_EPS
-    use_bg: bool = False
-    calibrator: Optional[object] = None
-    if isinstance(obj, dict) and "model" in obj:
-        model = obj["model"]
-        g_mode = obj.get("g_mode", DEFAULT_G_MODE)
-        target_transform = obj.get("target_transform", target_transform)
-        target_eps = obj.get("target_eps", TARGET_EPS)
-        use_bg = obj.get("use_bg", use_bg)
-        calibrator = obj.get("isotonic", None)
-    else:
-        model = obj
-        g_mode = DEFAULT_G_MODE
-
-    if g_mode_override:
-        g_mode = g_mode_override
-    if g_mode not in ("g1", "avg"):
-        g_mode = DEFAULT_G_MODE
-    return model, g_mode, target_transform, target_eps, use_bg, calibrator
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 
-def inverse_target(pred: np.ndarray, transform: Optional[str], target_eps: float) -> np.ndarray:
-    """Reverse log-target transform (if present) and enforce non-negative concentration."""
+def transform_target(y: np.ndarray, transform: str, eps: float) -> np.ndarray:
     if transform == "log":
-        conc = np.exp(pred) - target_eps
-    else:
-        conc = pred
-    return np.maximum(conc, 0.0)
+        return np.log(y + eps)
+    return y
 
 
-def apply_calibrator(pred: np.ndarray, calibrator: Optional[object]) -> np.ndarray:
+def inverse_target(pred: np.ndarray, transform: str, eps: float) -> np.ndarray:
+    if transform == "log":
+        pred = np.exp(pred) - eps
+    return np.maximum(np.asarray(pred, dtype=float), 0.0)
+
+
+def apply_calibrator(pred: np.ndarray, calibrator: Optional[IsotonicRegression]) -> np.ndarray:
     if calibrator is None:
-        return np.maximum(pred, 0.0)
-    calibrated = calibrator.predict(pred)
-    return np.maximum(calibrated, 0.0)
+        return np.maximum(np.asarray(pred, dtype=float), 0.0)
+    calibrated = calibrator.predict(np.asarray(pred, dtype=float))
+    return np.maximum(np.asarray(calibrated, dtype=float), 0.0)
 
 
-def predict_batch(
-    model: object,
-    roi_csv: Path,
-    out_csv: Path,
-    g_mode: str,
+def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> Tuple[float, float, float]:
+    r2 = float(r2_score(y_true, y_pred))
+    rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
+    mae = float(mean_absolute_error(y_true, y_pred))
+    return r2, rmse, mae
+
+
+def make_sample_weights(y: np.ndarray, weight_eps: float) -> np.ndarray:
+    if weight_eps < 0:
+        raise ValueError("--weight-eps must be >= 0.")
+    weights = 1.0 / (y + weight_eps)
+    return weights / np.mean(weights)
+
+
+def train_model(
+    X: np.ndarray,
+    y_target: np.ndarray,
     *,
-    target_transform: Optional[str],
-    target_eps: float,
-    use_bg: bool,
-    calibrator: Optional[object],
-) -> None:
-    df = pd.read_csv(roi_csv)
-    
-    # Handle background column availability
-    dataset_use_bg = use_bg
-    if use_bg and not has_background_columns(df, g_mode):
-        print("WARNING: Model trained with background subtraction, but input CSV lacks bg_* columns.")
-        print("         Falling back to raw features (assuming bg=0/negligible).")
-        dataset_use_bg = False
-
-    features = build_feature_frame(df, g_mode=g_mode, use_bg=dataset_use_bg, clip_min=CLIP_MIN)
-    preds_target = model.predict(features.to_numpy())
-    preds = inverse_target(np.asarray(preds_target), target_transform, target_eps)
-    preds = apply_calibrator(preds, calibrator)
-
-    out_df = pd.DataFrame({"filename": df["filename"], "conc_pred": preds})
-
-    conc_true = df["filename"].apply(extract_concentration_from_name)
-    if conc_true.notna().any():
-        out_df["conc_true"] = conc_true
-        out_df["residual"] = preds - conc_true
-
-    out_df.to_csv(out_csv, index=False)
-    print(f"Saved predictions -> {out_csv}")
-
-
-def predict_single(
-    model: object,
-    g_mode: str,
-    args: argparse.Namespace,
-    *,
-    target_transform: Optional[str],
-    target_eps: float,
-    use_bg: bool,
-    calibrator: Optional[object],
-) -> None:
-    if args.r is None or args.g1 is None or args.b is None:
-        raise ValueError("Single-sample mode requires --r, --g1, and --b.")
-    if args.var_g is None:
-        raise ValueError("Single-sample mode requires --var-g to build Var_G feature.")
-
-    feature_row = build_feature_vector(
-        args.r,
-        args.g1,
-        args.b,
-        var_g1=args.var_g,
-        g2=args.g2,
-        var_g2=args.var_g2,
-        g_mode=g_mode,
-        use_bg=use_bg,
-        clip_min=CLIP_MIN,
-        bg_r=args.bg_r or 0.0,
-        bg_g1=args.bg_g1 or 0.0,
-        bg_g2=args.bg_g2 or 0.0,
-        bg_b=args.bg_b or 0.0,
+    alphas: Iterable[float],
+    sample_weight: np.ndarray,
+) -> Pipeline:
+    model = Pipeline(
+        [("scaler", StandardScaler()), ("regressor", RidgeCV(alphas=tuple(alphas), scoring="neg_mean_squared_error"))]
     )
-    pred_target = model.predict(feature_row)[0]
-    pred = float(inverse_target(np.array([pred_target]), target_transform, target_eps)[0])
-    pred = float(apply_calibrator(np.array([pred]), calibrator)[0])
-    print(
-        f"[Single] Predicted concentration: {pred:.4f} uM "
-        f"(g-mode={g_mode}, target={target_transform or 'identity'}, use_bg={use_bg})"
+    model.fit(X, y_target, regressor__sample_weight=sample_weight)
+    return model
+
+
+def fit_calibrator(
+    y_pred_raw: np.ndarray,
+    y_true: np.ndarray,
+    sample_weight: np.ndarray,
+) -> Optional[IsotonicRegression]:
+    if y_pred_raw.size < 2:
+        return None
+    if float(np.max(y_pred_raw) - np.min(y_pred_raw)) <= 1e-12:
+        return None
+    calibrator = IsotonicRegression(out_of_bounds="clip")
+    calibrator.fit(y_pred_raw, y_true, sample_weight=sample_weight)
+    return calibrator
+
+
+def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Train Ridge regression and run Leave-One-Out validation.")
+    parser.add_argument("--roi-csv", type=Path, default=default_cfg.roi_csv, help="Input ROI statistics CSV.")
+    parser.add_argument("--model-out", type=Path, default=default_cfg.model_path, help="Output model bundle (.pkl).")
+    parser.add_argument("--pred-out", type=Path, default=default_cfg.predictions_path, help="Training prediction CSV.")
+    parser.add_argument("--loo-out", type=Path, help="LOO prediction CSV. Default: <pred-out stem>_loo.csv")
+    parser.add_argument("--coef-out", type=Path, default=default_cfg.coefficients_path, help="Coefficient CSV path.")
+    parser.add_argument("--plot-out", type=Path, help="PNG plot output. Default: <model-out stem>_evaluation.png")
+    parser.add_argument(
+        "--g-mode",
+        choices=["g1", "avg", "auto"],
+        default=default_cfg.g_mode,
+        help="Green channel mode. 'auto' selects the mode with better internal CV score.",
     )
-
-
-def parse_args(default_cfg: PredictConfig) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Predict concentration using the trained Ridge model.")
-    parser.add_argument("--model", type=Path, default=default_cfg.model_path, help="Path to joblib model bundle.")
-    parser.add_argument("--roi-csv", type=Path, help="ROI CSV for batch prediction.")
-    parser.add_argument("--out", type=Path, help="Output CSV path for batch mode.")
-    parser.add_argument("--g-mode", choices=["g1", "avg"], help="Override green feature mode (defaults to model metadata).")
-    parser.add_argument("--r", type=float, help="Single-sample R channel mean.")
-    parser.add_argument("--g1", type=float, help="Single-sample G1 channel mean.")
-    parser.add_argument("--g2", type=float, help="Single-sample G2 channel mean (optional, used if g-mode=avg).")
-    parser.add_argument("--b", type=float, help="Single-sample B channel mean.")
-    parser.add_argument("--var-g", type=float, help="Single-sample variance for green channel (G1 or average).")
-    parser.add_argument("--var-g2", type=float, help="Single-sample variance for G2 (optional, used if g-mode=avg).")
-    parser.add_argument("--bg-r", type=float, help="Background R mean (for background mode).")
-    parser.add_argument("--bg-g1", type=float, help="Background G1 mean (for background mode).")
-    parser.add_argument("--bg-g2", type=float, help="Background G2 mean (for background mode, g-mode=avg).")
-    parser.add_argument("--bg-b", type=float, help="Background B mean (for background mode).")
+    parser.add_argument(
+        "--use-bg",
+        choices=["auto", "true", "false"],
+        default="auto",
+        help="Background subtraction setting. 'auto' uses bg columns when available.",
+    )
+    parser.add_argument(
+        "--target-transform",
+        choices=["identity", "log"],
+        default=TARGET_TRANSFORM,
+        help="Regression target transform.",
+    )
+    parser.add_argument("--alpha", type=float, help="Single alpha value. If set, --alpha-grid is ignored.")
+    parser.add_argument("--alpha-grid", nargs="+", type=float, help="Alpha grid for RidgeCV.")
+    parser.add_argument("--weight-eps", type=float, default=WEIGHT_EPS, help="Sample weight: 1 / (conc + weight_eps).")
+    parser.add_argument("--clip-min", type=float, default=CLIP_MIN, help="Min signal after bg subtraction.")
     return parser.parse_args()
 
 
+def load_training_dataframe(roi_csv: Path) -> Tuple[pd.DataFrame, np.ndarray]:
+    if not roi_csv.exists():
+        raise FileNotFoundError(f"ROI CSV not found: {roi_csv}")
+
+    df = pd.read_csv(roi_csv)
+    if df.empty:
+        raise ValueError("ROI CSV is empty.")
+    if "filename" not in df.columns:
+        raise ValueError("ROI CSV must include a 'filename' column.")
+
+    df = df.copy()
+    df["conc_true"] = df["filename"].apply(extract_concentration_from_name)
+    df = df.dropna(subset=["conc_true"]).sort_values("conc_true").reset_index(drop=True)
+    if df.empty:
+        raise ValueError("No valid concentration labels parsed from filename.")
+
+    return df, df["conc_true"].to_numpy(dtype=float)
+
+
+def resolve_alphas(args: argparse.Namespace) -> Tuple[float, ...]:
+    if args.alpha is not None and args.alpha_grid:
+        raise ValueError("Use either --alpha or --alpha-grid, not both.")
+    if args.alpha is not None:
+        return (float(args.alpha),)
+    if args.alpha_grid:
+        return tuple(float(x) for x in args.alpha_grid)
+    return tuple(float(x) for x in ALPHAS)
+
+
+def resolve_use_bg(df: pd.DataFrame, g_mode: str, use_bg_arg: str) -> bool:
+    if use_bg_arg == "true":
+        if not has_background_columns(df, g_mode):
+            raise ValueError(f"--use-bg true but required bg_* columns are missing for g_mode={g_mode}.")
+        return True
+    if use_bg_arg == "false":
+        return False
+    return has_background_columns(df, g_mode)
+
+
+def model_selection_score(model: Pipeline, X: np.ndarray, y_target: np.ndarray) -> float:
+    regressor = model.named_steps["regressor"]
+    best_score = getattr(regressor, "best_score_", None)
+    if best_score is not None:
+        return float(best_score)
+    y_hat = model.predict(X)
+    return -float(mean_squared_error(y_target, y_hat))
+
+
+def train_candidate(
+    df: pd.DataFrame,
+    y_true: np.ndarray,
+    *,
+    g_mode: str,
+    use_bg: bool,
+    target_transform: str,
+    target_eps: float,
+    alphas: Tuple[float, ...],
+    weight_eps: float,
+    clip_min: float,
+) -> Dict[str, object]:
+    feature_df = build_feature_frame(df, g_mode=g_mode, use_bg=use_bg, clip_min=clip_min)
+    X = feature_df.to_numpy(dtype=float)
+    y_target = transform_target(y_true, target_transform, target_eps)
+    sample_weight = make_sample_weights(y_true, weight_eps)
+
+    model = train_model(X, y_target, alphas=alphas, sample_weight=sample_weight)
+    y_pred_target = model.predict(X)
+    y_pred_raw = inverse_target(y_pred_target, target_transform, target_eps)
+    calibrator = fit_calibrator(y_pred_raw, y_true, sample_weight)
+    y_pred = apply_calibrator(y_pred_raw, calibrator)
+    score = model_selection_score(model, X, y_target)
+
+    return {
+        "model": model,
+        "g_mode": g_mode,
+        "use_bg": use_bg,
+        "X": X,
+        "sample_weight": sample_weight,
+        "y_pred_raw": y_pred_raw,
+        "y_pred": y_pred,
+        "calibrator": calibrator,
+        "score": score,
+    }
+
+
+def run_leave_one_out(
+    X: np.ndarray,
+    y_true: np.ndarray,
+    *,
+    alphas: Tuple[float, ...],
+    target_transform: str,
+    target_eps: float,
+    weight_eps: float,
+) -> np.ndarray:
+    loo = LeaveOneOut()
+    y_pred_loo = np.zeros_like(y_true, dtype=float)
+
+    for train_idx, test_idx in loo.split(X):
+        X_train = X[train_idx]
+        X_test = X[test_idx]
+        y_train = y_true[train_idx]
+
+        y_train_target = transform_target(y_train, target_transform, target_eps)
+        w_train = make_sample_weights(y_train, weight_eps)
+        model_fold = train_model(X_train, y_train_target, alphas=alphas, sample_weight=w_train)
+
+        pred_test_target = model_fold.predict(X_test)
+        pred_test_raw = inverse_target(pred_test_target, target_transform, target_eps)
+
+        pred_train_target = model_fold.predict(X_train)
+        pred_train_raw = inverse_target(pred_train_target, target_transform, target_eps)
+        calibrator_fold = fit_calibrator(pred_train_raw, y_train, w_train)
+        pred_test = apply_calibrator(pred_test_raw, calibrator_fold)
+
+        y_pred_loo[test_idx] = pred_test
+
+    return y_pred_loo
+
+
+def draw_result_plot(
+    y_true: np.ndarray,
+    y_train_pred: np.ndarray,
+    y_loo_pred: np.ndarray,
+    *,
+    train_metrics: Tuple[float, float, float],
+    loo_metrics: Tuple[float, float, float],
+    out_path: Path,
+) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    v_min = float(min(np.min(y_true), np.min(y_train_pred), np.min(y_loo_pred)))
+    v_max = float(max(np.max(y_true), np.max(y_train_pred), np.max(y_loo_pred)))
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), dpi=150)
+
+    axes[0].scatter(y_true, y_train_pred, s=24, alpha=0.8)
+    axes[0].plot([v_min, v_max], [v_min, v_max], "k--", linewidth=1.0)
+    axes[0].set_xlabel("True concentration (uM)")
+    axes[0].set_ylabel("Predicted concentration (uM)")
+    axes[0].set_title(
+        f"Training Fit\\nR2={train_metrics[0]:.4f}, RMSE={train_metrics[1]:.4f}, MAE={train_metrics[2]:.4f}"
+    )
+    axes[0].grid(alpha=0.25)
+
+    axes[1].scatter(y_true, y_loo_pred, s=24, alpha=0.8, color="#d62728")
+    axes[1].plot([v_min, v_max], [v_min, v_max], "k--", linewidth=1.0)
+    axes[1].set_xlabel("True concentration (uM)")
+    axes[1].set_ylabel("Predicted concentration (uM)")
+    axes[1].set_title(f"Leave-One-Out\\nR2={loo_metrics[0]:.4f}, RMSE={loo_metrics[1]:.4f}, MAE={loo_metrics[2]:.4f}")
+    axes[1].grid(alpha=0.25)
+
+    plt.tight_layout()
+    fig.savefig(out_path)
+    plt.close(fig)
+
+
+def save_outputs(
+    df: pd.DataFrame,
+    y_true: np.ndarray,
+    y_pred_raw: np.ndarray,
+    y_pred: np.ndarray,
+    y_pred_loo: np.ndarray,
+    *,
+    model: Pipeline,
+    calibrator: Optional[IsotonicRegression],
+    model_out: Path,
+    pred_out: Path,
+    loo_out: Path,
+    coef_out: Path,
+    g_mode: str,
+    use_bg: bool,
+    target_transform: str,
+    target_eps: float,
+    alphas: Tuple[float, ...],
+    weight_eps: float,
+) -> None:
+    for path in (model_out, pred_out, loo_out, coef_out):
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+    regressor = model.named_steps["regressor"]
+    selected_alpha = float(getattr(regressor, "alpha_", alphas[0]))
+
+    bundle = {
+        "model": model,
+        "g_mode": g_mode,
+        "alpha": selected_alpha,
+        "alphas_tried": tuple(alphas),
+        "feature_names": tuple(feature_names(use_bg)),
+        "target_transform": target_transform,
+        "target_eps": target_eps,
+        "use_bg": use_bg,
+        "weight_eps": weight_eps,
+        "isotonic": calibrator,
+        "sklearn_version": sklearn_version,
+        "python_version": platform.python_version(),
+        "bundle_created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+    joblib.dump(bundle, model_out)
+
+    pred_df = pd.DataFrame(
+        {
+            "filename": df["filename"],
+            "conc_true": y_true,
+            "conc_pred_raw": y_pred_raw,
+            "conc_pred": y_pred,
+            "residual": y_pred - y_true,
+        }
+    )
+    pred_df.to_csv(pred_out, index=False)
+
+    loo_df = pd.DataFrame(
+        {
+            "filename": df["filename"],
+            "conc_true": y_true,
+            "conc_pred_loo": y_pred_loo,
+            "residual_loo": y_pred_loo - y_true,
+        }
+    )
+    loo_df.to_csv(loo_out, index=False)
+
+    coef_df = pd.DataFrame({"feature": tuple(feature_names(use_bg)), "coefficient": regressor.coef_})
+    coef_df.to_csv(coef_out, index=False)
+
+
+def load_model_bundle(path: Path, g_mode_override: Optional[str] = None) -> Tuple[object, str, str, float, bool, Optional[object]]:
+    """
+    Backward-compatible helper for callers that imported inference helpers
+    from this module before `predict.py` became the dedicated inference entry.
+    """
+    from predict import load_model_bundle as _load_bundle
+
+    _, model, g_mode, target_transform, target_eps, use_bg, calibrator = _load_bundle(path, g_mode_override)
+    return model, g_mode, target_transform, target_eps, use_bg, calibrator
+
+
 def main() -> None:
-    cfg = PredictConfig()
+    cfg = TrainConfig()
     args = parse_args(cfg)
-    if not args.model.exists():
-        raise FileNotFoundError(f"Model file not found: {args.model}")
-    model, g_mode, target_transform, target_eps, use_bg, calibrator = load_model_bundle(args.model, args.g_mode)
-    print(
-        f"Loaded model from {args.model} "
-        f"(g-mode={g_mode}, target={target_transform or 'identity'}, use_bg={use_bg}, calibrator={'yes' if calibrator else 'no'})"
+
+    df, y_true = load_training_dataframe(args.roi_csv)
+    alphas = resolve_alphas(args)
+    target_transform = str(args.target_transform)
+
+    g_modes = ["g1", "avg"] if args.g_mode == "auto" else [args.g_mode]
+    best_result: Optional[Dict[str, object]] = None
+    best_score = -float("inf")
+
+    print(f"Training data: {args.roi_csv} (n={len(df)})")
+    print(f"Alpha candidates: {alphas}")
+    print(f"Evaluating g_modes={g_modes}, use_bg={args.use_bg}, target_transform={target_transform}")
+
+    for g_mode in g_modes:
+        use_bg = resolve_use_bg(df, g_mode, args.use_bg)
+        result = train_candidate(
+            df,
+            y_true,
+            g_mode=g_mode,
+            use_bg=use_bg,
+            target_transform=target_transform,
+            target_eps=TARGET_EPS,
+            alphas=alphas,
+            weight_eps=float(args.weight_eps),
+            clip_min=float(args.clip_min),
+        )
+        score = float(result["score"])
+        print(f"  candidate g_mode={g_mode}, use_bg={use_bg}, cv_score={score:.6f}")
+        if score > best_score:
+            best_score = score
+            best_result = result
+
+    if best_result is None:
+        raise RuntimeError("No valid model candidate found.")
+
+    model = best_result["model"]
+    g_mode = str(best_result["g_mode"])
+    use_bg = bool(best_result["use_bg"])
+    X = np.asarray(best_result["X"], dtype=float)
+    y_pred_raw = np.asarray(best_result["y_pred_raw"], dtype=float)
+    y_pred = np.asarray(best_result["y_pred"], dtype=float)
+    calibrator = best_result["calibrator"]
+
+    y_pred_loo = run_leave_one_out(
+        X,
+        y_true,
+        alphas=alphas,
+        target_transform=target_transform,
+        target_eps=TARGET_EPS,
+        weight_eps=float(args.weight_eps),
     )
 
-    if args.roi_csv:
-        out_csv = args.out or cfg.output_path_for(args.roi_csv)
-        out_csv.parent.mkdir(parents=True, exist_ok=True)
-        predict_batch(
-            model,
-            args.roi_csv,
-            out_csv,
-            g_mode,
-            target_transform=target_transform,
-            target_eps=target_eps,
-            use_bg=use_bg,
-            calibrator=calibrator,
-        )
-    elif args.r is not None or args.g1 is not None or args.b is not None:
-        predict_single(
-            model,
-            g_mode,
-            args,
-            target_transform=target_transform,
-            target_eps=target_eps,
-            use_bg=use_bg,
-            calibrator=calibrator,
-        )
-    else:
-        default_csv = cfg.default_roi_csv
-        if default_csv.exists():
-            print("No inputs provided, running batch prediction on default roi_detailed_statistics.csv ...")
-            out_csv = cfg.output_path_for(default_csv)
-            out_csv.parent.mkdir(parents=True, exist_ok=True)
-            predict_batch(
-                model,
-                default_csv,
-                out_csv,
-                g_mode,
-                target_transform=target_transform,
-                target_eps=target_eps,
-                use_bg=use_bg,
-                calibrator=calibrator,
-            )
-        else:
-            print("No work to do: provide --roi-csv for batch mode or --r/--g1/--b/--var-g for single mode.")
+    train_metrics = evaluate_predictions(y_true, y_pred)
+    loo_metrics = evaluate_predictions(y_true, y_pred_loo)
+
+    loo_out = args.loo_out or args.pred_out.with_name(args.pred_out.stem + "_loo.csv")
+    plot_out = args.plot_out or args.model_out.with_name(args.model_out.stem + "_evaluation.png")
+
+    save_outputs(
+        df,
+        y_true,
+        y_pred_raw,
+        y_pred,
+        y_pred_loo,
+        model=model,
+        calibrator=calibrator if isinstance(calibrator, IsotonicRegression) else None,
+        model_out=args.model_out,
+        pred_out=args.pred_out,
+        loo_out=loo_out,
+        coef_out=args.coef_out,
+        g_mode=g_mode,
+        use_bg=use_bg,
+        target_transform=target_transform,
+        target_eps=TARGET_EPS,
+        alphas=alphas,
+        weight_eps=float(args.weight_eps),
+    )
+    draw_result_plot(
+        y_true,
+        y_pred,
+        y_pred_loo,
+        train_metrics=train_metrics,
+        loo_metrics=loo_metrics,
+        out_path=plot_out,
+    )
+
+    reg = model.named_steps["regressor"]
+    selected_alpha = float(getattr(reg, "alpha_", alphas[0]))
+    print(f"Selected model: g_mode={g_mode}, use_bg={use_bg}, alpha={selected_alpha}")
+    print(f"Train   -> R2={train_metrics[0]:.4f}, RMSE={train_metrics[1]:.4f}, MAE={train_metrics[2]:.4f}")
+    print(f"LOO-CV  -> R2={loo_metrics[0]:.4f}, RMSE={loo_metrics[1]:.4f}, MAE={loo_metrics[2]:.4f}")
+    print(f"Saved model       -> {args.model_out}")
+    print(f"Saved train preds -> {args.pred_out}")
+    print(f"Saved LOO preds   -> {loo_out}")
+    print(f"Saved coefficients-> {args.coef_out}")
+    print(f"Saved plot        -> {plot_out}")
 
 
 if __name__ == "__main__":

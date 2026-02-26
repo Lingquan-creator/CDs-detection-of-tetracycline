@@ -42,7 +42,16 @@
     - `model`: 训练好的 Pipeline (Scaler + Ridge)。
     - `isotonic`: 训练好的保序回归校准器 (IsotonicRegression)。
     - `g_mode`, `use_bg`, `feature_names`: 训练时选定的最佳策略元数据。
+    - `sklearn_version`, `python_version`, `bundle_created_utc`: 训练环境信息（用于排查版本一致性问题）。
   - **用途**：推理脚本 `rgb_to_concentration.py` 的唯一输入。
+  - **版本兼容提示**：模型文件使用 joblib/pickle 序列化，建议训练与推理使用相同的 scikit-learn 版本。
+    - 出现版本不一致警告时：优先重新训练（`python concentration/rgb_exponential_fit.py --method ridge`）。
+    - 若仅需减少/消除重复警告（并理解风险）：可用 `python concentration/rgb_to_concentration.py --resave-model` 重新保存 bundle。
+
+### 1.1 指数拟合输出（无需模型文件）
+- **`rgb_fit_params.csv`**：指数拟合参数（按通道）。
+- **`rgb_fit_predictions.csv`**：指数拟合曲线在各浓度点的强度预测（用于检查拟合质量）。
+- **`pic_RGB/roi_results/roi_detailed_statistics_pred_concentration_exp.csv`**：指数拟合反推的浓度预测结果（默认使用 `G1_corr`）。
 
 ### 2. 评估报告 (重要)
 - **`ridge_predictions_LOO_CV.csv` (真实精度)**
@@ -61,8 +70,11 @@
 
 ### 训练
 ```bash
-# 自动搜索最佳参数 (Alpha, G-mode) 并生成所有输出
+# 指数拟合（默认）：拟合 I = a*exp(b*C)+c 并反推浓度
 python concentration/rgb_exponential_fit.py
+
+# 岭回归训练：生成 concentration_model_v1.pkl 等（用于 rgb_to_concentration.py）
+python concentration/rgb_exponential_fit.py --method ridge
 ```
 
 ### 推理
@@ -87,7 +99,7 @@ python concentration/rgb_to_concentration.py \
 concentration/
 ├── config.py               # [配置] 路径、超参数 (Alpha, Eps)
 ├── physics_features.py     # [核心] 物理特征计算逻辑
-├── rgb_exponential_fit.py  # [训练] 训练、CV评估、模型保存
+├── rgb_exponential_fit.py  # [拟合] 指数拟合(默认) / 岭回归训练(--method ridge)
 ├── rgb_to_concentration.py # [推理] 加载模型预测
 ├── METHODOLOGY.md          # [文档] 算法原理白皮书
 └── rgb_fit_output/         # [输出] 产物目录

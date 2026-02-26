@@ -11,3 +11,7 @@ backup/
 *.dng
 test data/
 rep/
+CDs_cha_comp/
+_tmp*
+_deleteme*
+*.bak
