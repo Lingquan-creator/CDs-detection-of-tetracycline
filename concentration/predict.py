@@ -13,7 +13,7 @@ import re
 import shutil
 import warnings
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 import joblib
 import numpy as np
@@ -154,6 +154,16 @@ def apply_calibrator(pred: np.ndarray, calibrator: Optional[object]) -> np.ndarr
     return np.maximum(np.asarray(calibrated, dtype=float), 0.0)
 
 
+def _select_model_features(feature_df: pd.DataFrame, feature_names: Optional[Sequence[str]]) -> pd.DataFrame:
+    if not feature_names:
+        return feature_df
+
+    missing = [name for name in feature_names if name not in feature_df.columns]
+    if missing:
+        raise ValueError(f"Input CSV cannot build required model features: {missing}")
+    return feature_df.loc[:, list(feature_names)]
+
+
 def predict_batch(
     model: object,
     roi_csv: Path,
@@ -164,6 +174,7 @@ def predict_batch(
     target_eps: float,
     use_bg: bool,
     calibrator: Optional[object],
+    expected_feature_names: Optional[Sequence[str]],
 ) -> None:
     if not roi_csv.exists():
         raise FileNotFoundError(f"ROI CSV not found: {roi_csv}")
@@ -178,7 +189,8 @@ def predict_batch(
         dataset_use_bg = False
 
     feature_df = build_feature_frame(df, g_mode=g_mode, use_bg=dataset_use_bg, clip_min=CLIP_MIN)
-    pred_target = model.predict(feature_df.to_numpy(dtype=float))
+    model_features = _select_model_features(feature_df, expected_feature_names)
+    pred_target = model.predict(model_features.to_numpy(dtype=float))
     pred_raw = inverse_target(np.asarray(pred_target, dtype=float), target_transform, target_eps)
     pred = apply_calibrator(pred_raw, calibrator)
 
@@ -241,6 +253,12 @@ def main() -> None:
         f"(g_mode={g_mode}, target={target_transform}, use_bg={use_bg}, calibrator={'yes' if calibrator else 'no'})"
     )
 
+    expected_feature_names: Optional[Sequence[str]] = None
+    if isinstance(bundle, dict):
+        names = bundle.get("feature_names")
+        if isinstance(names, (tuple, list)):
+            expected_feature_names = [str(name) for name in names]
+
     out_csv = args.out or cfg.output_path_for(args.roi_csv)
     predict_batch(
         model,
@@ -251,6 +269,7 @@ def main() -> None:
         target_eps=target_eps,
         use_bg=use_bg,
         calibrator=calibrator,
+        expected_feature_names=expected_feature_names,
     )
 
 

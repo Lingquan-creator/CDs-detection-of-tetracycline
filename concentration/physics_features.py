@@ -2,7 +2,7 @@
 Shared utilities for physics-informed ridge regression on ROI statistics.
 
 Supported feature sets:
-- Raw features (default, no background columns): ln_R/ln_G/ln_B, Ratio_RG/Ratio_BG, Var_G.
+- Raw features (default, no background columns): ln_R/ln_G/ln_B, Ratio_RG/Delta_RG/Ratio_BG, Var_G.
 - Background-subtracted features (if bg_* columns present): ln_R_sig/ln_G_sig/ln_B_sig using signal=ROI-BG, plus ratios/Var_G.
 """
 
@@ -14,10 +14,10 @@ from typing import Optional, Tuple
 import numpy as np
 import pandas as pd
 
-FEATURE_NAMES_RAW: Tuple[str, ...] = ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Ratio_BG", "Var_G")
-FEATURE_NAMES_BG: Tuple[str, ...] = ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Ratio_BG", "Var_G")
+FEATURE_NAMES_RAW: Tuple[str, ...] = ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Delta_RG", "Ratio_BG", "Var_G")
+FEATURE_NAMES_BG: Tuple[str, ...] = ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Delta_RG", "Ratio_BG", "Var_G")
 FEATURE_NAMES: Tuple[str, ...] = FEATURE_NAMES_RAW  # backward-compatibility alias
-DEFAULT_G_MODE = "g1"  # use G1 only. Alternatives: "avg" (G1/G2 average).
+DEFAULT_G_MODE = "avg"  # default to averaged green response, per art.md.
 _EPS = 1e-6
 _CLIP_MIN = 0.1  # minimum signal after bg subtraction to avoid log of non-positive
 
@@ -97,6 +97,7 @@ def build_feature_frame(df: pd.DataFrame, g_mode: str = DEFAULT_G_MODE, *, use_b
             "ln_G_sig" if use_bg else "ln_G": np.log(g_sig + _EPS),
             "ln_B_sig" if use_bg else "ln_B": np.log(b_sig + _EPS),
             "Ratio_RG": r_sig / (g_sig + _EPS),
+            "Delta_RG": (g_sig - r_sig) / (g_sig + r_sig + _EPS),
             "Ratio_BG": b_sig / (g_sig + _EPS),
             "Var_G": g_var,
         }
@@ -146,6 +147,7 @@ def build_feature_vector(
     ln_g = np.log(g_mean + _EPS)
     ln_b = np.log(b_sig + _EPS)
     ratio_rg = r_sig / (g_mean + _EPS)
+    delta_rg = (g_mean - r_sig) / (g_mean + r_sig + _EPS)
     ratio_bg = b_sig / (g_mean + _EPS)
 
-    return np.array([[ln_r, ln_g, ln_b, ratio_rg, ratio_bg, var_g]], dtype=float)
+    return np.array([[ln_r, ln_g, ln_b, ratio_rg, delta_rg, ratio_bg, var_g]], dtype=float)

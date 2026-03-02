@@ -12,6 +12,5 @@ backup/
 test data/
 rep/
 CDs_cha_comp/
-_tmp*
-_deleteme*
-*.bak
+*.pkl
+ignore/

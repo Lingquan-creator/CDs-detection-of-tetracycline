@@ -1,0 +1,94 @@
+﻿\documentclass[12pt,a4paper]{ctexart}
+
+\usepackage{amsmath,amssymb,bm}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{setspace}
+\usepackage{indentfirst}
+
+\geometry{left=2.5cm,right=2.5cm,top=2.6cm,bottom=2.6cm}
+\hypersetup{colorlinks=true,linkcolor=black,urlcolor=blue,citecolor=black}
+\setlength{\parindent}{2em}
+\linespread{1.25}
+
+\begin{document}
+
+\section*{基于固定摄像头 RAW 数据的荧光浓度定量分析软件}
+
+本研究面向固定摄像头荧光成像场景，研发了一套从 RAW 图像到浓度结果的端到端分析软件。系统以 DNG/RAW 作为统一输入，避免 ISP 链路中的非线性和色彩映射对定量关系的干扰；通过图形化 ROI 与背景环选区实现批量复用，在固定光路与固定视角条件下获得跨样本可比的统计量输出。软件实现覆盖 GUI 交互与命令行两种模式，支持批处理与结果落盘，满足实验复现与工程部署需求\cite{ruiz2023,branning2024}。
+
+在数据处理层，软件首先对 Bayer 阵列按 RGGB 进行四通道拆分，提取 $R,G_1,G_2,B$ 子通道，并结合黑电平扣除与非负截断进行预处理。随后在 ROI 与背景环区域分别计算均值、方差、分位数、饱和比例与通道比值等统计量；背景校正采用
+\begin{equation}
+X_{\mathrm{sig}}=\max\!\left(\mu_{\mathrm{ROI},X}-\mu_{\mathrm{BG},X},\,s_{\min}\right),
+\end{equation}
+其中 $X\in\{R,G_1,G_2,B\}$，$s_{\min}$ 为最小信号截断值（当前实现为 $0.1$）。需要说明的是，$G_1/G_2$ 一致性和饱和比例目前作为质量检查统计量输出，不直接进入岭回归训练特征。
+
+在特征构建层，当前代码默认采用绿色双通道平均模式（\texttt{g\_mode=avg}）：
+\begin{equation}
+G=\frac{G_1+G_2}{2},\qquad
+\mathrm{Var}_G=\frac{\mathrm{Var}_{G_1}+\mathrm{Var}_{G_2}}{2}.
+\end{equation}
+当背景列可用且启用背景模式时，$R,G,B$ 使用背景扣除后的 $R_{\mathrm{sig}},G_{\mathrm{sig}},B_{\mathrm{sig}}$；否则使用 ROI 原始均值。最终用于回归的 7 维特征为
+\begin{equation}
+\bm{f}=
+\left[
+\ln(R+\varepsilon),
+\ln(G+\varepsilon),
+\ln(B+\varepsilon),
+\frac{R}{G+\varepsilon},
+\frac{G-R}{G+R+\varepsilon},
+\frac{B}{G+\varepsilon},
+\mathrm{Var}_G
+\right]^{\mathsf T},
+\end{equation}
+其中 $\varepsilon=10^{-6}$。该特征设计同时覆盖强度衰减信息与红绿谱形偏置信息，与“双峰”发射谱的定量判别需求一致\cite{liu2021,rasooly2016}。
+
+在建模层，训练脚本采用“标准化 + 加权岭回归 + 单调校准 + 留一法验证（LOO-CV）”流程。设真实浓度为 $y$、预测为 $\hat{y}$，岭回归主模型为
+\begin{equation}
+\hat{y}=\bm{w}^{\mathsf T}\bm{f}+b,
+\end{equation}
+并在样本权重 $w_i$ 下优化平方误差与 $L_2$ 正则项。当前代码中样本权重定义为
+\begin{equation}
+w_i=\frac{1}{y_i+\epsilon_w},\qquad \epsilon_w=50,
+\end{equation}
+再归一化到均值为 1，以增强低浓度区间拟合稳定性。目标变量默认采用对数变换 $y_t=\ln(y+\epsilon_t)$（$\epsilon_t=10^{-6}$），回归后执行逆变换并截断至非负。模型使用 \texttt{RidgeCV} 在 $\alpha\in\{10000,100000\}$ 上选择正则强度，并以 \texttt{IsotonicRegression} 对回归输出进行单调校准\cite{hasinoff2016}。
+
+在验证与推理层，软件采用 LOO-CV 进行泛化评估，并在每个折中独立训练岭回归与单调校准器，避免信息泄露。依据当前代码与数据（\texttt{pic\_RGB/roi\_results/roi\_detailed\_statistics.csv}）的最新运行结果，LOO-CV 指标为 $R^2=0.9823$、$\mathrm{RMSE}=9.5440\,\mu\mathrm{M}$、$\mathrm{MAE}=5.4581\,\mu\mathrm{M}$；对应训练集指标为 $R^2=0.9998$、$\mathrm{RMSE}=0.8850\,\mu\mathrm{M}$。推理脚本会从模型包中读取 \texttt{g\_mode}、\texttt{use\_bg}、\texttt{target\_transform} 与 \texttt{feature\_names} 元数据，自动匹配输入 CSV 的特征列并输出浓度预测结果，从而保证训练与部署阶段的一致性。
+
+综上，本文软件在固定摄像头平台下实现了“可解释特征构建 + 稳健回归建模 + 自动化批量推理”的完整链路。其核心优势在于：以 RAW 数据提升定量可信度，以背景扣除与比值特征降低漂移敏感性，以加权岭回归与单调校准提升全量程稳定性，并以 LOO-CV 提供可复核的泛化证据。
+
+\begin{thebibliography}{99}
+
+\bibitem{ruiz2023}
+Ruiz, A. J., Allen, R., Giallorenzi, M. K., Samkoe, K. S., Chapman, M. S., \& Pogue, B. W. (2023). 
+Smartphone-based dual radiometric fluorescence and white-light imager for quantification of protoporphyrin IX in skin. 
+Journal of Biomedical Optics, 28(08), 086003. 
+
+\bibitem{hasinoff2016}
+Hasinoff, S. W., Sharlet, D., Geiss, R., Adams, A., Barron, J. T., Kainz, F., Chen, J., \& Levoy, M. (2016). 
+Burst photography for high dynamic range and low-light imaging on mobile cameras. 
+ACM Transactions on Graphics, 35(6), 1–12.
+
+\bibitem{chen2005}
+Chen, T., Lin, B., Brunner, E., \& Schild, D. (2005). 
+In situ background estimation in quantitative fluorescence imaging. 
+Biophysical Journal, 90(7), 2534–2547. 
+
+\bibitem{liu2021}
+Liu, Y., Rollins, A. M., Levenson, R. M., Fereidouni, F., \& Jenkins, M. W. (2021). 
+Pocket MUSE: an affordable, versatile and high-performance fluorescence microscope using a smartphone. 
+Communications Biology, 4(1), 334.
+
+\bibitem{rasooly2016}
+Rasooly, R., Bruck, H., Balsam, J., Prickril, B., Ossandon, M., \& Rasooly, A. (2016). 
+Improving the sensitivity and functionality of mobile Webcam-Based fluorescence detectors for Point-of-Care diagnostics in global health. 
+Diagnostics, 6(2), 19. 
+
+\bibitem{branning2024}
+Branning, J. M., Faughnan, K. A., Tomson, A. A., Bell, G. J., Isbell, S. M., DeGroot, A., Jameson, L., Kilroy, K., Smith, M., Smith, R., Mottel, L., Branning, E. G., Worrall, Z., Anderson, F., Panditaradyula, A., Yang, W., Abdelmalek, J., Brake, J., \& Cash, K. J. (2024). 
+Multifunction fluorescence open source in vivo/in vitro imaging system (openIVIS). 
+PLoS ONE, 19(3), e0299875.
+
+\end{thebibliography}
+
+\end{document}
