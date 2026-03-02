@@ -1,9 +1,17 @@
 """
-Shared utilities for physics-informed ridge regression on ROI statistics.
+Shared utilities for physics-informed feature extraction from ROI statistics.
+
+This module provides unified feature engineering tools for all concentration
+prediction methods (Ridge, Exponential, Gaussian amortized posterior).
 
 Supported feature sets:
-- Raw features (default, no background columns): ln_R/ln_G/ln_B, Ratio_RG/Delta_RG/Ratio_BG, Var_G.
-- Background-subtracted features (if bg_* columns present): ln_R_sig/ln_G_sig/ln_B_sig using signal=ROI-BG, plus ratios/Var_G.
+- Raw features (no background): ln_R/ln_G/ln_B, Ratio_RG/Delta_RG/Ratio_BG, Var_G
+- Background-subtracted features: ln_R_sig/ln_G_sig/ln_B_sig using signal=ROI-BG, plus ratios/Var_G
+
+Based on Beer-Lambert law: I ∝ exp(-εlC), so ln(I) should be linear with concentration.
+
+Note: This module is duplicated in concentration_EXP and concentration_GS for independence.
+All three versions are kept synchronized.
 """
 
 from __future__ import annotations
