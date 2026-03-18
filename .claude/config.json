@@ -1,0 +1,4 @@
+{
+  "model": "claude-sonnet-4-5-20250929",
+  "description": "Configuration for Claude Code to use Sonnet 4.5 model"
+}
