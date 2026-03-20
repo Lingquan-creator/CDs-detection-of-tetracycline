@@ -363,7 +363,7 @@ def build_summary_frame(
     *,
     confidence: float,
     target_eps: float,
-) -> pd.DataFrame:
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     summary = lognormal_summary(mu_log, std_log, confidence=confidence, target_eps=target_eps)
     prob_df = build_probability_frame(
         df["filename"].tolist(),

@@ -53,8 +53,19 @@
 - `roi_results.json`：每张图的完整结果（几何 + 通道值 + 元数据）
 - `roi_features.csv`：扁平化特征表（适合直接用 Excel / pandas）
 - `feature_matrix.npy`：形状 `(N, 4)` 的特征矩阵 `[R,G1,G2,B]`（背景扣除后）
+- `feature_matrix_full.npy`：增强输入向量，包含 4 维 RAW 均值 + RAW 四通道分布参数 + RGB 三通道分布参数
+- `feature_matrix_rgb_full.npy`：RGB 输入向量，包含 3 维 `[R,G,B]` + ROI 内 RGB 三通道分布参数
+- `roi_distribution_features.csv`：RAW 四通道（`R/G1/G2/B`）ROI 强度分布参数
+- `roi_rgb_distribution_features.csv`：RGB 三通道（`R/G/B`）ROI 强度分布参数
 - `roi_detailed_statistics.csv`：ROI 与 BG 的详细统计（均值/方差/分位数/饱和比例/通道比值）
 - `*_roi.png`：可视化覆盖图（由 `SAVE_VISUALIZATION=True` 控制）
+
+新增的分布参数会同时尝试 `Gaussian / Poisson / Gamma` 三种模型，并输出：
+
+- `best_model_code`：最佳模型编码（`1=Gaussian`, `2=Poisson`, `3=Gamma`）
+- `best_model_margin`：最佳模型相对第二名的 AIC 优势
+- 拟合参数：`gauss_mu / gauss_sigma / poisson_lambda / gamma_shape / gamma_scale`
+- 分布形状与频域特征：`fano_factor / skewness / kurtosis / entropy / fft_* / mgf_t1~t4`
 
 ## 复用与缓存
 

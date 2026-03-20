@@ -25,6 +25,13 @@ from roi_config import (
 )
 from roi_gui import BackgroundSelection, ROISelection, select_roi_with_gui
 from roi_manual import ManualROITools
+from roi_distribution_features import (
+    RAW_DIST_CHANNELS,
+    RGB_DIST_CHANNELS,
+    compute_channel_distribution_features,
+    compute_rgb_distribution_features,
+    DIST_FEATURE_KEYS,
+)
 
 # 字体设置：尽量兼容中英文
 matplotlib.rcParams["font.sans-serif"] = [
@@ -72,6 +79,9 @@ class ROIResult:
     B_display: float
     exposure_time: Optional[float] = None
     iso: Optional[int] = None
+    # 各通道强度分布统计参数（高斯拟合、泊松、矩、熵、FFT、MGF）
+    roi_dist_stats: Optional[Dict[str, float]] = None
+    rgb_dist_stats: Optional[Dict[str, float]] = None
 
     def to_dict(self) -> Dict:
         data = asdict(self)
@@ -89,12 +99,43 @@ class ROIResult:
         return data
 
     def get_feature_vector(self) -> np.ndarray:
+        """基础特征向量：背景校正后的 R, G1, G2, B 均值（4 维）。"""
         return np.array(
             [
                 self.R_corrected,
                 self.G1_corrected,
                 self.G2_corrected,
                 self.B_corrected,
+            ]
+        )
+
+    def get_distribution_feature_vector(self) -> np.ndarray:
+        """返回 RAW 四通道 ROI 强度分布参数向量。"""
+        if not self.roi_dist_stats:
+            return np.zeros(len(RAW_DIST_CHANNELS) * len(DIST_FEATURE_KEYS))
+        features = []
+        for ch in RAW_DIST_CHANNELS:
+            for key in DIST_FEATURE_KEYS:
+                features.append(self.roi_dist_stats.get(f"{ch}_{key}", 0.0))
+        return np.array(features)
+
+    def get_rgb_distribution_feature_vector(self) -> np.ndarray:
+        """返回 RGB 三通道 ROI 强度分布参数向量。"""
+        if not self.rgb_dist_stats:
+            return np.zeros(len(RGB_DIST_CHANNELS) * len(DIST_FEATURE_KEYS))
+        features = []
+        for ch in RGB_DIST_CHANNELS:
+            for key in DIST_FEATURE_KEYS:
+                features.append(self.rgb_dist_stats.get(f"{ch}_{key}", 0.0))
+        return np.array(features)
+
+    def get_full_feature_vector(self) -> np.ndarray:
+        """返回增强输入向量：RAW 均值 + RAW 分布 + RGB 分布。"""
+        return np.concatenate(
+            [
+                self.get_feature_vector(),
+                self.get_distribution_feature_vector(),
+                self.get_rgb_distribution_feature_vector(),
             ]
         )
 
@@ -105,6 +146,12 @@ class ROIResult:
                 self.G_display,
                 self.B_display,
             ]
+        )
+
+    def get_rgb_full_feature_vector(self) -> np.ndarray:
+        """返回 RGB 输入向量：RGB 均值 + RGB 分布参数。"""
+        return np.concatenate(
+            [self.get_rgb_vector(), self.get_rgb_distribution_feature_vector()]
         )
 
 
@@ -276,7 +323,7 @@ class ROIProcessor:
     def compute_roi_statistics(self, raw_channels: np.ndarray, roi_mask: np.ndarray, metadata: Optional[Dict] = None) -> Dict[str, float]:
         """计算 ROI 内的通道统计值，包括均值、方差、分位数、饱和比例等。"""
         stats: Dict[str, float] = {}
-        channel_names = ["R", "G1", "G2", "B"]
+        channel_names = list(RAW_DIST_CHANNELS)
         
         # 获取白电平（用于计算饱和比例）
         white_level = 16383.0  # 14-bit RAW 默认值
@@ -321,7 +368,14 @@ class ROIProcessor:
         stats["B_G_ratio"] = stats["B_mean"] / (G_mean + epsilon)
         stats["R_B_ratio"] = stats["R_mean"] / (stats["B_mean"] + epsilon)
         stats["G1_G2_ratio"] = stats["G1_mean"] / (stats["G2_mean"] + epsilon)
-        
+
+        # ---- 各通道强度分布统计建模 ----
+        # 包含：高斯拟合、泊松统计、高阶矩、Shannon熵、FFT频谱、MGF（Laplace域）
+        dist_feats = compute_channel_distribution_features(
+            raw_channels, roi_mask, channel_names
+        )
+        stats.update(dist_feats)
+
         return stats
 
     def process_image(
@@ -482,6 +536,15 @@ class ROIProcessor:
             int(np.clip(np.max(roi_box[:, 1]), 0, H - 1)),
         )
 
+        # 提取 ROI 分布统计特征
+        roi_dist: Dict[str, float] = {}
+        for ch in RAW_DIST_CHANNELS:
+            for key in DIST_FEATURE_KEYS:
+                full_key = f"{ch}_{key}"
+                if full_key in roi_stats:
+                    roi_dist[full_key] = roi_stats[full_key]
+        roi_rgb_dist = compute_rgb_distribution_features(raw_channels, roi_mask)
+
         result = ROIResult(
             filename=filepath.name,
             center_x=roi_sel.center[0],
@@ -515,6 +578,8 @@ class ROIProcessor:
             B_display=max(0, B_corrected),
             exposure_time=metadata.get("exposure_time"),
             iso=metadata.get("iso"),
+            roi_dist_stats=roi_dist if roi_dist else None,
+            rgb_dist_stats=roi_rgb_dist if roi_rgb_dist else None,
         )
 
         print(
@@ -711,6 +776,51 @@ class ROIProcessor:
         feature_matrix = np.array([r.get_feature_vector() for r in results])
         np.save(features_path, feature_matrix)
         print(f"特征矩阵已保存: {features_path} (shape: {feature_matrix.shape})")
+
+        # 保存完整特征矩阵（含分布统计参数）
+        full_features_path = output_dir / "feature_matrix_full.npy"
+        full_feature_matrix = np.array([r.get_full_feature_vector() for r in results])
+        np.save(full_features_path, full_feature_matrix)
+        rgb_full_features_path = output_dir / "feature_matrix_rgb_full.npy"
+        rgb_full_feature_matrix = np.array([r.get_rgb_full_feature_vector() for r in results])
+        np.save(rgb_full_features_path, rgb_full_feature_matrix)
+        print(
+            f"RGB 增强特征矩阵已保存: {rgb_full_features_path} (shape: {rgb_full_feature_matrix.shape})"
+        )
+        print(f"完整特征矩阵已保存: {full_features_path} (shape: {full_feature_matrix.shape})")
+
+        # 保存分布特征 CSV
+        dist_csv_path = output_dir / "roi_distribution_features.csv"
+        dist_col_names = [f"{ch}_{k}" for ch in RAW_DIST_CHANNELS for k in DIST_FEATURE_KEYS]
+        with open(dist_csv_path, "w", encoding="utf-8") as f:
+            f.write("filename," + ",".join(dist_col_names) + "\n")
+            for r in results:
+                vals = [r.filename]
+                dist = r.roi_dist_stats or {}
+                for col in dist_col_names:
+                    vals.append(f"{dist.get(col, 0.0):.8g}")
+                f.write(",".join(vals) + "\n")
+        print(f"分布特征CSV已保存: {dist_csv_path}")
+        print(f"  特征说明: 4通道 × {len(DIST_FEATURE_KEYS)}特征 = {len(dist_col_names)} 列")
+        print("  模型候选: Gaussian / Poisson / Gamma，best_model_code: 1/2/3")
+        print("  关键参数: gauss_mu/sigma/r2, poisson_lambda, gamma_shape/scale,")
+        print("            fano_factor, skewness, kurtosis, entropy, fft_*, mgf_t1~t4")
+
+        rgb_dist_csv_path = output_dir / "roi_rgb_distribution_features.csv"
+        rgb_dist_col_names = [
+            f"{ch}_{k}" for ch in RGB_DIST_CHANNELS for k in DIST_FEATURE_KEYS
+        ]
+        with open(rgb_dist_csv_path, "w", encoding="utf-8") as f:
+            f.write("filename," + ",".join(rgb_dist_col_names) + "\n")
+            for r in results:
+                vals = [r.filename]
+                dist = r.rgb_dist_stats or {}
+                for col in rgb_dist_col_names:
+                    vals.append(f"{dist.get(col, 0.0):.8g}")
+                f.write(",".join(vals) + "\n")
+        print(f"RGB 分布特征CSV已保存: {rgb_dist_csv_path}")
+        print(f"  特征说明: 3 通道 × {len(DIST_FEATURE_KEYS)} 特征 = {len(rgb_dist_col_names)} 列")
+        print("  模型候选: Gaussian / Poisson / Gamma，best_model_code: 1/2/3")
 
     def _save_detailed_statistics(self, results: List[ROIResult], output_dir: Path):
         """保存详细的统计信息到单独的CSV文件，包括均值、方差、分位数、饱和比例和通道比值。"""

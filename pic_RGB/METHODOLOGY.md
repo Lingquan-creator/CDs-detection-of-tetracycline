@@ -60,6 +60,24 @@ BG 的中心允许独立于 ROI（便于避开局部杂散光）；GUI 中按 `B
   - `G_display = max(0, (G1_corrected + G2_corrected) / 2)`
   - `B_display = B_corrected`
 
+### 4.1 ROI 强度分布建模
+
+针对 ROI 内每个通道的像素强度，额外计算两组增强特征：
+
+- RAW 四通道：`R/G1/G2/B`
+- RGB 三通道：`R/G/B`，其中 `G = (G1 + G2) / 2`
+
+每个通道都会尝试 `Gaussian / Poisson / Gamma` 三种模型，并按 AIC 选出最优模型，输出：
+
+- `*_best_model_code`：最佳模型编码，`1=Gaussian`，`2=Poisson`，`3=Gamma`
+- `*_best_model_margin`：最佳模型相对第二名的 AIC 优势
+- `*_gauss_mu`, `*_gauss_sigma`, `*_gauss_r2`
+- `*_poisson_lambda`
+- `*_gamma_shape`, `*_gamma_scale`
+- `*_fano_factor`, `*_skewness`, `*_kurtosis`, `*_entropy`
+- `*_fft_peak_freq`, `*_fft_spectral_centroid`, `*_fft_spectral_spread`, `*_fft_dc_ratio`
+- `*_mgf_t1` ~ `*_mgf_t4`：对归一化强度分布采样的 Laplace/MGF 特征
+
 ## 5. 输出文件与字段
 
 ### 5.1 `roi_features.csv`
@@ -72,11 +90,39 @@ BG 的中心允许独立于 ROI（便于避开局部杂散光）；GUI 中按 `B
 
 形状 `(N, 4)`，每行对应一张图的背景扣除特征向量 `[R_corrected, G1_corrected, G2_corrected, B_corrected]`。
 
-### 5.3 `roi_results.json`
+### 5.3 `feature_matrix_full.npy`
+
+增强输入向量，按如下顺序拼接：
+
+`[RAW 4 维均值特征] + [RAW 四通道分布参数] + [RGB 三通道分布参数]`
+
+### 5.4 `feature_matrix_rgb_full.npy`
+
+RGB 输入向量，按如下顺序拼接：
+
+`[R_display, G_display, B_display] + [RGB 三通道分布参数]`
+
+### 5.5 `roi_results.json`
 
 JSON 为列表，每个元素对应一张图，字段基本与 `roi_features.csv` 一一对应（包含几何、均值/背景/扣除值、显示值与可选元数据）。
 
-### 5.4 `roi_detailed_statistics.csv`
+### 5.6 `roi_distribution_features.csv`
+
+RAW 四通道 ROI 分布参数表，列名为：
+
+`R_*`, `G1_*`, `G2_*`, `B_*`
+
+其中 `*` 为第 4.1 节中的分布建模字段。
+
+### 5.7 `roi_rgb_distribution_features.csv`
+
+RGB 三通道 ROI 分布参数表，列名为：
+
+`R_*`, `G_*`, `B_*`
+
+其中 `*` 为第 4.1 节中的分布建模字段。
+
+### 5.8 `roi_detailed_statistics.csv`
 
 每行对应一张图，包含：
 
@@ -86,7 +132,7 @@ JSON 为列表，每个元素对应一张图，字段基本与 `roi_features.csv
 
 浮点数按 `%.6f` 写入。
 
-### 5.5 `*_roi.png`
+### 5.9 `*_roi.png`
 
 当 `SAVE_VISUALIZATION=True` 时生成，包含：
 
