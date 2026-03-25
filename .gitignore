@@ -14,3 +14,4 @@ rep/
 CDs_cha_comp/
 *.pkl
 ignore/
+.venv/
