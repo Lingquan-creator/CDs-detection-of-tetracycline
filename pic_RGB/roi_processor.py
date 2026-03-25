@@ -48,6 +48,7 @@ class ROIResult:
     """ROI 提取结果。"""
 
     filename: str
+    concentration: Optional[float]
     center_x: float
     center_y: float
     width: float
@@ -82,6 +83,7 @@ class ROIResult:
     # 各通道强度分布统计参数（高斯拟合、泊松、矩、熵、FFT、MGF）
     roi_dist_stats: Optional[Dict[str, float]] = None
     rgb_dist_stats: Optional[Dict[str, float]] = None
+    source_path: Optional[str] = None
 
     def to_dict(self) -> Dict:
         data = asdict(self)
@@ -177,8 +179,91 @@ class ROIProcessor:
         self.selection_cache: Dict[str, Tuple[ROISelection, BackgroundSelection]] = (
             self._load_selection_cache()
         )
+        self.directory_metadata_cache: Dict[Path, Dict[str, Any]] = {}
 
         self.manual = ManualROITools(self.settings)
+
+    @staticmethod
+    def _parse_scalar(value: str) -> Any:
+        text = value.strip()
+        if text == "":
+            return text
+        lower = text.lower()
+        if lower in {"true", "false"}:
+            return lower == "true"
+        try:
+            if any(ch in text for ch in (".", "e", "E")):
+                return float(text)
+            return int(text)
+        except ValueError:
+            return text
+
+    def _load_directory_metadata(self, directory: Path) -> Dict[str, Any]:
+        resolved = directory.resolve()
+        if resolved in self.directory_metadata_cache:
+            return self.directory_metadata_cache[resolved]
+
+        metadata_file = directory / "metadata.txt"
+        parsed: Dict[str, Any] = {}
+        if metadata_file.exists():
+            try:
+                for line in metadata_file.read_text(encoding="utf-8").splitlines():
+                    text = line.strip()
+                    if not text or text.startswith("#") or "=" not in text:
+                        continue
+                    key, value = text.split("=", maxsplit=1)
+                    key = key.strip()
+                    if not key:
+                        continue
+                    parsed[key] = self._parse_scalar(value)
+            except OSError as exc:
+                print(f"  警告: 无法读取目录元数据 {metadata_file}: {exc}")
+
+        self.directory_metadata_cache[resolved] = parsed
+        if parsed:
+            print(f"  已加载目录元数据: {metadata_file.name} ({', '.join(sorted(parsed.keys()))})")
+        return parsed
+
+    @staticmethod
+    def _parse_filename_metadata(filepath: Path) -> Dict[str, Any]:
+        stem = filepath.stem
+        if "." not in stem:
+            return {}
+
+        concentration_text, exposure_text = stem.rsplit(".", maxsplit=1)
+        if not concentration_text or not exposure_text:
+            return {}
+
+        metadata: Dict[str, Any] = {}
+        try:
+            metadata["concentration"] = float(concentration_text)
+        except ValueError:
+            pass
+        try:
+            metadata["exposure_time"] = float(exposure_text)
+        except ValueError:
+            pass
+        return metadata
+
+    @staticmethod
+    def _lookup_metadata_value(metadata: Dict[str, Any], *keys: str) -> Any:
+        lowered = {str(k).lower(): v for k, v in metadata.items()}
+        for key in keys:
+            if key in metadata:
+                return metadata[key]
+            lowered_key = key.lower()
+            if lowered_key in lowered:
+                return lowered[lowered_key]
+        return None
+
+    @staticmethod
+    def _to_float(value: Any, default: float) -> float:
+        if value is None:
+            return default
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
 
     def _load_selection_cache(self) -> Dict[str, Tuple[ROISelection, BackgroundSelection]]:
         """Load previous selections from roi_results.json and optional cache file."""
@@ -268,9 +353,43 @@ class ROIProcessor:
             metadata = {
                 "exposure_time": None,
                 "iso": None,
+                "concentration": None,
                 "black_level": None,
                 "white_level": None,
             }
+
+            # 规则1：*.dng 保持原输入；规则2：*.*.dng => 第一段浓度，第二段曝光时长
+            filename_meta = self._parse_filename_metadata(filepath)
+            if "concentration" in filename_meta:
+                metadata["concentration"] = filename_meta["concentration"]
+            if "exposure_time" in filename_meta:
+                metadata["exposure_time"] = filename_meta["exposure_time"]
+
+            # 同目录 metadata.txt（如存在）作为附加元数据输入
+            directory_meta = self._load_directory_metadata(filepath.parent)
+            if directory_meta:
+                metadata["directory_metadata"] = dict(directory_meta)
+                if metadata["exposure_time"] is None:
+                    exp_from_txt = self._lookup_metadata_value(directory_meta, "exposure_time", "exposure", "exp")
+                    if isinstance(exp_from_txt, (int, float)):
+                        metadata["exposure_time"] = float(exp_from_txt)
+                iso_from_txt = self._lookup_metadata_value(directory_meta, "iso", "iso_speed")
+                if isinstance(iso_from_txt, (int, float)):
+                    metadata["iso"] = int(iso_from_txt)
+
+            try:
+                raw_meta = getattr(raw, "metadata", None)
+                if raw_meta is not None:
+                    if metadata["exposure_time"] is None and hasattr(raw_meta, "shutter"):
+                        shutter = getattr(raw_meta, "shutter")
+                        if isinstance(shutter, (int, float)) and shutter > 0:
+                            metadata["exposure_time"] = float(shutter)
+                    if metadata["iso"] is None and hasattr(raw_meta, "iso_speed"):
+                        iso_speed = getattr(raw_meta, "iso_speed")
+                        if isinstance(iso_speed, (int, float)) and iso_speed > 0:
+                            metadata["iso"] = int(iso_speed)
+            except Exception:
+                pass
 
             try:
                 if hasattr(raw, "white_level"):
@@ -523,7 +642,31 @@ class ROIProcessor:
         G1_corrected = roi_stats["G1_mean"] - bg_stats["G1_mean"]
         G2_corrected = roi_stats["G2_mean"] - bg_stats["G2_mean"]
         B_corrected = roi_stats["B_mean"] - bg_stats["B_mean"]
-        G_display = (G1_corrected + G2_corrected) / 2
+        G_corrected = (G1_corrected + G2_corrected) / 2
+
+        directory_meta = metadata.get("directory_metadata", {})
+        if not isinstance(directory_meta, dict):
+            directory_meta = {}
+        r_gain = max(0.0, self._to_float(self._lookup_metadata_value(directory_meta, "R_gain"), 1.0))
+        g_gain = max(0.0, self._to_float(self._lookup_metadata_value(directory_meta, "G_gain"), 1.0))
+        b_gain = max(0.0, self._to_float(self._lookup_metadata_value(directory_meta, "B_gain"), 1.0))
+        gamma = self._to_float(self._lookup_metadata_value(directory_meta, "gama", "gamma"), 1.0)
+        saturability = self._to_float(self._lookup_metadata_value(directory_meta, "saturability"), 0.0)
+
+        R_display = max(0.0, R_corrected) * r_gain
+        G_display = max(0.0, G_corrected) * g_gain
+        B_display = max(0.0, B_corrected) * b_gain
+
+        if gamma > 0 and gamma != 1.0:
+            inv_gamma = 1.0 / gamma
+            R_display = R_display ** inv_gamma
+            G_display = G_display ** inv_gamma
+            B_display = B_display ** inv_gamma
+
+        if saturability > 0:
+            R_display = min(R_display, saturability)
+            G_display = min(G_display, saturability)
+            B_display = min(B_display, saturability)
 
         area = int(np.sum(roi_mask))
         roi_box = self.manual.get_rotated_box(
@@ -547,6 +690,7 @@ class ROIProcessor:
 
         result = ROIResult(
             filename=filepath.name,
+            concentration=metadata.get("concentration"),
             center_x=roi_sel.center[0],
             center_y=roi_sel.center[1],
             width=float(roi_sel.width),
@@ -573,13 +717,14 @@ class ROIProcessor:
             G1_corrected=max(0, G1_corrected),
             G2_corrected=max(0, G2_corrected),
             B_corrected=max(0, B_corrected),
-            R_display=max(0, R_corrected),
+            R_display=max(0, R_display),
             G_display=max(0, G_display),
-            B_display=max(0, B_corrected),
+            B_display=max(0, B_display),
             exposure_time=metadata.get("exposure_time"),
             iso=metadata.get("iso"),
             roi_dist_stats=roi_dist if roi_dist else None,
             rgb_dist_stats=roi_rgb_dist if roi_rgb_dist else None,
+            source_path=str(filepath),
         )
 
         print(
@@ -699,12 +844,22 @@ class ROIProcessor:
         interactive: bool = True,
     ) -> List[ROIResult]:
         """批量处理文件夹中的 DNG 文件。"""
+        image_dir = image_dir.expanduser().resolve()
+        if not image_dir.exists():
+            raise FileNotFoundError(f"输入目录不存在: {image_dir}")
+        if not image_dir.is_dir():
+            raise NotADirectoryError(f"输入路径不是目录: {image_dir}")
+
         if output_dir is None:
             output_dir = image_dir.parent / "roi_results"
+        else:
+            output_dir = output_dir.expanduser().resolve()
 
-        image_files = sorted(image_dir.glob("*.dng"))
+        image_files = sorted(
+            path for path in image_dir.iterdir() if path.is_file() and path.suffix.lower() == ".dng"
+        )
         if len(image_files) == 0:
-            raise ValueError(f"在 {image_dir} 中未找到 DNG 文件")
+            raise ValueError(f"在 {image_dir} 中未找到 DNG 文件（支持 .dng/.DNG）")
 
         print(f"找到 {len(image_files)} 个 DNG 文件")
 
@@ -747,7 +902,7 @@ class ROIProcessor:
         csv_path = output_dir / "roi_features.csv"
         with open(csv_path, "w", encoding="utf-8") as f:
             f.write(
-                "filename,center_x,center_y,width,height,angle_deg,bg_center_x,bg_center_y,bg_inner_x,bg_inner_y,bg_outer_x,bg_outer_y,bg_angle_deg,area,"
+                "filename,concentration,center_x,center_y,width,height,angle_deg,bg_center_x,bg_center_y,bg_inner_x,bg_inner_y,bg_outer_x,bg_outer_y,bg_angle_deg,area,"
             )
             f.write("R_mean,G1_mean,G2_mean,B_mean,")
             f.write("R_bg,G1_bg,G2_bg,B_bg,")
@@ -755,8 +910,9 @@ class ROIProcessor:
             f.write("R_display,G_display,B_display,")
             f.write("exposure_time,iso\n")
             for r in results:
+                concentration_text = "" if r.concentration is None else f"{r.concentration:.8g}"
                 f.write(
-                    f"{r.filename},{r.center_x:.2f},{r.center_y:.2f},{r.width:.2f},{r.height:.2f},{r.angle_deg:.2f},"
+                    f"{r.filename},{concentration_text},{r.center_x:.2f},{r.center_y:.2f},{r.width:.2f},{r.height:.2f},{r.angle_deg:.2f},"
                     f"{r.bg_center_x:.2f},{r.bg_center_y:.2f},{r.bg_inner_x:.2f},{r.bg_inner_y:.2f},{r.bg_outer_x:.2f},{r.bg_outer_y:.2f},{r.bg_angle_deg:.2f},{r.area},"
                 )
                 f.write(
@@ -831,7 +987,7 @@ class ROIProcessor:
         
         for result in results:
             # 构建完整路径
-            filepath = DATA_DIR / result.filename
+            filepath = Path(result.source_path) if result.source_path else (DATA_DIR / result.filename)
             if not filepath.exists():
                 print(f"  警告: 找不到文件 {filepath}，跳过详细统计")
                 continue

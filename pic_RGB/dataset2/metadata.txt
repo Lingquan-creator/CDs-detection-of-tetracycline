@@ -1,0 +1,5 @@
+R_gain=25
+G_gain=16
+B_gain=25
+gama=1
+saturability=0

@@ -2,6 +2,7 @@
 ROI extractor configuration for GUI-driven manual selection.
 """
 
+import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -9,8 +10,11 @@ from typing import Any, Dict, Optional
 # ============================================
 # Paths
 # ============================================
-DATA_DIR = Path(r"h:\000\CDs\pic_RGB\data_pic")       # Input DNG directory
-OUTPUT_DIR = Path(r"h:\000\CDs\pic_RGB\roi_results")  # Output directory
+PROJECT_DIR = Path(__file__).resolve().parent
+DATA_DIR = Path(os.environ.get("PIC_RGB_DATA_DIR", str(PROJECT_DIR / "dataset2"))).expanduser().resolve()
+OUTPUT_DIR = Path(
+    os.environ.get("PIC_RGB_OUTPUT_DIR", str(PROJECT_DIR / "roi_results2"))
+).expanduser().resolve()
 
 # ============================================
 # ROI parameters (dict form)
