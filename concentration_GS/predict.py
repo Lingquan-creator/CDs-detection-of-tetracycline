@@ -13,12 +13,16 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+import matplotlib
 import numpy as np
 import pandas as pd
 
 from config import PredictConfig
 from physics_features import build_feature_frame, extract_concentration_from_name, has_background_columns
 from train import build_probability_frame, load_model_bundle, lognormal_summary, posterior_from_bundle, shifted_lognormal_logpdf
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 
 def parse_args(default_cfg: PredictConfig) -> argparse.Namespace:
@@ -27,6 +31,7 @@ def parse_args(default_cfg: PredictConfig) -> argparse.Namespace:
     parser.add_argument("--roi-csv", type=Path, default=default_cfg.default_roi_csv, help="Input ROI statistics CSV.")
     parser.add_argument("--out", type=Path, help="Summary CSV output path.")
     parser.add_argument("--grid-out", type=Path, help="Probability CSV output path.")
+    parser.add_argument("--plot-out", type=Path, help="Prediction visualization PNG output path.")
     parser.add_argument("--confidence", type=float, help="Credible interval coverage. Default: use model bundle value.")
     return parser.parse_args()
 
@@ -97,11 +102,87 @@ def build_inference_summary(
     return out_df, prob_df
 
 
+def resolve_output_path(path: Path | None, default_path: Path, output_dir: Path) -> Path:
+    chosen = (path or default_path).expanduser()
+    if not chosen.is_absolute():
+        chosen = output_dir / chosen
+    return chosen.resolve()
+
+
+def draw_prediction_plot(summary_df: pd.DataFrame, out_path: Path, confidence: float) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5), dpi=150)
+
+    mean_col = "posterior_mean"
+    ci_low_col = f"ci_{int(confidence * 100):02d}_low"
+    ci_high_col = f"ci_{int(confidence * 100):02d}_high"
+    y_pred = summary_df[mean_col].to_numpy(dtype=np.float64)
+
+    if "conc_true" in summary_df.columns:
+        y_true = summary_df["conc_true"].to_numpy(dtype=np.float64)
+        valid = np.isfinite(y_true) & np.isfinite(y_pred)
+        if np.any(valid):
+            x = y_true[valid]
+            y = y_pred[valid]
+            axes[0].scatter(x, y, s=24, alpha=0.8, color="#1f77b4")
+            low = float(min(np.min(x), np.min(y)))
+            high = float(max(np.max(x), np.max(y)))
+            axes[0].plot([low, high], [low, high], "k--", linewidth=1.0)
+            axes[0].set_xlabel("True concentration (uM)")
+            axes[0].set_ylabel("Posterior mean (uM)")
+            axes[0].set_title("GS Prediction vs Truth")
+            axes[0].grid(alpha=0.25)
+
+            ci_low = summary_df[ci_low_col].to_numpy(dtype=np.float64)[valid]
+            ci_high = summary_df[ci_high_col].to_numpy(dtype=np.float64)[valid]
+            idx = np.arange(len(x))
+            axes[1].errorbar(
+                idx,
+                y,
+                yerr=[y - ci_low, ci_high - y],
+                fmt="o",
+                markersize=3,
+                alpha=0.7,
+                ecolor="#ff7f0e",
+                color="#1f77b4",
+            )
+            axes[1].set_xlabel("Sample index")
+            axes[1].set_ylabel("Posterior mean ± CI (uM)")
+            axes[1].set_title(f"Uncertainty ({int(confidence * 100)}% CI)")
+            axes[1].grid(alpha=0.25)
+        else:
+            axes[0].text(0.5, 0.5, "No finite labels", ha="center", va="center")
+            axes[1].text(0.5, 0.5, "No finite labels", ha="center", va="center")
+    else:
+        axes[0].hist(y_pred[np.isfinite(y_pred)], bins=20, color="#1f77b4", alpha=0.8)
+        axes[0].set_xlabel("Posterior mean (uM)")
+        axes[0].set_ylabel("Count")
+        axes[0].set_title("Prediction Distribution")
+        axes[0].grid(alpha=0.25)
+
+        posterior_std = summary_df["posterior_std"].to_numpy(dtype=np.float64)
+        axes[1].scatter(y_pred, posterior_std, s=16, alpha=0.7, color="#d62728")
+        axes[1].set_xlabel("Posterior mean (uM)")
+        axes[1].set_ylabel("Posterior std (uM)")
+        axes[1].set_title("Uncertainty vs Prediction")
+        axes[1].grid(alpha=0.25)
+
+    plt.tight_layout()
+    fig.savefig(out_path, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved plot        -> {out_path}")
+
+
 def main() -> None:
     cfg = PredictConfig()
     args = parse_args(cfg)
 
-    bundle = load_model_bundle(args.model)
+    model_path = args.model.expanduser()
+    if not model_path.is_absolute():
+        model_path = cfg.output_dir / model_path
+    model_path = model_path.resolve()
+
+    bundle = load_model_bundle(model_path)
     confidence = float(args.confidence if args.confidence is not None else bundle.get("confidence", cfg.confidence))
     if not (0.0 < confidence < 1.0):
         raise ValueError("--confidence must be between 0 and 1.")
@@ -130,16 +211,18 @@ def main() -> None:
         target_eps=float(bundle["target_eps"]),
     )
 
-    out_path = args.out or cfg.summary_output_path_for(args.roi_csv)
-    grid_out_path = args.grid_out or cfg.probability_output_path_for(args.roi_csv)
+    out_path = resolve_output_path(args.out, cfg.summary_output_path_for(args.roi_csv), cfg.output_dir)
+    grid_out_path = resolve_output_path(args.grid_out, cfg.probability_output_path_for(args.roi_csv), cfg.output_dir)
+    plot_out_path = resolve_output_path(args.plot_out, cfg.plot_output_path_for(args.roi_csv), cfg.output_dir)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     grid_out_path.parent.mkdir(parents=True, exist_ok=True)
 
     summary_df.to_csv(out_path, index=False)
     prob_df.to_csv(grid_out_path, index=False)
+    draw_prediction_plot(summary_df, plot_out_path, confidence)
 
     print(
-        f"Loaded model: {args.model} "
+        f"Loaded model: {model_path} "
         f"(g_mode={g_mode}, use_bg={use_bg}, bins={len(bundle['reference_concentrations'])})"
     )
     print(f"Saved summary CSV -> {out_path}")

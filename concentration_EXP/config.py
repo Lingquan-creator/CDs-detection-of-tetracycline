@@ -11,7 +11,7 @@ from pathlib import Path
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent
-ROI_STATS_PATH = BASE_DIR.parent / "pic_RGB" / "roi_results" / "roi_detailed_statistics.csv"
+ROI_STATS_PATH = BASE_DIR.parent / "pic_RGB" / "roi_results2" / "roi_detailed_statistics.csv"
 OUTPUT_DIR = BASE_DIR / "exp_fit_output"
 
 # Exponential fitting defaults
@@ -22,6 +22,8 @@ DEFAULT_WEIGHT_EPS = 5.0  # Weighting parameter: weights ~ 1/(conc + eps)
 PARAMS_FILENAME = "exp_fit_params.csv"
 PREDICTIONS_FILENAME = "exp_fit_predictions.csv"
 CONCENTRATION_SUFFIX = "_pred_concentration_exp.csv"
+FIT_PLOT_FILENAME = "exp_fit_evaluation.png"
+CONCENTRATION_PLOT_SUFFIX = "_pred_concentration_exp.png"
 
 
 @dataclass
@@ -41,6 +43,14 @@ class ExpConfig:
     def predictions_path(self) -> Path:
         return self.output_dir / PREDICTIONS_FILENAME
 
+    @property
+    def fit_plot_path(self) -> Path:
+        return self.output_dir / FIT_PLOT_FILENAME
+
     def concentration_path_for(self, roi_csv: Path) -> Path:
         """Build output path for concentration predictions."""
-        return roi_csv.with_name(roi_csv.stem + CONCENTRATION_SUFFIX)
+        return self.output_dir / f"{roi_csv.stem}{CONCENTRATION_SUFFIX}"
+
+    def concentration_plot_path_for(self, roi_csv: Path) -> Path:
+        """Build output path for concentration prediction visualization."""
+        return self.output_dir / f"{roi_csv.stem}{CONCENTRATION_PLOT_SUFFIX}"

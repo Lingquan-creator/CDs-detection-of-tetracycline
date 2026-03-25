@@ -15,7 +15,7 @@ from typing import Literal
 
 
 BASE_DIR = Path(__file__).resolve().parent
-ROI_STATS_PATH = BASE_DIR.parent / "pic_RGB" / "roi_results" / "roi_detailed_statistics.csv"
+ROI_STATS_PATH = BASE_DIR.parent / "pic_RGB" / "roi_results2" / "roi_detailed_statistics.csv"
 OUTPUT_DIR = BASE_DIR / "amortized_output"
 
 MODEL_FILENAME = "amortized_posterior_model.pt"
@@ -27,6 +27,7 @@ PLOT_FILENAME = "posterior_evaluation.png"
 
 PREDICT_SUMMARY_SUFFIX = "_pred_concentration_gs.csv"
 PREDICT_GRID_SUFFIX = "_pred_concentration_gs_prob.csv"
+PREDICT_PLOT_SUFFIX = "_pred_concentration_gs.png"
 
 DEFAULT_G_MODE: Literal["g1", "avg"] = "avg"
 DEFAULT_USE_BG = "auto"  # auto -> use background columns when available
@@ -93,10 +94,14 @@ class TrainConfig:
 class PredictConfig:
     model_path: Path = OUTPUT_DIR / MODEL_FILENAME
     default_roi_csv: Path = ROI_STATS_PATH
+    output_dir: Path = OUTPUT_DIR
     confidence: float = DEFAULT_CONFIDENCE
 
     def summary_output_path_for(self, roi_csv: Path) -> Path:
-        return roi_csv.with_name(roi_csv.stem + PREDICT_SUMMARY_SUFFIX)
+        return self.output_dir / f"{roi_csv.stem}{PREDICT_SUMMARY_SUFFIX}"
 
     def probability_output_path_for(self, roi_csv: Path) -> Path:
-        return roi_csv.with_name(roi_csv.stem + PREDICT_GRID_SUFFIX)
+        return self.output_dir / f"{roi_csv.stem}{PREDICT_GRID_SUFFIX}"
+
+    def plot_output_path_for(self, roi_csv: Path) -> Path:
+        return self.output_dir / f"{roi_csv.stem}{PREDICT_PLOT_SUFFIX}"

@@ -560,12 +560,27 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
     return parser.parse_args()
 
 
+def resolve_output_path(path: Path, output_dir: Path) -> Path:
+    chosen = path.expanduser()
+    if not chosen.is_absolute():
+        chosen = output_dir / chosen
+    return chosen.resolve()
+
+
 def main() -> None:
     cfg = TrainConfig()
     args = parse_args(cfg)
+    output_dir = cfg.output_dir.resolve()
 
     if not (0.0 < float(args.confidence) < 1.0):
         raise ValueError("--confidence must be between 0 and 1.")
+
+    args.model_out = resolve_output_path(args.model_out, output_dir)
+    args.train_out = resolve_output_path(args.train_out, output_dir)
+    args.loo_out = resolve_output_path(args.loo_out, output_dir)
+    args.train_grid_out = resolve_output_path(args.train_grid_out, output_dir)
+    args.loo_grid_out = resolve_output_path(args.loo_grid_out, output_dir)
+    args.plot_out = resolve_output_path(args.plot_out, output_dir)
 
     df, y_true = load_training_dataframe(args.roi_csv)
     use_bg = resolve_use_bg(df, args.g_mode, args.use_bg)

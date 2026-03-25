@@ -29,7 +29,7 @@ CLIP_MIN = 0.1            # minimum signal after background subtraction to avoid
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent
-ROI_STATS_PATH = BASE_DIR.parent / "pic_RGB" / "roi_results" / "roi_detailed_statistics.csv"
+ROI_STATS_PATH = BASE_DIR.parent / "pic_RGB" / "roi_results2" / "roi_detailed_statistics.csv"
 OUTPUT_DIR = BASE_DIR / "rgb_fit_output"
 
 # Filenames
@@ -37,6 +37,7 @@ MODEL_FILENAME = "concentration_model_v1.pkl"
 PREDICTIONS_FILENAME = "ridge_predictions.csv"
 COEFFICIENTS_FILENAME = "ridge_coefficients.csv"
 PRED_SUFFIX = "_pred_concentration.csv"
+PRED_PLOT_SUFFIX = "_pred_concentration.png"
 
 
 @dataclass
@@ -68,8 +69,14 @@ class PredictConfig:
 
     model_path: Path = OUTPUT_DIR / MODEL_FILENAME
     default_roi_csv: Path = ROI_STATS_PATH
+    output_dir: Path = OUTPUT_DIR
     output_suffix: str = PRED_SUFFIX
+    plot_suffix: str = PRED_PLOT_SUFFIX
 
     def output_path_for(self, roi_csv: Path) -> Path:
-        """Build default output path for a ROI CSV."""
-        return roi_csv.with_name(roi_csv.stem + self.output_suffix)
+        """Build default output CSV path for a ROI CSV."""
+        return self.output_dir / f"{roi_csv.stem}{self.output_suffix}"
+
+    def plot_path_for(self, roi_csv: Path) -> Path:
+        """Build default output plot path for a ROI CSV."""
+        return self.output_dir / f"{roi_csv.stem}{self.plot_suffix}"

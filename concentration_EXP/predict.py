@@ -13,11 +13,16 @@ import argparse
 from pathlib import Path
 from typing import Optional, Tuple
 
+import matplotlib
 import numpy as np
 import pandas as pd
 
 from config import ExpConfig
 from fit_exponential import build_corrected_channels, invert_exponential_intensity
+from physics_features import extract_concentration_from_name
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 
 def load_fit_parameters(params_csv: Path, channel: str) -> Tuple[float, float, float]:
@@ -84,16 +89,33 @@ def parse_args(default_cfg: ExpConfig) -> argparse.Namespace:
         type=Path,
         help="Output CSV path (default: <roi-csv>_pred_concentration_exp.csv)",
     )
+    parser.add_argument(
+        "--plot-out",
+        type=Path,
+        help="Output PNG path (default: <output_dir>/<roi_stem>_pred_concentration_exp.png)",
+    )
     
     return parser.parse_args()
+
+
+def resolve_output_path(path: Optional[Path], default_path: Path, output_dir: Path) -> Path:
+    chosen = (path or default_path).expanduser()
+    if not chosen.is_absolute():
+        chosen = output_dir / chosen
+    return chosen.resolve()
 
 
 def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
     """Run concentration prediction."""
     
     # Load fitted parameters
-    print(f"Loading parameters from {args.params}...")
-    a, b, c = load_fit_parameters(args.params, args.channel)
+    params_path = args.params.expanduser()
+    if not params_path.is_absolute():
+        params_path = cfg.output_dir / params_path
+    params_path = params_path.resolve()
+
+    print(f"Loading parameters from {params_path}...")
+    a, b, c = load_fit_parameters(params_path, args.channel)
     print(f"Using channel: {args.channel}")
     print(f"Parameters: a={a:.3f}, b={b:.6f}, c={c:.3f}\n")
     
@@ -118,11 +140,18 @@ def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
         "conc_pred": conc_pred,
         f"{args.channel}_intensity": intensity,
     })
+    conc_true = df_raw["filename"].apply(extract_concentration_from_name)
+    if conc_true.notna().any():
+        output_df["conc_true"] = conc_true
+        output_df["residual"] = output_df["conc_pred"] - output_df["conc_true"]
     
     # Save predictions
-    output_path = args.output or cfg.concentration_path_for(args.roi_csv)
+    output_path = resolve_output_path(args.output, cfg.concentration_path_for(args.roi_csv), cfg.output_dir)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_df.to_csv(output_path, index=False)
+
+    plot_path = resolve_output_path(args.plot_out, cfg.concentration_plot_path_for(args.roi_csv), cfg.output_dir)
+    _draw_prediction_plot(output_df, plot_path, args.channel)
     
     # Display statistics
     valid_mask = np.isfinite(conc_pred)
@@ -138,6 +167,55 @@ def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
         print(f"\n⚠ Warning: {n_total - n_valid} samples have invalid (NaN) predictions")
     
     print(f"\n✓ Saved predictions → {output_path}")
+
+
+def _draw_prediction_plot(output_df: pd.DataFrame, plot_path: Path, channel: str) -> None:
+    plot_path.parent.mkdir(parents=True, exist_ok=True)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), dpi=150)
+    conc_pred = output_df["conc_pred"].to_numpy(dtype=float)
+
+    if "conc_true" in output_df.columns:
+        conc_true = output_df["conc_true"].to_numpy(dtype=float)
+        valid = np.isfinite(conc_true) & np.isfinite(conc_pred)
+        if np.any(valid):
+            x = conc_true[valid]
+            y = conc_pred[valid]
+            axes[0].scatter(x, y, s=24, alpha=0.8, color="#2ca02c")
+            low = float(min(np.min(x), np.min(y)))
+            high = float(max(np.max(x), np.max(y)))
+            axes[0].plot([low, high], [low, high], "k--", linewidth=1.0)
+            axes[0].set_xlabel("True concentration (uM)")
+            axes[0].set_ylabel("Pred concentration (uM)")
+            axes[0].set_title(f"Exp Predict ({channel})")
+            axes[0].grid(alpha=0.25)
+
+            residual = y - x
+            axes[1].hist(residual, bins=20, color="#ff7f0e", alpha=0.8)
+            axes[1].axvline(0.0, color="k", linestyle="--", linewidth=1.0)
+            axes[1].set_xlabel("Residual (pred - true)")
+            axes[1].set_ylabel("Count")
+            axes[1].set_title("Residual Distribution")
+            axes[1].grid(alpha=0.25)
+        else:
+            axes[0].text(0.5, 0.5, "No finite labels", ha="center", va="center")
+            axes[1].text(0.5, 0.5, "No finite labels", ha="center", va="center")
+    else:
+        axes[0].hist(conc_pred[np.isfinite(conc_pred)], bins=20, color="#2ca02c", alpha=0.8)
+        axes[0].set_xlabel("Pred concentration (uM)")
+        axes[0].set_ylabel("Count")
+        axes[0].set_title(f"Exp Predict ({channel})")
+        axes[0].grid(alpha=0.25)
+
+        axes[1].plot(np.arange(len(conc_pred)), conc_pred, ".", markersize=4, color="#d62728")
+        axes[1].set_xlabel("Sample index")
+        axes[1].set_ylabel("Pred concentration (uM)")
+        axes[1].set_title("Prediction by Sample")
+        axes[1].grid(alpha=0.25)
+
+    plt.tight_layout()
+    fig.savefig(plot_path, bbox_inches="tight")
+    plt.close(fig)
+    print(f"✓ Saved plot       → {plot_path}")
 
 
 def main() -> None:

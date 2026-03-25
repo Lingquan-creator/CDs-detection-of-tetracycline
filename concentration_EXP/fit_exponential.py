@@ -17,11 +17,15 @@ import math
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import matplotlib
 import numpy as np
 import pandas as pd
 
 from config import ExpConfig
 from physics_features import extract_concentration_from_name
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 
 def model_exponential(x: np.ndarray, a: float, b: float, c0: float) -> np.ndarray:
@@ -242,12 +246,26 @@ def parse_args(default_cfg: ExpConfig) -> argparse.Namespace:
         type=Path,
         help="Output CSV for concentration predictions (default: <roi-csv>_pred_concentration_exp.csv)",
     )
+    parser.add_argument(
+        "--plot-out",
+        type=Path,
+        help="Output PNG for fitting/prediction visualization (default: exp_fit_output/exp_fit_evaluation.png)",
+    )
     
     return parser.parse_args()
 
 
+def resolve_output_path(path: Optional[Path], default_path: Path, output_dir: Path) -> Path:
+    chosen = (path or default_path).expanduser()
+    if not chosen.is_absolute():
+        chosen = output_dir / chosen
+    return chosen.resolve()
+
+
 def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     """Main fitting workflow."""
+    params_out = resolve_output_path(args.params_out, cfg.params_path, cfg.output_dir)
+    pred_out = resolve_output_path(args.pred_out, cfg.predictions_path, cfg.output_dir)
     
     # Load and validate data
     df_raw = pd.read_csv(args.roi_csv)
@@ -306,12 +324,12 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
         raise RuntimeError("Exponential fit failed for all channels.")
 
     # Ensure output directories exist
-    args.params_out.parent.mkdir(parents=True, exist_ok=True)
-    args.pred_out.parent.mkdir(parents=True, exist_ok=True)
+    params_out.parent.mkdir(parents=True, exist_ok=True)
+    pred_out.parent.mkdir(parents=True, exist_ok=True)
 
     # Save fit parameters
-    pd.DataFrame(results).to_csv(args.params_out, index=False)
-    print(f"\n✓ Saved fit parameters → {args.params_out}")
+    pd.DataFrame(results).to_csv(params_out, index=False)
+    print(f"\n✓ Saved fit parameters → {params_out}")
 
     # Save fitted intensity predictions per channel
     pred_df = pd.DataFrame({
@@ -327,8 +345,8 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
         else:
             pred_df[f"{ch}_pred"] = np.nan
 
-    pred_df.to_csv(args.pred_out, index=False)
-    print(f"✓ Saved intensity predictions → {args.pred_out}")
+    pred_df.to_csv(pred_out, index=False)
+    print(f"✓ Saved intensity predictions → {pred_out}")
 
     # Invert selected channel to get concentration predictions
     if args.channel not in params_by_channel:
@@ -346,7 +364,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     conc_pred = np.maximum(np.asarray(conc_pred, dtype=float), 0.0)
 
     # Save concentration predictions
-    conc_out = args.conc_out or cfg.concentration_path_for(args.roi_csv)
+    conc_out = resolve_output_path(args.conc_out, cfg.concentration_path_for(args.roi_csv), cfg.output_dir)
     conc_out.parent.mkdir(parents=True, exist_ok=True)
 
     out_df = pd.DataFrame({
@@ -369,6 +387,71 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     else:
         print(f"\n✓ Saved concentration predictions → {conc_out}")
         print("\nWARNING: All predictions are invalid (NaN)")
+
+    plot_out = resolve_output_path(args.plot_out, cfg.fit_plot_path, cfg.output_dir)
+    draw_fit_visualization(
+        conc=conc,
+        corrected_channels=corr,
+        params_by_channel=params_by_channel,
+        selected_channel=args.channel,
+        conc_pred=conc_pred,
+        out_path=plot_out,
+    )
+
+
+def draw_fit_visualization(
+    *,
+    conc: np.ndarray,
+    corrected_channels: pd.DataFrame,
+    params_by_channel: Dict[str, Tuple[float, float, float]],
+    selected_channel: str,
+    conc_pred: np.ndarray,
+    out_path: Path,
+) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    channels = ["R_corr", "G1_corr", "G2_corr", "G_corr", "B_corr"]
+
+    fig, axes = plt.subplots(2, 3, figsize=(16, 10), dpi=150)
+    axes = axes.ravel()
+    x_curve = np.linspace(float(np.min(conc)), float(np.max(conc)), 200)
+
+    for idx, ch in enumerate(channels):
+        ax = axes[idx]
+        y = corrected_channels[ch].to_numpy(dtype=float)
+        ax.scatter(conc, y, s=20, alpha=0.7, label="Measured")
+        if ch in params_by_channel:
+            a, b, c0 = params_by_channel[ch]
+            y_curve = model_exponential(x_curve, a, b, c0)
+            ax.plot(x_curve, y_curve, "r-", linewidth=1.5, label="Fit")
+            ax.set_title(f"{ch}: fit")
+        else:
+            ax.set_title(f"{ch}: skipped")
+        ax.set_xlabel("Concentration (uM)")
+        ax.set_ylabel("Corrected intensity")
+        ax.grid(alpha=0.25)
+        ax.legend(loc="best", fontsize=8)
+
+    ax_eval = axes[-1]
+    valid = np.isfinite(conc_pred)
+    if np.any(valid):
+        x = conc[valid]
+        y = conc_pred[valid]
+        ax_eval.scatter(x, y, s=22, alpha=0.8, color="#1f77b4")
+        low = float(min(np.min(x), np.min(y)))
+        high = float(max(np.max(x), np.max(y)))
+        ax_eval.plot([low, high], [low, high], "k--", linewidth=1.0)
+        ax_eval.set_title(f"Concentration inversion ({selected_channel})")
+        ax_eval.set_xlabel("True concentration (uM)")
+        ax_eval.set_ylabel("Pred concentration (uM)")
+        ax_eval.grid(alpha=0.25)
+    else:
+        ax_eval.text(0.5, 0.5, "No valid prediction", ha="center", va="center")
+        ax_eval.set_title(f"Concentration inversion ({selected_channel})")
+
+    plt.tight_layout()
+    fig.savefig(out_path, bbox_inches="tight")
+    plt.close(fig)
+    print(f"✓ Saved fit plot   → {out_path}")
 
 
 def main() -> None:

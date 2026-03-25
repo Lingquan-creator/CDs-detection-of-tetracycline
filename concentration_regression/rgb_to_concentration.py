@@ -126,6 +126,13 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
     return parser.parse_args()
 
 
+def resolve_output_path(path: Path, output_dir: Path) -> Path:
+    chosen = path.expanduser()
+    if not chosen.is_absolute():
+        chosen = output_dir / chosen
+    return chosen.resolve()
+
+
 def load_training_dataframe(roi_csv: Path) -> Tuple[pd.DataFrame, np.ndarray]:
     if not roi_csv.exists():
         raise FileNotFoundError(f"ROI CSV not found: {roi_csv}")
@@ -364,6 +371,10 @@ def load_model_bundle(path: Path, g_mode_override: Optional[str] = None) -> Tupl
 def main() -> None:
     cfg = TrainConfig()
     args = parse_args(cfg)
+    output_dir = cfg.output_dir.resolve()
+    args.model_out = resolve_output_path(args.model_out, output_dir)
+    args.pred_out = resolve_output_path(args.pred_out, output_dir)
+    args.coef_out = resolve_output_path(args.coef_out, output_dir)
 
     df, y_true = load_training_dataframe(args.roi_csv)
     alphas = resolve_alphas(args)
@@ -419,8 +430,10 @@ def main() -> None:
     train_metrics = evaluate_predictions(y_true, y_pred)
     loo_metrics = evaluate_predictions(y_true, y_pred_loo)
 
-    loo_out = args.loo_out or args.pred_out.with_name(args.pred_out.stem + "_loo.csv")
-    plot_out = args.plot_out or args.model_out.with_name(args.model_out.stem + "_evaluation.png")
+    loo_default = args.pred_out.with_name(args.pred_out.stem + "_loo.csv")
+    plot_default = args.model_out.with_name(args.model_out.stem + "_evaluation.png")
+    loo_out = resolve_output_path(args.loo_out or loo_default, output_dir)
+    plot_out = resolve_output_path(args.plot_out or plot_default, output_dir)
 
     save_outputs(
         df,

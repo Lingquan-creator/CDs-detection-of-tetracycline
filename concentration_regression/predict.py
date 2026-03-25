@@ -2,7 +2,7 @@
 Run concentration inference from ROI statistics using a trained Ridge model bundle.
 
 Defaults are read from config.PredictConfig:
-- model path: concentration/rgb_fit_output/concentration_model_v1.pkl
+- model path: concentration_regression/rgb_fit_output/concentration_model_v1.pkl
 - input CSV: pic_RGB/roi_results/roi_detailed_statistics.csv
 """
 
@@ -16,11 +16,15 @@ from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
 import joblib
+import matplotlib
 import numpy as np
 import pandas as pd
 
 from config import CLIP_MIN, PredictConfig, TARGET_EPS
 from physics_features import DEFAULT_G_MODE, build_feature_frame, extract_concentration_from_name, has_background_columns
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 _INCONSISTENT_VERSION_RE = re.compile(
     r"Trying to unpickle estimator\s+(?P<estimator>[A-Za-z0-9_]+)\s+from version\s+(?P<saved>[A-Za-z0-9_.+-]+)\s+when using version\s+(?P<runtime>[A-Za-z0-9_.+-]+)"
@@ -175,7 +179,7 @@ def predict_batch(
     use_bg: bool,
     calibrator: Optional[object],
     expected_feature_names: Optional[Sequence[str]],
-) -> None:
+) -> pd.DataFrame:
     if not roi_csv.exists():
         raise FileNotFoundError(f"ROI CSV not found: {roi_csv}")
 
@@ -203,6 +207,63 @@ def predict_batch(
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     out_df.to_csv(out_csv, index=False)
     print(f"Saved predictions -> {out_csv}")
+    return out_df
+
+
+def draw_prediction_plot(out_df: pd.DataFrame, out_path: Path) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), dpi=150)
+
+    conc_pred = out_df["conc_pred"].to_numpy(dtype=float)
+    if "conc_true" in out_df.columns:
+        conc_true = out_df["conc_true"].to_numpy(dtype=float)
+        valid = np.isfinite(conc_true) & np.isfinite(conc_pred)
+        if np.any(valid):
+            x = conc_true[valid]
+            y = conc_pred[valid]
+            axes[0].scatter(x, y, s=24, alpha=0.8, color="#1f77b4")
+            low = float(min(np.min(x), np.min(y)))
+            high = float(max(np.max(x), np.max(y)))
+            axes[0].plot([low, high], [low, high], "k--", linewidth=1.0)
+            axes[0].set_xlabel("True concentration (uM)")
+            axes[0].set_ylabel("Pred concentration (uM)")
+            axes[0].set_title("Prediction vs Truth")
+            axes[0].grid(alpha=0.25)
+
+            residual = y - x
+            axes[1].hist(residual, bins=20, color="#ff7f0e", alpha=0.8)
+            axes[1].axvline(0.0, color="k", linestyle="--", linewidth=1.0)
+            axes[1].set_xlabel("Residual (pred - true)")
+            axes[1].set_ylabel("Count")
+            axes[1].set_title("Residual Distribution")
+            axes[1].grid(alpha=0.25)
+        else:
+            axes[0].text(0.5, 0.5, "No finite labels", ha="center", va="center")
+            axes[1].text(0.5, 0.5, "No finite labels", ha="center", va="center")
+    else:
+        axes[0].hist(conc_pred[np.isfinite(conc_pred)], bins=20, color="#1f77b4", alpha=0.8)
+        axes[0].set_xlabel("Pred concentration (uM)")
+        axes[0].set_ylabel("Count")
+        axes[0].set_title("Prediction Distribution")
+        axes[0].grid(alpha=0.25)
+
+        axes[1].plot(np.arange(len(conc_pred)), conc_pred, ".", markersize=4, color="#d62728")
+        axes[1].set_xlabel("Sample index")
+        axes[1].set_ylabel("Pred concentration (uM)")
+        axes[1].set_title("Prediction by Sample")
+        axes[1].grid(alpha=0.25)
+
+    plt.tight_layout()
+    fig.savefig(out_path, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved figure      -> {out_path}")
+
+
+def resolve_output_path(path: Optional[Path], default_path: Path, output_dir: Path) -> Path:
+    chosen = (path or default_path).expanduser()
+    if not chosen.is_absolute():
+        chosen = output_dir / chosen
+    return chosen.resolve()
 
 
 def parse_args(default_cfg: PredictConfig) -> argparse.Namespace:
@@ -210,6 +271,7 @@ def parse_args(default_cfg: PredictConfig) -> argparse.Namespace:
     parser.add_argument("--model", type=Path, default=default_cfg.model_path, help="Model bundle (.pkl) path.")
     parser.add_argument("--roi-csv", type=Path, default=default_cfg.default_roi_csv, help="Input ROI CSV path.")
     parser.add_argument("--out", type=Path, help="Output CSV path. Default: auto by config output suffix.")
+    parser.add_argument("--plot-out", type=Path, help="Output PNG path. Default: auto by config output suffix.")
     parser.add_argument("--g-mode", choices=["g1", "avg"], help="Override model g-mode.")
     parser.add_argument(
         "--strict-sklearn-version",
@@ -234,22 +296,29 @@ def main() -> None:
     cfg = PredictConfig()
     args = parse_args(cfg)
 
-    if not args.model.exists():
-        raise FileNotFoundError(f"Model file not found: {args.model}")
+    model_path = args.model.expanduser()
+    if not model_path.is_absolute():
+        model_path = cfg.output_dir / model_path
+    model_path = model_path.resolve()
+    if not model_path.exists():
+        raise FileNotFoundError(f"Model file not found: {model_path}")
 
     bundle, model, g_mode, target_transform, target_eps, use_bg, calibrator = load_model_bundle(
-        args.model,
+        model_path,
         args.g_mode,
         strict_sklearn_version=bool(args.strict_sklearn_version),
         suppress_sklearn_version_warning=bool(args.suppress_sklearn_version_warning),
     )
 
     if args.resave_model:
-        resaved_path = _resave_model_bundle(bundle, in_path=args.model, out_path=args.resave_model_out)
+        resave_out = None
+        if args.resave_model_out is not None:
+            resave_out = resolve_output_path(args.resave_model_out, model_path, cfg.output_dir)
+        resaved_path = _resave_model_bundle(bundle, in_path=model_path, out_path=resave_out)
         print(f"Resaved model bundle -> {resaved_path}")
 
     print(
-        f"Loaded model: {args.model} "
+        f"Loaded model: {model_path} "
         f"(g_mode={g_mode}, target={target_transform}, use_bg={use_bg}, calibrator={'yes' if calibrator else 'no'})"
     )
 
@@ -259,8 +328,8 @@ def main() -> None:
         if isinstance(names, (tuple, list)):
             expected_feature_names = [str(name) for name in names]
 
-    out_csv = args.out or cfg.output_path_for(args.roi_csv)
-    predict_batch(
+    out_csv = resolve_output_path(args.out, cfg.output_path_for(args.roi_csv), cfg.output_dir)
+    out_df = predict_batch(
         model,
         args.roi_csv,
         out_csv,
@@ -271,6 +340,8 @@ def main() -> None:
         calibrator=calibrator,
         expected_feature_names=expected_feature_names,
     )
+    plot_out = resolve_output_path(args.plot_out, cfg.plot_path_for(args.roi_csv), cfg.output_dir)
+    draw_prediction_plot(out_df, plot_out)
 
 
 if __name__ == "__main__":
