@@ -5,8 +5,8 @@ This module provides unified feature engineering tools for all concentration
 prediction methods (Ridge, Exponential, Gaussian amortized posterior).
 
 Supported feature sets:
-- Raw features (no background): ln_R/ln_G/ln_B, Ratio_RG/Delta_RG/Ratio_BG, Var_G
-- Background-subtracted features: ln_R_sig/ln_G_sig/ln_B_sig using signal=ROI-BG, plus ratios/Var_G
+- Raw features (no background): brightness, exposure-normalized brightness, ratios, variance
+- Background-subtracted features: signal brightness, exposure-normalized signal, ratios, variance
 
 Based on Beer-Lambert law: I ∝ exp(-εlC), so ln(I) should be linear with concentration.
 """
@@ -14,73 +14,107 @@ Based on Beer-Lambert law: I ∝ exp(-εlC), so ln(I) should be linear with conc
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 
 # Feature name constants
-FEATURE_NAMES_RAW: Tuple[str, ...] = ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Delta_RG", "Ratio_BG", "Var_G")
-FEATURE_NAMES_BG: Tuple[str, ...] = ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Delta_RG", "Ratio_BG", "Var_G")
+FEATURE_NAMES_RAW: Tuple[str, ...] = (
+    "ln_R",
+    "ln_G",
+    "ln_B",
+    "ln_R_per_exp",
+    "ln_G_per_exp",
+    "ln_B_per_exp",
+    "Ratio_RG",
+    "Delta_RG",
+    "Ratio_BG",
+    "Var_G",
+    "exposure_time",
+    "ln_exposure",
+)
+FEATURE_NAMES_BG: Tuple[str, ...] = (
+    "ln_R_sig",
+    "ln_G_sig",
+    "ln_B_sig",
+    "ln_R_sig_per_exp",
+    "ln_G_sig_per_exp",
+    "ln_B_sig_per_exp",
+    "Ratio_RG",
+    "Delta_RG",
+    "Ratio_BG",
+    "Var_G",
+    "exposure_time",
+    "ln_exposure",
+)
 FEATURE_NAMES: Tuple[str, ...] = FEATURE_NAMES_RAW  # backward-compatibility alias
 
 # Default configuration
 DEFAULT_G_MODE = "avg"  # use averaged green channels (G1+G2)/2 when available
 _EPS = 1e-6  # small constant to avoid log(0)
 _CLIP_MIN = 0.1  # minimum signal after background subtraction to avoid log of non-positive
+_EXPOSURE_MIN = 1e-6
+
+
+def extract_sample_metadata_from_name(name: str) -> Dict[str, Optional[float]]:
+    """Parse concentration/exposure metadata from `浓度_曝光时长.ext` filenames."""
+    stem = Path(name).stem
+
+    if "_" in stem:
+        concentration_text, exposure_text = stem.rsplit("_", maxsplit=1)
+        try:
+            return {
+                "concentration": float(concentration_text),
+                "exposure_time": float(exposure_text),
+            }
+        except ValueError:
+            pass
+
+    if "." in stem:
+        concentration_text, exposure_text = stem.rsplit(".", maxsplit=1)
+        try:
+            exposure_value = float(exposure_text)
+            if exposure_value < 100:
+                raise ValueError
+            return {
+                "concentration": float(concentration_text),
+                "exposure_time": exposure_value,
+            }
+        except ValueError:
+            pass
+
+    try:
+        return {"concentration": float(stem), "exposure_time": None}
+    except ValueError:
+        return {"concentration": None, "exposure_time": None}
 
 
 def extract_concentration_from_name(name: str) -> Optional[float]:
-    """
-    Extract numeric concentration from filename stem.
-    
-    Examples:
-        "12.5.dng" -> 12.5
-        "100.jpg" -> 100.0
-        "test.png" -> None
-    
-    Args:
-        name: Filename (with or without extension)
-    
-    Returns:
-        Concentration value or None if parsing fails
-    """
-    stem = Path(name).stem
-    try:
-        return float(stem)
-    except ValueError:
-        return None
+    """Extract numeric concentration from filename stem."""
+    return extract_sample_metadata_from_name(name)["concentration"]
+
+
+def extract_exposure_time_from_name(name: str) -> Optional[float]:
+    """Extract exposure time from filename stem."""
+    return extract_sample_metadata_from_name(name)["exposure_time"]
 
 
 def feature_names(use_bg: bool) -> Tuple[str, ...]:
-    """
-    Return the active feature names based on background usage.
-    
-    Args:
-        use_bg: Whether background subtraction is used
-    
-    Returns:
-        Tuple of feature names
-    """
+    """Return the active feature names based on background usage."""
     return FEATURE_NAMES_BG if use_bg else FEATURE_NAMES_RAW
 
 
 def has_background_columns(df: pd.DataFrame, g_mode: str = DEFAULT_G_MODE) -> bool:
-    """
-    Check if dataframe has required background columns.
-    
-    Args:
-        df: DataFrame to check
-        g_mode: Green channel mode ("g1" or "avg")
-    
-    Returns:
-        True if all required background columns are present
-    """
+    """Check if dataframe has required background columns."""
     required = {
-        "roi_R_mean", "bg_R_mean",
-        "roi_B_mean", "bg_B_mean",
-        "roi_G1_mean", "bg_G1_mean",
-        "roi_G1_var"
+        "roi_R_mean",
+        "bg_R_mean",
+        "roi_B_mean",
+        "bg_B_mean",
+        "roi_G1_mean",
+        "bg_G1_mean",
+        "roi_G1_var",
     }
     if g_mode == "avg":
         required |= {"roi_G2_mean", "bg_G2_mean"}
@@ -111,6 +145,28 @@ def _signal(roi: pd.Series, bg: pd.Series, clip_min: float) -> np.ndarray:
     return np.maximum(sig, clip_min)
 
 
+def resolve_exposure_time_series(df: pd.DataFrame) -> np.ndarray:
+    """Resolve exposure time from CSV column first, then filename metadata."""
+    exposure = pd.Series(np.nan, index=df.index, dtype=float)
+
+    if "exposure_time" in df.columns:
+        exposure = pd.to_numeric(df["exposure_time"], errors="coerce").astype(float)
+
+    if "filename" in df.columns:
+        parsed = df["filename"].apply(extract_exposure_time_from_name)
+        parsed_series = pd.to_numeric(parsed, errors="coerce").astype(float)
+        exposure = exposure.fillna(parsed_series)
+
+    missing_mask = ~np.isfinite(exposure.to_numpy(dtype=float)) | (exposure.to_numpy(dtype=float) <= 0.0)
+    if np.any(missing_mask):
+        missing_count = int(np.sum(missing_mask))
+        raise ValueError(
+            f"Exposure time is required for feature build, but {missing_count} rows are missing a valid exposure_time."
+        )
+
+    return np.maximum(exposure.to_numpy(dtype=float), _EXPOSURE_MIN)
+
+
 def build_feature_frame(
     df: pd.DataFrame,
     g_mode: str = DEFAULT_G_MODE,
@@ -120,26 +176,10 @@ def build_feature_frame(
 ) -> pd.DataFrame:
     """
     Compute physics-informed features from a ROI dataframe.
-    
-    Features based on Beer-Lambert law:
-    - ln_R, ln_G, ln_B: Log-transformed intensities (linear with concentration)
-    - Ratio_RG, Ratio_BG: Channel ratios (invariant to lighting changes)
-    - Delta_RG: Normalized color difference
-    - Var_G: Green channel variance (quality metric)
-    
-    Args:
-        df: DataFrame with ROI statistics
-        g_mode: Green channel mode ("g1" uses only G1, "avg" averages G1 and G2)
-        use_bg: If True, use background-subtracted signal
-        clip_min: Minimum signal value after background subtraction (avoid log <= 0)
-    
-    Returns:
-        DataFrame with computed features
-    
-    Raises:
-        ValueError: If required columns are missing
+
+    Features include measured brightness, exposure-normalized brightness, channel ratios,
+    green variance, and explicit exposure-time terms.
     """
-    # Check required columns
     base_missing = [
         col for col in ["roi_R_mean", "roi_G1_mean", "roi_B_mean", "roi_G1_var"]
         if col not in df.columns
@@ -147,7 +187,6 @@ def build_feature_frame(
     if base_missing:
         raise ValueError(f"Missing required columns for feature build: {base_missing}")
 
-    # Compute signals (with or without background subtraction)
     if use_bg:
         bg_required = ["bg_R_mean", "bg_B_mean", "bg_G1_mean"]
         if g_mode == "avg":
@@ -171,18 +210,29 @@ def build_feature_frame(
         g_sig = _select_green_mean(df, g_mode).to_numpy()
 
     g_var = _select_green_var(df, g_mode).to_numpy()
+    exposure = resolve_exposure_time_series(df)
+    ln_exposure = np.log(exposure + _EPS)
+    r_sig_per_exp = r_sig / exposure
+    g_sig_per_exp = g_sig / exposure
+    b_sig_per_exp = b_sig / exposure
 
-    # Build feature DataFrame
-    features = pd.DataFrame({
-        "ln_R_sig" if use_bg else "ln_R": np.log(r_sig + _EPS),
-        "ln_G_sig" if use_bg else "ln_G": np.log(g_sig + _EPS),
-        "ln_B_sig" if use_bg else "ln_B": np.log(b_sig + _EPS),
-        "Ratio_RG": r_sig / (g_sig + _EPS),
-        "Delta_RG": (g_sig - r_sig) / (g_sig + r_sig + _EPS),
-        "Ratio_BG": b_sig / (g_sig + _EPS),
-        "Var_G": g_var,
-    })
-    
+    features = pd.DataFrame(
+        {
+            "ln_R_sig" if use_bg else "ln_R": np.log(r_sig + _EPS),
+            "ln_G_sig" if use_bg else "ln_G": np.log(g_sig + _EPS),
+            "ln_B_sig" if use_bg else "ln_B": np.log(b_sig + _EPS),
+            "ln_R_sig_per_exp" if use_bg else "ln_R_per_exp": np.log(r_sig_per_exp + _EPS),
+            "ln_G_sig_per_exp" if use_bg else "ln_G_per_exp": np.log(g_sig_per_exp + _EPS),
+            "ln_B_sig_per_exp" if use_bg else "ln_B_per_exp": np.log(b_sig_per_exp + _EPS),
+            "Ratio_RG": r_sig / (g_sig + _EPS),
+            "Delta_RG": (g_sig - r_sig) / (g_sig + r_sig + _EPS),
+            "Ratio_BG": b_sig / (g_sig + _EPS),
+            "Var_G": g_var,
+            "exposure_time": exposure,
+            "ln_exposure": ln_exposure,
+        }
+    )
+
     return features
 
 
@@ -198,29 +248,12 @@ def build_feature_vector(
     g2: Optional[float] = None,
     bg_g2: float = 0.0,
     var_g2: Optional[float] = None,
+    exposure_time: float = 1.0,
     g_mode: str = DEFAULT_G_MODE,
     use_bg: bool = False,
     clip_min: float = _CLIP_MIN,
 ) -> np.ndarray:
-    """
-    Create a single feature row for inference.
-    
-    This is useful for real-time prediction from individual measurements.
-    
-    Args:
-        r, g1, b: RGB channel means
-        var_g1: Green channel variance
-        bg_r, bg_g1, bg_b: Background channel means (if use_bg=True)
-        g2: Optional second green channel mean
-        bg_g2: Background for second green channel
-        var_g2: Optional second green channel variance
-        g_mode: Green channel mode ("g1" or "avg")
-        use_bg: Whether to subtract background
-        clip_min: Minimum signal value after background subtraction
-    
-    Returns:
-        Feature vector as numpy array of shape (1, 7)
-    """
+    """Create a single feature row for inference."""
     if use_bg:
         r_sig = max(r - bg_r, clip_min)
         b_sig = max(b - bg_b, clip_min)
@@ -242,25 +275,31 @@ def build_feature_vector(
             g_mean = g1
             var_g = var_g1
 
+    exposure = max(float(exposure_time), _EXPOSURE_MIN)
     ln_r = np.log(r_sig + _EPS)
     ln_g = np.log(g_mean + _EPS)
     ln_b = np.log(b_sig + _EPS)
+    ln_r_per_exp = np.log(r_sig / exposure + _EPS)
+    ln_g_per_exp = np.log(g_mean / exposure + _EPS)
+    ln_b_per_exp = np.log(b_sig / exposure + _EPS)
     ratio_rg = r_sig / (g_mean + _EPS)
     delta_rg = (g_mean - r_sig) / (g_mean + r_sig + _EPS)
     ratio_bg = b_sig / (g_mean + _EPS)
 
-    return np.array([[ln_r, ln_g, ln_b, ratio_rg, delta_rg, ratio_bg, var_g]], dtype=float)
+    return np.array(
+        [[ln_r, ln_g, ln_b, ln_r_per_exp, ln_g_per_exp, ln_b_per_exp, ratio_rg, delta_rg, ratio_bg, var_g, exposure, np.log(exposure + _EPS)]],
+        dtype=float,
+    )
 
 
-# Backward compatibility exports
 __all__ = [
-    "extract_concentration_from_name",
-    "feature_names",
-    "has_background_columns",
+    "DEFAULT_G_MODE",
     "build_feature_frame",
     "build_feature_vector",
-    "FEATURE_NAMES_RAW",
-    "FEATURE_NAMES_BG",
-    "FEATURE_NAMES",
-    "DEFAULT_G_MODE",
+    "extract_concentration_from_name",
+    "extract_exposure_time_from_name",
+    "extract_sample_metadata_from_name",
+    "feature_names",
+    "has_background_columns",
+    "resolve_exposure_time_series",
 ]

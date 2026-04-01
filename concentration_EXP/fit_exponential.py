@@ -27,6 +27,8 @@ from physics_features import extract_concentration_from_name
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+_EXPOSURE_MIN = 1e-6
+
 
 def model_exponential(x: np.ndarray, a: float, b: float, c0: float) -> np.ndarray:
     """
@@ -151,7 +153,9 @@ def build_corrected_channels(df: pd.DataFrame) -> pd.DataFrame:
     """
     Build background-corrected mean intensities per channel.
     
-    Computes: Signal = max(ROI - Background, 0)
+    Computes:
+    - Signal = max(ROI - Background, 0)
+    - Signal_per_exposure = Signal / exposure_time
     
     Required columns:
         - roi_R_mean, roi_G1_mean, roi_B_mean
@@ -161,8 +165,13 @@ def build_corrected_channels(df: pd.DataFrame) -> pd.DataFrame:
         - roi_G2_mean, bg_G2_mean (for dual-green sensors)
     
     Returns:
-        DataFrame with columns: R_corr, G1_corr, G2_corr, G_corr, B_corr
+        DataFrame with columns:
+        - corrected intensities: R_corr, G1_corr, G2_corr, G_corr, B_corr
+        - exposure metadata: exposure_time
+        - exposure-normalized intensities: <channel>_per_exp
     """
+    from physics_features import resolve_exposure_time_series
+
     required = {
         "roi_R_mean",
         "roi_G1_mean",
@@ -189,7 +198,7 @@ def build_corrected_channels(df: pd.DataFrame) -> pd.DataFrame:
         g2 = pd.Series([np.nan] * len(df), index=df.index, dtype=float)
         g = g1
 
-    return pd.DataFrame(
+    corr = pd.DataFrame(
         {
             "R_corr": r.astype(float),
             "G1_corr": g1.astype(float),
@@ -198,6 +207,11 @@ def build_corrected_channels(df: pd.DataFrame) -> pd.DataFrame:
             "B_corr": b.astype(float),
         }
     )
+    exposure = resolve_exposure_time_series(df)
+    corr["exposure_time"] = exposure
+    for ch in ("R_corr", "G1_corr", "G2_corr", "G_corr", "B_corr"):
+        corr[f"{ch}_per_exp"] = corr[ch].to_numpy(dtype=float) / np.maximum(exposure, _EXPOSURE_MIN)
+    return corr
 
 
 def parse_args(default_cfg: ExpConfig) -> argparse.Namespace:
@@ -217,7 +231,7 @@ def parse_args(default_cfg: ExpConfig) -> argparse.Namespace:
         "--channel",
         choices=["R_corr", "G1_corr", "G2_corr", "G_corr", "B_corr"],
         default=default_cfg.channel,
-        help=f"Which corrected channel to use for concentration inversion (default: {default_cfg.channel})",
+        help=f"Which corrected channel to use for concentration inversion (fit uses exposure-normalized {default_cfg.channel})",
     )
     
     parser.add_argument(
@@ -294,7 +308,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     print(f"Weight epsilon: {args.weight_eps}\n")
 
     for ch in channels:
-        y = corr[ch].to_numpy(dtype=float)
+        y = corr[f"{ch}_per_exp"].to_numpy(dtype=float)
         if np.all(np.isnan(y)):
             print(f"[SKIP] {ch}: all NaN values")
             continue
@@ -306,6 +320,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
             params_by_channel[ch] = (a, b, c0)
             results.append({
                 "channel": ch,
+                "fit_signal": f"{ch}_per_exp",
                 "a": a,
                 "b": b,
                 "c": c0,
@@ -313,7 +328,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
                 "rmse": rmse,
             })
             print(
-                f"[FIT] {ch:8s}: a={a:9.3f}, b={b:9.6f}, c={c0:9.3f}  "
+                f"[FIT] {ch:8s} (per_exp): a={a:9.3f}, b={b:9.6f}, c={c0:9.3f}  "
                 f"R²={r2:.4f}  RMSE={rmse:.3f}"
             )
         except Exception as e:
@@ -335,15 +350,17 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     pred_df = pd.DataFrame({
         "filename": df["filename"],
         "concentration_uM": conc,
+        "exposure_time": corr["exposure_time"],
     })
 
     for ch in channels:
         pred_df[ch] = corr[ch]
+        pred_df[f"{ch}_per_exp"] = corr[f"{ch}_per_exp"]
         if ch in params_by_channel:
             a, b, c0 = params_by_channel[ch]
-            pred_df[f"{ch}_pred"] = model_exponential(conc, a, b, c0)
+            pred_df[f"{ch}_per_exp_pred"] = model_exponential(conc, a, b, c0)
         else:
-            pred_df[f"{ch}_pred"] = np.nan
+            pred_df[f"{ch}_per_exp_pred"] = np.nan
 
     pred_df.to_csv(pred_out, index=False)
     print(f"✓ Saved intensity predictions → {pred_out}")
@@ -356,7 +373,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
 
     a, b, c0 = params_by_channel[args.channel]
     conc_pred = invert_exponential_intensity(
-        corr[args.channel].to_numpy(dtype=float),
+        corr[f"{args.channel}_per_exp"].to_numpy(dtype=float),
         a=a,
         b=b,
         c0=c0,
@@ -369,8 +386,11 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
 
     out_df = pd.DataFrame({
         "filename": df["filename"],
+        "exposure_time": corr["exposure_time"],
         "conc_pred": conc_pred,
         "conc_true": conc,
+        f"{args.channel}_intensity": corr[args.channel],
+        f"{args.channel}_per_exp": corr[f"{args.channel}_per_exp"],
         "residual": conc_pred - conc,
     })
     out_df.to_csv(conc_out, index=False)
@@ -381,7 +401,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
         r2_final = 1 - np.sum((conc[valid_mask] - conc_pred[valid_mask])**2) / np.sum((conc[valid_mask] - conc[valid_mask].mean())**2)
         rmse_final = np.sqrt(np.mean((conc[valid_mask] - conc_pred[valid_mask])**2))
         print(f"\n✓ Saved concentration predictions → {conc_out}")
-        print(f"\nFinal Evaluation (channel={args.channel}):")
+        print(f"\nFinal Evaluation (channel={args.channel}, signal={args.channel}_per_exp):")
         print(f"  R² = {r2_final:.4f}")
         print(f"  RMSE = {rmse_final:.3f} µM")
     else:
@@ -417,17 +437,17 @@ def draw_fit_visualization(
 
     for idx, ch in enumerate(channels):
         ax = axes[idx]
-        y = corrected_channels[ch].to_numpy(dtype=float)
+        y = corrected_channels[f"{ch}_per_exp"].to_numpy(dtype=float)
         ax.scatter(conc, y, s=20, alpha=0.7, label="Measured")
         if ch in params_by_channel:
             a, b, c0 = params_by_channel[ch]
             y_curve = model_exponential(x_curve, a, b, c0)
             ax.plot(x_curve, y_curve, "r-", linewidth=1.5, label="Fit")
-            ax.set_title(f"{ch}: fit")
+            ax.set_title(f"{ch}: fit (per_exp)")
         else:
             ax.set_title(f"{ch}: skipped")
         ax.set_xlabel("Concentration (uM)")
-        ax.set_ylabel("Corrected intensity")
+        ax.set_ylabel("Corrected intensity / exposure")
         ax.grid(alpha=0.25)
         ax.legend(loc="best", fontsize=8)
 

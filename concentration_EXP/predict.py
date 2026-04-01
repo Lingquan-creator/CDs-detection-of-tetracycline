@@ -116,7 +116,7 @@ def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
 
     print(f"Loading parameters from {params_path}...")
     a, b, c = load_fit_parameters(params_path, args.channel)
-    print(f"Using channel: {args.channel}")
+    print(f"Using channel: {args.channel} (exposure-normalized for inversion)")
     print(f"Parameters: a={a:.3f}, b={b:.6f}, c={c:.3f}\n")
     
     # Load ROI data
@@ -129,16 +129,19 @@ def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
     
     # Get intensity for selected channel
     intensity = corr[args.channel].to_numpy(dtype=float)
+    intensity_per_exp = corr[f"{args.channel}_per_exp"].to_numpy(dtype=float)
     
     # Predict concentration
-    conc_pred = invert_exponential_intensity(intensity, a=a, b=b, c0=c)
+    conc_pred = invert_exponential_intensity(intensity_per_exp, a=a, b=b, c0=c)
     conc_pred = np.maximum(np.asarray(conc_pred, dtype=float), 0.0)
     
     # Prepare output
     output_df = pd.DataFrame({
         "filename": df_raw["filename"],
+        "exposure_time": corr["exposure_time"],
         "conc_pred": conc_pred,
         f"{args.channel}_intensity": intensity,
+        f"{args.channel}_per_exp": intensity_per_exp,
     })
     conc_true = df_raw["filename"].apply(extract_concentration_from_name)
     if conc_true.notna().any():

@@ -227,23 +227,31 @@ class ROIProcessor:
     @staticmethod
     def _parse_filename_metadata(filepath: Path) -> Dict[str, Any]:
         stem = filepath.stem
-        if "." not in stem:
-            return {}
+        candidates: List[Tuple[str, str]] = []
+        if "_" in stem:
+            candidates.append(stem.rsplit("_", maxsplit=1))
+        if "." in stem:
+            candidates.append(stem.rsplit(".", maxsplit=1))
 
-        concentration_text, exposure_text = stem.rsplit(".", maxsplit=1)
-        if not concentration_text or not exposure_text:
-            return {}
+        for concentration_text, exposure_text in candidates:
+            if not concentration_text or not exposure_text:
+                continue
 
-        metadata: Dict[str, Any] = {}
-        try:
-            metadata["concentration"] = float(concentration_text)
-        except ValueError:
-            pass
-        try:
-            metadata["exposure_time"] = float(exposure_text)
-        except ValueError:
-            pass
-        return metadata
+            metadata: Dict[str, Any] = {}
+            try:
+                metadata["concentration"] = float(concentration_text)
+            except ValueError:
+                continue
+            try:
+                exposure_value = float(exposure_text)
+            except ValueError:
+                continue
+            if "_" not in stem and exposure_value < 100:
+                continue
+            metadata["exposure_time"] = exposure_value
+            return metadata
+
+        return {}
 
     @staticmethod
     def _lookup_metadata_value(metadata: Dict[str, Any], *keys: str) -> Any:
@@ -358,7 +366,7 @@ class ROIProcessor:
                 "white_level": None,
             }
 
-            # 规则1：*.dng 保持原输入；规则2：*.*.dng => 第一段浓度，第二段曝光时长
+            # 优先支持新命名规则：浓度_曝光时长.dng；兼容旧规则：浓度.曝光时长.dng
             filename_meta = self._parse_filename_metadata(filepath)
             if "concentration" in filename_meta:
                 metadata["concentration"] = filename_meta["concentration"]
@@ -1033,6 +1041,9 @@ class ROIProcessor:
                 # 合并信息
                 detailed_info = {
                     'filename': result.filename,
+                    'concentration': result.concentration,
+                    'exposure_time': result.exposure_time,
+                    'iso': result.iso,
                     **{f'roi_{k}': v for k, v in roi_stats.items()},
                     **{f'bg_{k}': v for k, v in bg_stats.items()}
                 }
