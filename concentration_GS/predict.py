@@ -23,6 +23,47 @@ from train import build_probability_frame, load_model_bundle, lognormal_summary,
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
+
+
+CSV_FLOAT_FORMAT = "%.6g"
+FONT_FALLBACKS = [
+    "Droid Sans Fallback",
+    "AR PL UMing CN",
+    "AR PL SungtiL GB",
+    "Noto Sans CJK SC",
+    "WenQuanYi Zen Hei",
+    "SimHei",
+    "Microsoft YaHei",
+    "DejaVu Sans",
+]
+
+
+def configure_matplotlib_output() -> None:
+    plt.rcParams.update(
+        {
+            "font.family": "sans-serif",
+            "font.sans-serif": FONT_FALLBACKS,
+            "axes.unicode_minus": False,
+        }
+    )
+
+
+def format_plot_number(value: float, _pos: object = None) -> str:
+    if not np.isfinite(value):
+        return ""
+    text = f"{value:.6g}"
+    return "0" if text in ("", "-0") else text
+
+
+def format_figure_numbers(fig: plt.Figure) -> None:
+    formatter = FuncFormatter(format_plot_number)
+    for ax in fig.axes:
+        ax.xaxis.set_major_formatter(formatter)
+        ax.yaxis.set_major_formatter(formatter)
+
+
+configure_matplotlib_output()
 
 
 def parse_args(default_cfg: PredictConfig) -> argparse.Namespace:
@@ -147,7 +188,7 @@ def draw_prediction_plot(summary_df: pd.DataFrame, out_path: Path, confidence: f
                 color="#1f77b4",
             )
             axes[1].set_xlabel("Sample index")
-            axes[1].set_ylabel("Posterior mean ± CI (uM)")
+            axes[1].set_ylabel("Posterior mean +/- CI (uM)")
             axes[1].set_title(f"Uncertainty ({int(confidence * 100)}% CI)")
             axes[1].grid(alpha=0.25)
         else:
@@ -167,6 +208,7 @@ def draw_prediction_plot(summary_df: pd.DataFrame, out_path: Path, confidence: f
         axes[1].set_title("Uncertainty vs Prediction")
         axes[1].grid(alpha=0.25)
 
+    format_figure_numbers(fig)
     plt.tight_layout()
     fig.savefig(out_path, bbox_inches="tight")
     plt.close(fig)
@@ -217,8 +259,8 @@ def main() -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     grid_out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    summary_df.to_csv(out_path, index=False)
-    prob_df.to_csv(grid_out_path, index=False)
+    summary_df.to_csv(out_path, index=False, float_format=CSV_FLOAT_FORMAT)
+    prob_df.to_csv(grid_out_path, index=False, float_format=CSV_FLOAT_FORMAT)
     draw_prediction_plot(summary_df, plot_out_path, confidence)
 
     print(

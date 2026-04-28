@@ -23,6 +23,27 @@ from physics_features import extract_concentration_from_name
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
+
+
+CSV_FLOAT_FORMAT = "%.6g"
+
+
+def format_plot_number(value: float, _pos: object = None) -> str:
+    if not np.isfinite(value):
+        return ""
+    text = f"{value:.6g}"
+    return "0" if text in ("", "-0") else text
+
+
+def format_figure_numbers(fig: plt.Figure) -> None:
+    formatter = FuncFormatter(format_plot_number)
+    for ax in fig.axes:
+        ax.xaxis.set_major_formatter(formatter)
+        ax.yaxis.set_major_formatter(formatter)
+
+
+plt.rcParams.update({"axes.unicode_minus": False})
 
 
 def load_fit_parameters(params_csv: Path, channel: str) -> Tuple[float, float, float]:
@@ -117,7 +138,7 @@ def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
     print(f"Loading parameters from {params_path}...")
     a, b, c = load_fit_parameters(params_path, args.channel)
     print(f"Using channel: {args.channel} (exposure-normalized for inversion)")
-    print(f"Parameters: a={a:.3f}, b={b:.6f}, c={c:.3f}\n")
+    print(f"Parameters: a={a:.6g}, b={b:.6g}, c={c:.6g}\n")
     
     # Load ROI data
     df_raw = pd.read_csv(args.roi_csv)
@@ -151,7 +172,7 @@ def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
     # Save predictions
     output_path = resolve_output_path(args.output, cfg.concentration_path_for(args.roi_csv), cfg.output_dir)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_df.to_csv(output_path, index=False)
+    output_df.to_csv(output_path, index=False, float_format=CSV_FLOAT_FORMAT)
 
     plot_path = resolve_output_path(args.plot_out, cfg.concentration_plot_path_for(args.roi_csv), cfg.output_dir)
     _draw_prediction_plot(output_df, plot_path, args.channel)
@@ -161,15 +182,15 @@ def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
     n_valid = valid_mask.sum()
     n_total = len(conc_pred)
     
-    print(f"✓ Predicted {n_valid}/{n_total} samples")
+    print(f"Predicted {n_valid}/{n_total} samples")
     if n_valid > 0:
-        print(f"  Range: {conc_pred[valid_mask].min():.2f} - {conc_pred[valid_mask].max():.2f} µM")
-        print(f"  Mean: {conc_pred[valid_mask].mean():.2f} µM")
+        print(f"  Range: {conc_pred[valid_mask].min():.6g} - {conc_pred[valid_mask].max():.6g} uM")
+        print(f"  Mean: {conc_pred[valid_mask].mean():.6g} uM")
     
     if n_valid < n_total:
-        print(f"\n⚠ Warning: {n_total - n_valid} samples have invalid (NaN) predictions")
+        print(f"\nWARNING: {n_total - n_valid} samples have invalid (NaN) predictions")
     
-    print(f"\n✓ Saved predictions → {output_path}")
+    print(f"\nSaved predictions -> {output_path}")
 
 
 def _draw_prediction_plot(output_df: pd.DataFrame, plot_path: Path, channel: str) -> None:
@@ -215,10 +236,11 @@ def _draw_prediction_plot(output_df: pd.DataFrame, plot_path: Path, channel: str
         axes[1].set_title("Prediction by Sample")
         axes[1].grid(alpha=0.25)
 
+    format_figure_numbers(fig)
     plt.tight_layout()
     fig.savefig(plot_path, bbox_inches="tight")
     plt.close(fig)
-    print(f"✓ Saved plot       → {plot_path}")
+    print(f"Saved plot -> {plot_path}")
 
 
 def main() -> None:

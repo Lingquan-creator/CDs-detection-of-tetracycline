@@ -30,6 +30,27 @@ from physics_features import build_feature_frame, extract_concentration_from_nam
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
+
+
+CSV_FLOAT_FORMAT = "%.6g"
+
+
+def format_plot_number(value: float, _pos: object = None) -> str:
+    if not np.isfinite(value):
+        return ""
+    text = f"{value:.6g}"
+    return "0" if text in ("", "-0") else text
+
+
+def format_figure_numbers(fig: plt.Figure) -> None:
+    formatter = FuncFormatter(format_plot_number)
+    for ax in fig.axes:
+        ax.xaxis.set_major_formatter(formatter)
+        ax.yaxis.set_major_formatter(formatter)
+
+
+plt.rcParams.update({"axes.unicode_minus": False})
 
 
 def transform_target(y: np.ndarray, transform: str, eps: float) -> np.ndarray:
@@ -162,6 +183,10 @@ def resolve_alphas(args: argparse.Namespace) -> Tuple[float, ...]:
     return tuple(float(x) for x in ALPHAS)
 
 
+def format_float_sequence(values: Iterable[float]) -> str:
+    return "(" + ", ".join(f"{float(value):.6g}" for value in values) + ")"
+
+
 def resolve_use_bg(df: pd.DataFrame, g_mode: str, use_bg_arg: str) -> bool:
     if use_bg_arg == "true":
         if not has_background_columns(df, g_mode):
@@ -273,7 +298,7 @@ def draw_result_plot(
     axes[0].set_xlabel("True concentration (uM)")
     axes[0].set_ylabel("Predicted concentration (uM)")
     axes[0].set_title(
-        f"Training Fit\\nR2={train_metrics[0]:.4f}, RMSE={train_metrics[1]:.4f}, MAE={train_metrics[2]:.4f}"
+        f"Training Fit\\nR2={train_metrics[0]:.6g}, RMSE={train_metrics[1]:.6g}, MAE={train_metrics[2]:.6g}"
     )
     axes[0].grid(alpha=0.25)
 
@@ -281,9 +306,10 @@ def draw_result_plot(
     axes[1].plot([v_min, v_max], [v_min, v_max], "k--", linewidth=1.0)
     axes[1].set_xlabel("True concentration (uM)")
     axes[1].set_ylabel("Predicted concentration (uM)")
-    axes[1].set_title(f"Leave-One-Out\\nR2={loo_metrics[0]:.4f}, RMSE={loo_metrics[1]:.4f}, MAE={loo_metrics[2]:.4f}")
+    axes[1].set_title(f"Leave-One-Out\\nR2={loo_metrics[0]:.6g}, RMSE={loo_metrics[1]:.6g}, MAE={loo_metrics[2]:.6g}")
     axes[1].grid(alpha=0.25)
 
+    format_figure_numbers(fig)
     plt.tight_layout()
     fig.savefig(out_path)
     plt.close(fig)
@@ -341,7 +367,7 @@ def save_outputs(
             "residual": y_pred - y_true,
         }
     )
-    pred_df.to_csv(pred_out, index=False)
+    pred_df.to_csv(pred_out, index=False, float_format=CSV_FLOAT_FORMAT)
 
     loo_df = pd.DataFrame(
         {
@@ -351,10 +377,10 @@ def save_outputs(
             "residual_loo": y_pred_loo - y_true,
         }
     )
-    loo_df.to_csv(loo_out, index=False)
+    loo_df.to_csv(loo_out, index=False, float_format=CSV_FLOAT_FORMAT)
 
     coef_df = pd.DataFrame({"feature": tuple(feature_names(use_bg)), "coefficient": regressor.coef_})
-    coef_df.to_csv(coef_out, index=False)
+    coef_df.to_csv(coef_out, index=False, float_format=CSV_FLOAT_FORMAT)
 
 
 def load_model_bundle(path: Path, g_mode_override: Optional[str] = None) -> Tuple[object, str, str, float, bool, Optional[object]]:
@@ -385,7 +411,7 @@ def main() -> None:
     best_score = -float("inf")
 
     print(f"Training data: {args.roi_csv} (n={len(df)})")
-    print(f"Alpha candidates: {alphas}")
+    print(f"Alpha candidates: {format_float_sequence(alphas)}")
     print(f"Evaluating g_modes={g_modes}, use_bg={args.use_bg}, target_transform={target_transform}")
 
     for g_mode in g_modes:
@@ -402,7 +428,7 @@ def main() -> None:
             clip_min=float(args.clip_min),
         )
         score = float(result["score"])
-        print(f"  candidate g_mode={g_mode}, use_bg={use_bg}, cv_score={score:.6f}")
+        print(f"  candidate g_mode={g_mode}, use_bg={use_bg}, cv_score={score:.6g}")
         if score > best_score:
             best_score = score
             best_result = result
@@ -465,9 +491,9 @@ def main() -> None:
 
     reg = model.named_steps["regressor"]
     selected_alpha = float(getattr(reg, "alpha_", alphas[0]))
-    print(f"Selected model: g_mode={g_mode}, use_bg={use_bg}, alpha={selected_alpha}")
-    print(f"Train   -> R2={train_metrics[0]:.4f}, RMSE={train_metrics[1]:.4f}, MAE={train_metrics[2]:.4f}")
-    print(f"LOO-CV  -> R2={loo_metrics[0]:.4f}, RMSE={loo_metrics[1]:.4f}, MAE={loo_metrics[2]:.4f}")
+    print(f"Selected model: g_mode={g_mode}, use_bg={use_bg}, alpha={selected_alpha:.6g}")
+    print(f"Train   -> R2={train_metrics[0]:.6g}, RMSE={train_metrics[1]:.6g}, MAE={train_metrics[2]:.6g}")
+    print(f"LOO-CV  -> R2={loo_metrics[0]:.6g}, RMSE={loo_metrics[1]:.6g}, MAE={loo_metrics[2]:.6g}")
     print(f"Saved model       -> {args.model_out}")
     print(f"Saved train preds -> {args.pred_out}")
     print(f"Saved LOO preds   -> {loo_out}")

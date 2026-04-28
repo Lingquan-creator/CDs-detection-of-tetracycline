@@ -37,6 +37,47 @@ from physics_features import (
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.ticker import FuncFormatter  # noqa: E402
+
+
+CSV_FLOAT_FORMAT = "%.6g"
+FONT_FALLBACKS = [
+    "Droid Sans Fallback",
+    "AR PL UMing CN",
+    "AR PL SungtiL GB",
+    "Noto Sans CJK SC",
+    "WenQuanYi Zen Hei",
+    "SimHei",
+    "Microsoft YaHei",
+    "DejaVu Sans",
+]
+
+
+def configure_matplotlib_output() -> None:
+    plt.rcParams.update(
+        {
+            "font.family": "sans-serif",
+            "font.sans-serif": FONT_FALLBACKS,
+            "axes.unicode_minus": False,
+        }
+    )
+
+
+def format_plot_number(value: float, _pos: object = None) -> str:
+    if not np.isfinite(value):
+        return ""
+    text = f"{value:.6g}"
+    return "0" if text in ("", "-0") else text
+
+
+def format_figure_numbers(fig: plt.Figure) -> None:
+    formatter = FuncFormatter(format_plot_number)
+    for ax in fig.axes:
+        ax.xaxis.set_major_formatter(formatter)
+        ax.yaxis.set_major_formatter(formatter)
+
+
+configure_matplotlib_output()
 
 
 class AmortizedPosteriorNet(nn.Module):
@@ -495,8 +536,8 @@ def draw_result_plot(
         ax.set_xlabel("True concentration (uM)")
         ax.set_ylabel("Posterior mean (uM)")
         ax.set_title(
-            f"{title}\nR2={metrics['r2']:.3f}, RMSE={metrics['rmse']:.3f}, "
-            f"MAE={metrics['mae']:.3f}, NLL={metrics['mean_nll']:.3f}"
+            f"{title}\nR2={metrics['r2']:.6g}, RMSE={metrics['rmse']:.6g}, "
+            f"MAE={metrics['mae']:.6g}, NLL={metrics['mean_nll']:.6g}"
         )
         ax.grid(alpha=0.25)
 
@@ -520,11 +561,18 @@ def draw_result_plot(
 
     tick_positions = np.linspace(0, len(concentration_order) - 1, num=min(8, len(concentration_order)), dtype=int)
     ax_heatmap.set_xticks(tick_positions)
-    ax_heatmap.set_xticklabels([f"{concentration_order[idx]:g}" for idx in tick_positions], rotation=45, ha="right")
+    ax_heatmap.set_xticklabels([format_plot_number(concentration_order[idx]) for idx in tick_positions], rotation=45, ha="right")
     ax_heatmap.set_yticks(np.arange(len(sorted_loo)))
-    ax_heatmap.set_yticklabels([f"{value:g}" for value in sorted_loo["conc_true"].to_numpy(dtype=np.float64)])
-    fig.colorbar(image, ax=ax_heatmap, fraction=0.046, pad=0.04, label="Probability")
+    ax_heatmap.set_yticklabels(
+        [format_plot_number(value) for value in sorted_loo["conc_true"].to_numpy(dtype=np.float64)]
+    )
+    colorbar = fig.colorbar(image, ax=ax_heatmap, fraction=0.046, pad=0.04, label="Probability")
 
+    formatter = FuncFormatter(format_plot_number)
+    for ax in (ax_train, ax_loo):
+        ax.xaxis.set_major_formatter(formatter)
+        ax.yaxis.set_major_formatter(formatter)
+    colorbar.ax.yaxis.set_major_formatter(formatter)
     plt.tight_layout()
     fig.savefig(out_path, bbox_inches="tight")
     plt.close(fig)
@@ -655,10 +703,10 @@ def main() -> None:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
 
     torch.save(bundle, args.model_out)
-    train_summary.to_csv(args.train_out, index=False)
-    loo_summary.to_csv(args.loo_out, index=False)
-    train_prob_df.to_csv(args.train_grid_out, index=False)
-    loo_prob_df.to_csv(args.loo_grid_out, index=False)
+    train_summary.to_csv(args.train_out, index=False, float_format=CSV_FLOAT_FORMAT)
+    loo_summary.to_csv(args.loo_out, index=False, float_format=CSV_FLOAT_FORMAT)
+    train_prob_df.to_csv(args.train_grid_out, index=False, float_format=CSV_FLOAT_FORMAT)
+    loo_prob_df.to_csv(args.loo_grid_out, index=False, float_format=CSV_FLOAT_FORMAT)
     draw_result_plot(
         train_summary,
         loo_summary,
@@ -669,8 +717,8 @@ def main() -> None:
         out_path=args.plot_out,
     )
 
-    print(f"Training metrics: R2={train_metrics['r2']:.4f}, RMSE={train_metrics['rmse']:.4f}, MAE={train_metrics['mae']:.4f}, NLL={train_metrics['mean_nll']:.4f}")
-    print(f"LOO metrics:      R2={loo_metrics['r2']:.4f}, RMSE={loo_metrics['rmse']:.4f}, MAE={loo_metrics['mae']:.4f}, NLL={loo_metrics['mean_nll']:.4f}")
+    print(f"Training metrics: R2={train_metrics['r2']:.6g}, RMSE={train_metrics['rmse']:.6g}, MAE={train_metrics['mae']:.6g}, NLL={train_metrics['mean_nll']:.6g}")
+    print(f"LOO metrics:      R2={loo_metrics['r2']:.6g}, RMSE={loo_metrics['rmse']:.6g}, MAE={loo_metrics['mae']:.6g}, NLL={loo_metrics['mean_nll']:.6g}")
     print(f"Saved model       -> {args.model_out}")
     print(f"Saved train CSV   -> {args.train_out}")
     print(f"Saved LOO CSV     -> {args.loo_out}")

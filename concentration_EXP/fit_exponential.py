@@ -26,8 +26,27 @@ from physics_features import extract_concentration_from_name
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 
 _EXPOSURE_MIN = 1e-6
+CSV_FLOAT_FORMAT = "%.6g"
+
+
+def format_plot_number(value: float, _pos: object = None) -> str:
+    if not np.isfinite(value):
+        return ""
+    text = f"{value:.6g}"
+    return "0" if text in ("", "-0") else text
+
+
+def format_figure_numbers(fig: plt.Figure) -> None:
+    formatter = FuncFormatter(format_plot_number)
+    for ax in fig.axes:
+        ax.xaxis.set_major_formatter(formatter)
+        ax.yaxis.set_major_formatter(formatter)
+
+
+plt.rcParams.update({"axes.unicode_minus": False})
 
 
 def model_exponential(x: np.ndarray, a: float, b: float, c0: float) -> np.ndarray:
@@ -65,7 +84,7 @@ def fit_exponential(
                    Lower values emphasize low concentration more.
     
     Returns:
-        ((a, b, c), r2, rmse): Fitted parameters, R² score, and RMSE
+        ((a, b, c), r2, rmse): Fitted parameters, R2 score, and RMSE
     
     Raises:
         RuntimeError: If scipy is not installed
@@ -304,8 +323,8 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     params_by_channel: Dict[str, Tuple[float, float, float]] = {}
 
     print(f"\nFitting exponential model to {len(df)} samples...")
-    print(f"Concentration range: {conc.min():.2f} - {conc.max():.2f} µM")
-    print(f"Weight epsilon: {args.weight_eps}\n")
+    print(f"Concentration range: {conc.min():.6g} - {conc.max():.6g} uM")
+    print(f"Weight epsilon: {float(args.weight_eps):.6g}\n")
 
     for ch in channels:
         y = corr[f"{ch}_per_exp"].to_numpy(dtype=float)
@@ -328,8 +347,8 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
                 "rmse": rmse,
             })
             print(
-                f"[FIT] {ch:8s} (per_exp): a={a:9.3f}, b={b:9.6f}, c={c0:9.3f}  "
-                f"R²={r2:.4f}  RMSE={rmse:.3f}"
+                f"[FIT] {ch:8s} (per_exp): a={a:9.6g}, b={b:9.6g}, c={c0:9.6g}  "
+                f"R2={r2:.6g}  RMSE={rmse:.6g}"
             )
         except Exception as e:
             print(f"[FAIL] {ch}: {e}")
@@ -343,8 +362,8 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     pred_out.parent.mkdir(parents=True, exist_ok=True)
 
     # Save fit parameters
-    pd.DataFrame(results).to_csv(params_out, index=False)
-    print(f"\n✓ Saved fit parameters → {params_out}")
+    pd.DataFrame(results).to_csv(params_out, index=False, float_format=CSV_FLOAT_FORMAT)
+    print(f"\nSaved fit parameters -> {params_out}")
 
     # Save fitted intensity predictions per channel
     pred_df = pd.DataFrame({
@@ -362,8 +381,8 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
         else:
             pred_df[f"{ch}_per_exp_pred"] = np.nan
 
-    pred_df.to_csv(pred_out, index=False)
-    print(f"✓ Saved intensity predictions → {pred_out}")
+    pred_df.to_csv(pred_out, index=False, float_format=CSV_FLOAT_FORMAT)
+    print(f"Saved intensity predictions -> {pred_out}")
 
     # Invert selected channel to get concentration predictions
     if args.channel not in params_by_channel:
@@ -393,19 +412,19 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
         f"{args.channel}_per_exp": corr[f"{args.channel}_per_exp"],
         "residual": conc_pred - conc,
     })
-    out_df.to_csv(conc_out, index=False)
+    out_df.to_csv(conc_out, index=False, float_format=CSV_FLOAT_FORMAT)
 
     # Calculate and display final metrics
     valid_mask = np.isfinite(conc_pred)
     if valid_mask.sum() > 0:
         r2_final = 1 - np.sum((conc[valid_mask] - conc_pred[valid_mask])**2) / np.sum((conc[valid_mask] - conc[valid_mask].mean())**2)
         rmse_final = np.sqrt(np.mean((conc[valid_mask] - conc_pred[valid_mask])**2))
-        print(f"\n✓ Saved concentration predictions → {conc_out}")
+        print(f"\nSaved concentration predictions -> {conc_out}")
         print(f"\nFinal Evaluation (channel={args.channel}, signal={args.channel}_per_exp):")
-        print(f"  R² = {r2_final:.4f}")
-        print(f"  RMSE = {rmse_final:.3f} µM")
+        print(f"  R2 = {r2_final:.6g}")
+        print(f"  RMSE = {rmse_final:.6g} uM")
     else:
-        print(f"\n✓ Saved concentration predictions → {conc_out}")
+        print(f"\nSaved concentration predictions -> {conc_out}")
         print("\nWARNING: All predictions are invalid (NaN)")
 
     plot_out = resolve_output_path(args.plot_out, cfg.fit_plot_path, cfg.output_dir)
@@ -468,10 +487,11 @@ def draw_fit_visualization(
         ax_eval.text(0.5, 0.5, "No valid prediction", ha="center", va="center")
         ax_eval.set_title(f"Concentration inversion ({selected_channel})")
 
+    format_figure_numbers(fig)
     plt.tight_layout()
     fig.savefig(out_path, bbox_inches="tight")
     plt.close(fig)
-    print(f"✓ Saved fit plot   → {out_path}")
+    print(f"Saved fit plot -> {out_path}")
 
 
 def main() -> None:

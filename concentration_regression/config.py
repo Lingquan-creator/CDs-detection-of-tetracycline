@@ -29,7 +29,7 @@ CLIP_MIN = 0.1            # minimum signal after background subtraction to avoid
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent
-ROI_STATS_PATH = BASE_DIR.parent / "pic_RGB" / "roi_results2" / "roi_detailed_statistics.csv"
+ROI_STATS_PATH = BASE_DIR.parent / "pic_RGB" / "roi_results" / "roi_detailed_statistics.csv"
 OUTPUT_DIR = BASE_DIR / "rgb_fit_output"
 
 # Filenames

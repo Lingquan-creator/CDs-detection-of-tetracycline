@@ -9,9 +9,15 @@ backup/
 *.tif
 *.tiff
 *.dng
+*.raw
 test data/
 rep/
 CDs_cha_comp/
 *.pkl
 ignore/
 .venv/
+concentration_regression/rgb_fit_output
+concentration_GS/amortized_output
+oncentration_EXP/exp_fit_output
+*.zip
+OUTPUT/

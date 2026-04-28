@@ -1,12 +1,20 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 import os
+
+
+def format_plot_number(value, _pos=None):
+    if not np.isfinite(value):
+        return ""
+    text = f"{value:.6g}"
+    return "0" if text in ("", "-0") else text
 
 def set_mpl_style():
     plt.rcParams.update(
         {
-            "font.family": ["Times New Roman", "SimSun", "STSong"],
+            "font.family": ["Times New Roman", "DejaVu Sans"],
             "axes.unicode_minus": False,
             "font.size": 12,
             "axes.labelsize": 12,
@@ -51,7 +59,7 @@ def main():
     b = g1_params['b']
     c = g1_params['c']
     
-    print(f"G1 Parameters: a={a}, b={b}, c={c}")
+    print(f"G1 Parameters: a={a:.6g}, b={b:.6g}, c={c:.6g}")
     
     # 4. Calculate Predicted Concentration from G1 Intensity (Inverse Model)
     # Model: I = a * exp(b * C) + c
@@ -89,7 +97,7 @@ def main():
         true_vals,
         df_merged["conc_pred_cv"],
         color="tab:blue",
-        label="岭回归（LOO-CV）",
+        label="Ridge regression (LOO-CV)",
         alpha=0.8,
         s=36,
         linewidths=0,
@@ -101,7 +109,7 @@ def main():
         df_merged["conc_pred_g1_exp"],
         color="tab:red",
         marker="x",
-        label="指数拟合（G1）",
+        label="Exponential fit (G1)",
         alpha=0.8,
         s=42,
         linewidths=1.2,
@@ -132,10 +140,13 @@ def main():
     ax.set_xlim(limit_min, limit_max)
     ax.set_ylim(limit_min, limit_max)
     ax.set_aspect("equal", adjustable="box")
-    ax.set_xlabel("真实浓度（μM）")
-    ax.set_ylabel("预测浓度（μM）")
+    ax.set_xlabel("True concentration (uM)")
+    ax.set_ylabel("Predicted concentration (uM)")
     ax.legend(loc="upper left", frameon=True)
     ax.grid(True, linestyle="--", linewidth=0.8, alpha=0.5)
+    formatter = FuncFormatter(format_plot_number)
+    ax.xaxis.set_major_formatter(formatter)
+    ax.yaxis.set_major_formatter(formatter)
     fig.tight_layout()
     
     out_file = os.path.join(current_dir, 'comparison_plot_ridge_vs_g1.png')

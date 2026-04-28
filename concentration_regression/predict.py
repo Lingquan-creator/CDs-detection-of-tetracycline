@@ -25,6 +25,27 @@ from physics_features import DEFAULT_G_MODE, build_feature_frame, extract_concen
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
+
+
+CSV_FLOAT_FORMAT = "%.6g"
+
+
+def format_plot_number(value: float, _pos: object = None) -> str:
+    if not np.isfinite(value):
+        return ""
+    text = f"{value:.6g}"
+    return "0" if text in ("", "-0") else text
+
+
+def format_figure_numbers(fig: plt.Figure) -> None:
+    formatter = FuncFormatter(format_plot_number)
+    for ax in fig.axes:
+        ax.xaxis.set_major_formatter(formatter)
+        ax.yaxis.set_major_formatter(formatter)
+
+
+plt.rcParams.update({"axes.unicode_minus": False})
 
 _INCONSISTENT_VERSION_RE = re.compile(
     r"Trying to unpickle estimator\s+(?P<estimator>[A-Za-z0-9_]+)\s+from version\s+(?P<saved>[A-Za-z0-9_.+-]+)\s+when using version\s+(?P<runtime>[A-Za-z0-9_.+-]+)"
@@ -205,7 +226,7 @@ def predict_batch(
         out_df["residual"] = pred - conc_true
 
     out_csv.parent.mkdir(parents=True, exist_ok=True)
-    out_df.to_csv(out_csv, index=False)
+    out_df.to_csv(out_csv, index=False, float_format=CSV_FLOAT_FORMAT)
     print(f"Saved predictions -> {out_csv}")
     return out_df
 
@@ -253,6 +274,7 @@ def draw_prediction_plot(out_df: pd.DataFrame, out_path: Path) -> None:
         axes[1].set_title("Prediction by Sample")
         axes[1].grid(alpha=0.25)
 
+    format_figure_numbers(fig)
     plt.tight_layout()
     fig.savefig(out_path, bbox_inches="tight")
     plt.close(fig)

@@ -33,15 +33,15 @@ def example_workflow():
     # Configuration
     cfg = ExpConfig()
     
-    print("\n📁 Configuration:")
+    print("\nConfiguration:")
     print(f"  Input CSV: {cfg.roi_csv}")
     print(f"  Output directory: {cfg.output_dir}")
     print(f"  Default channel: {cfg.channel}")
-    print(f"  Weight epsilon: {cfg.weight_eps}")
+    print(f"  Weight epsilon: {float(cfg.weight_eps):.6g}")
     
     # Check if input file exists
     if not cfg.roi_csv.exists():
-        print(f"\n❌ Error: Input file not found: {cfg.roi_csv}")
+        print(f"\nERROR: Input file not found: {cfg.roi_csv}")
         print("\nPlease ensure you have run the pic_RGB pipeline first to generate ROI statistics.")
         print("Expected path: pic_RGB/roi_results/roi_detailed_statistics.csv")
         return
@@ -74,9 +74,9 @@ def example_workflow():
     print("\n" + "=" * 70)
     print("OUTPUT FILES")
     print("=" * 70)
-    print(f"\n✓ Parameters: {cfg.params_path}")
-    print(f"✓ Fit quality: {cfg.predictions_path}")
-    print(f"✓ Concentrations: <input_csv>_pred_concentration_exp.csv")
+    print(f"\nParameters: {cfg.params_path}")
+    print(f"Fit quality: {cfg.predictions_path}")
+    print(f"Concentrations: <input_csv>_pred_concentration_exp.csv")
     
     print("\n" + "=" * 70)
     print("NEXT STEPS")
@@ -86,10 +86,10 @@ def example_workflow():
    python concentration_EXP/fit_exponential.py
 
 2. Inspect the fit quality:
-   - Check R² values in exp_fit_params.csv
+   - Check R2 values in exp_fit_params.csv
    - Visualize exp_fit_predictions.csv
 
-3. Choose the best channel (highest R²)
+3. Choose the best channel (highest R2)
 
 4. Predict on new data:
    python concentration_EXP/predict.py --roi-csv <new_data> --channel <best_channel>

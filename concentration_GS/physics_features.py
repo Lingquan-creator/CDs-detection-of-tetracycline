@@ -8,7 +8,7 @@ Supported feature sets:
 - Raw features (no background): brightness, exposure-normalized brightness, ratios, variance
 - Background-subtracted features: signal brightness, exposure-normalized signal, ratios, variance
 
-Based on Beer-Lambert law: I ∝ exp(-εlC), so ln(I) should be linear with concentration.
+Based on Beer-Lambert law: I is proportional to exp(-epsilon*l*C), so ln(I) should be linear with concentration.
 """
 
 from __future__ import annotations
@@ -55,10 +55,11 @@ DEFAULT_G_MODE = "avg"  # use averaged green channels (G1+G2)/2 when available
 _EPS = 1e-6  # small constant to avoid log(0)
 _CLIP_MIN = 0.1  # minimum signal after background subtraction to avoid log of non-positive
 _EXPOSURE_MIN = 1e-6
+_DEFAULT_EXPOSURE_TIME = 1.0
 
 
 def extract_sample_metadata_from_name(name: str) -> Dict[str, Optional[float]]:
-    """Parse concentration/exposure metadata from `浓度_曝光时长.ext` filenames."""
+    """Parse concentration/exposure metadata from `concentration_exposure.ext` filenames."""
     stem = Path(name).stem
 
     if "_" in stem:
@@ -146,7 +147,7 @@ def _signal(roi: pd.Series, bg: pd.Series, clip_min: float) -> np.ndarray:
 
 
 def resolve_exposure_time_series(df: pd.DataFrame) -> np.ndarray:
-    """Resolve exposure time from CSV column first, then filename metadata."""
+    """Resolve exposure time, assuming a constant exposure when metadata is missing."""
     exposure = pd.Series(np.nan, index=df.index, dtype=float)
 
     if "exposure_time" in df.columns:
@@ -157,14 +158,14 @@ def resolve_exposure_time_series(df: pd.DataFrame) -> np.ndarray:
         parsed_series = pd.to_numeric(parsed, errors="coerce").astype(float)
         exposure = exposure.fillna(parsed_series)
 
-    missing_mask = ~np.isfinite(exposure.to_numpy(dtype=float)) | (exposure.to_numpy(dtype=float) <= 0.0)
+    exposure_values = exposure.to_numpy(dtype=float, copy=True)
+    valid_mask = np.isfinite(exposure_values) & (exposure_values > 0.0)
+    missing_mask = ~valid_mask
     if np.any(missing_mask):
-        missing_count = int(np.sum(missing_mask))
-        raise ValueError(
-            f"Exposure time is required for feature build, but {missing_count} rows are missing a valid exposure_time."
-        )
+        fallback = exposure_values[valid_mask][0] if np.any(valid_mask) else _DEFAULT_EXPOSURE_TIME
+        exposure_values[missing_mask] = fallback
 
-    return np.maximum(exposure.to_numpy(dtype=float), _EXPOSURE_MIN)
+    return np.maximum(exposure_values, _EXPOSURE_MIN)
 
 
 def build_feature_frame(
