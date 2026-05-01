@@ -23,7 +23,7 @@ def get_base_path():
 WORKSPACE_ROOT = CURRENT_DIR
 sys.path.append(CURRENT_DIR)
 sys.path.append(os.path.join(CURRENT_DIR, 'pic_RGB'))
-sys.path.append(os.path.join(CURRENT_DIR, 'concentration'))
+sys.path.append(os.path.join(CURRENT_DIR, 'concentration_regression'))
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                                QHBoxLayout, QLabel, QPushButton, QFileDialog, 
@@ -118,7 +118,7 @@ try:
     from roi_processor import ROIProcessor, ROIResult  # Added ROIResult
     from roi_config import ROISettings
     from roi_manual import ManualROITools
-    import rgb_to_concentration as rtc
+    import train as rtc
     import physics_features as pf
     # from config import CLIP_MIN # Avoid direct import to prevent path issues
     CLIP_MIN = rtc.CLIP_MIN
@@ -353,7 +353,7 @@ class AnalysisWorker(QThread):
                 df_row = pd.DataFrame([row_data])
 
                 # Build features
-                # Check if model uses bg subtraction. The rgb_to_concentration logic handles this.
+                # Check if model uses bg subtraction. The concentration_regression training logic handles this.
                 # However, predict_batch expects a CSV path. We want to predict from memory.
                 # We reuse build_feature_frame from physics_features.
                 

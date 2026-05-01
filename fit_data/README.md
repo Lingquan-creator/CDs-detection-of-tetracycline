@@ -35,7 +35,7 @@ python fit_parameters.py
 所有输出将落到 `results/` 或对应图像目录（`fit_plots/`, `parameter_plots/`）。
 
 ## 与浓度映射衔接
-`results_intensity_models.csv`、`results_integrated_intensity.csv`、`results_parameter.csv` 等文件被 `concentration/` 下的映射脚本引用（如 `rgb_exponential_fit.py`、`rgb_to_concentration.py`），路径已统一到 `fit_data/results/`，无需额外配置。
+`results_intensity_models.csv`、`results_integrated_intensity.csv`、`results_parameter.csv` 等文件可被浓度映射脚本引用，路径已统一到 `fit_data/results/`，无需额外配置。
 
 ## 依赖
 - Python 3.8+

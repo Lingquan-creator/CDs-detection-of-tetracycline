@@ -26,7 +26,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 from config import ALPHAS, CLIP_MIN, TARGET_EPS, TARGET_TRANSFORM, WEIGHT_EPS, TrainConfig
-from physics_features import build_feature_frame, extract_concentration_from_name, feature_names, has_background_columns
+from physics_features import build_feature_frame, extract_concentration_from_name, has_background_columns
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -142,6 +142,12 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
     )
     parser.add_argument("--alpha", type=float, help="Single alpha value. If set, --alpha-grid is ignored.")
     parser.add_argument("--alpha-grid", nargs="+", type=float, help="Alpha grid for RidgeCV.")
+    parser.add_argument(
+        "--feature-set",
+        choices=["full", "compact", "compact_exposure"],
+        default=default_cfg.feature_set,
+        help="Feature set: compact=ln RGB + ratios; compact_exposure adds exposure_time.",
+    )
     parser.add_argument("--weight-eps", type=float, default=WEIGHT_EPS, help="Sample weight: 1 / (conc + weight_eps).")
     parser.add_argument("--clip-min", type=float, default=CLIP_MIN, help="Min signal after bg subtraction.")
     return parser.parse_args()
@@ -197,6 +203,55 @@ def resolve_use_bg(df: pd.DataFrame, g_mode: str, use_bg_arg: str) -> bool:
     return has_background_columns(df, g_mode)
 
 
+def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: str) -> pd.DataFrame:
+    if feature_set == "full":
+        return feature_df
+    if feature_set not in {"compact", "compact_exposure"}:
+        raise ValueError(f"Unsupported feature set: {feature_set}")
+
+    no_exposure_columns = (
+        ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Delta_RG", "Ratio_BG", "Var_G")
+        if use_bg
+        else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Delta_RG", "Ratio_BG", "Var_G")
+    )
+    exposure_columns = (
+        (
+            "ln_R_sig",
+            "ln_G_sig",
+            "ln_B_sig",
+            "ln_R_sig_per_exp",
+            "ln_G_sig_per_exp",
+            "ln_B_sig_per_exp",
+            "Ratio_RG",
+            "Delta_RG",
+            "Ratio_BG",
+            "Var_G",
+            "exposure_time",
+            "ln_exposure",
+        )
+        if use_bg
+        else (
+            "ln_R",
+            "ln_G",
+            "ln_B",
+            "ln_R_per_exp",
+            "ln_G_per_exp",
+            "ln_B_per_exp",
+            "Ratio_RG",
+            "Delta_RG",
+            "Ratio_BG",
+            "Var_G",
+            "exposure_time",
+            "ln_exposure",
+        )
+    )
+    selected_columns = exposure_columns if feature_set == "compact_exposure" else no_exposure_columns
+    missing = [column for column in selected_columns if column not in feature_df.columns]
+    if missing:
+        raise ValueError(f"Cannot build {feature_set} feature set; missing columns: {missing}")
+    return feature_df.loc[:, list(selected_columns)]
+
+
 def model_selection_score(model: Pipeline, X: np.ndarray, y_target: np.ndarray) -> float:
     regressor = model.named_steps["regressor"]
     best_score = getattr(regressor, "best_score_", None)
@@ -217,8 +272,10 @@ def train_candidate(
     alphas: Tuple[float, ...],
     weight_eps: float,
     clip_min: float,
+    feature_set: str,
 ) -> Dict[str, object]:
     feature_df = build_feature_frame(df, g_mode=g_mode, use_bg=use_bg, clip_min=clip_min)
+    feature_df = select_feature_set(feature_df, use_bg=use_bg, feature_set=feature_set)
     X = feature_df.to_numpy(dtype=float)
     y_target = transform_target(y_true, target_transform, target_eps)
     sample_weight = make_sample_weights(y_true, weight_eps)
@@ -234,6 +291,8 @@ def train_candidate(
         "model": model,
         "g_mode": g_mode,
         "use_bg": use_bg,
+        "feature_set": feature_set,
+        "feature_names": tuple(feature_df.columns),
         "X": X,
         "sample_weight": sample_weight,
         "y_pred_raw": y_pred_raw,
@@ -334,6 +393,8 @@ def save_outputs(
     target_eps: float,
     alphas: Tuple[float, ...],
     weight_eps: float,
+    feature_set: str,
+    selected_feature_names: Tuple[str, ...],
 ) -> None:
     for path in (model_out, pred_out, loo_out, coef_out):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -346,10 +407,11 @@ def save_outputs(
         "g_mode": g_mode,
         "alpha": selected_alpha,
         "alphas_tried": tuple(alphas),
-        "feature_names": tuple(feature_names(use_bg)),
+        "feature_names": selected_feature_names,
         "target_transform": target_transform,
         "target_eps": target_eps,
         "use_bg": use_bg,
+        "feature_set": feature_set,
         "weight_eps": weight_eps,
         "isotonic": calibrator,
         "sklearn_version": sklearn_version,
@@ -379,7 +441,7 @@ def save_outputs(
     )
     loo_df.to_csv(loo_out, index=False, float_format=CSV_FLOAT_FORMAT)
 
-    coef_df = pd.DataFrame({"feature": tuple(feature_names(use_bg)), "coefficient": regressor.coef_})
+    coef_df = pd.DataFrame({"feature": selected_feature_names, "coefficient": regressor.coef_})
     coef_df.to_csv(coef_out, index=False, float_format=CSV_FLOAT_FORMAT)
 
 
@@ -412,7 +474,7 @@ def main() -> None:
 
     print(f"Training data: {args.roi_csv} (n={len(df)})")
     print(f"Alpha candidates: {format_float_sequence(alphas)}")
-    print(f"Evaluating g_modes={g_modes}, use_bg={args.use_bg}, target_transform={target_transform}")
+    print(f"Evaluating g_modes={g_modes}, use_bg={args.use_bg}, feature_set={args.feature_set}, target_transform={target_transform}")
 
     for g_mode in g_modes:
         use_bg = resolve_use_bg(df, g_mode, args.use_bg)
@@ -426,9 +488,10 @@ def main() -> None:
             alphas=alphas,
             weight_eps=float(args.weight_eps),
             clip_min=float(args.clip_min),
+            feature_set=str(args.feature_set),
         )
         score = float(result["score"])
-        print(f"  candidate g_mode={g_mode}, use_bg={use_bg}, cv_score={score:.6g}")
+        print(f"  candidate g_mode={g_mode}, use_bg={use_bg}, feature_set={args.feature_set}, cv_score={score:.6g}")
         if score > best_score:
             best_score = score
             best_result = result
@@ -439,6 +502,8 @@ def main() -> None:
     model = best_result["model"]
     g_mode = str(best_result["g_mode"])
     use_bg = bool(best_result["use_bg"])
+    feature_set = str(best_result["feature_set"])
+    selected_feature_names = tuple(str(name) for name in best_result["feature_names"])
     X = np.asarray(best_result["X"], dtype=float)
     y_pred_raw = np.asarray(best_result["y_pred_raw"], dtype=float)
     y_pred = np.asarray(best_result["y_pred"], dtype=float)
@@ -479,6 +544,8 @@ def main() -> None:
         target_eps=TARGET_EPS,
         alphas=alphas,
         weight_eps=float(args.weight_eps),
+        feature_set=feature_set,
+        selected_feature_names=selected_feature_names,
     )
     draw_result_plot(
         y_true,
@@ -491,7 +558,7 @@ def main() -> None:
 
     reg = model.named_steps["regressor"]
     selected_alpha = float(getattr(reg, "alpha_", alphas[0]))
-    print(f"Selected model: g_mode={g_mode}, use_bg={use_bg}, alpha={selected_alpha:.6g}")
+    print(f"Selected model: g_mode={g_mode}, use_bg={use_bg}, feature_set={feature_set}, alpha={selected_alpha:.6g}")
     print(f"Train   -> R2={train_metrics[0]:.6g}, RMSE={train_metrics[1]:.6g}, MAE={train_metrics[2]:.6g}")
     print(f"LOO-CV  -> R2={loo_metrics[0]:.6g}, RMSE={loo_metrics[1]:.6g}, MAE={loo_metrics[2]:.6g}")
     print(f"Saved model       -> {args.model_out}")

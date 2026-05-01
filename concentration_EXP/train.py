@@ -4,10 +4,10 @@ Exponential Model Concentration Fitting and Inversion.
 Fits intensity = a * exp(b * conc) + c for each RGB channel, then inverts to predict concentration.
 
 Usage:
-    python fit_exponential.py                    # Use default ROI CSV
-    python fit_exponential.py --roi-csv <path>   # Custom ROI CSV
-    python fit_exponential.py --channel G_corr   # Use averaged green channel
-    python fit_exponential.py --weight-eps 10.0  # Adjust low-concentration emphasis
+    python train.py                    # Use default ROI CSV
+    python train.py --roi-csv <path>   # Custom ROI CSV
+    python train.py --channel G_corr   # Use averaged green channel
+    python train.py --weight-eps 10.0  # Adjust low-concentration emphasis
 """
 
 from __future__ import annotations

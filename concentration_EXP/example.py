@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config import ExpConfig
-from fit_exponential import run_exponential_fitting, parse_args as parse_fit_args
+from train import run_exponential_fitting, parse_args as parse_fit_args
 from predict import predict_concentration, parse_args as parse_predict_args
 
 
@@ -50,13 +50,13 @@ def example_workflow():
     print("STEP 1: FITTING EXPONENTIAL MODEL")
     print("=" * 70)
     print("\nCommand equivalent:")
-    print(f"  python concentration_EXP/fit_exponential.py")
+    print(f"  python concentration_EXP/train.py")
     print()
     
-    # Note: In actual use, you would run fit_exponential.py directly
+    # Note: In actual use, you would run train.py directly
     # This is just a demonstration
     print("Tip: Run the fitting script with:")
-    print("  python concentration_EXP/fit_exponential.py --channel G_corr --weight-eps 5.0")
+    print("  python concentration_EXP/train.py --channel G_corr --weight-eps 5.0")
     
     print("\n" + "=" * 70)
     print("STEP 2: PREDICTING WITH SAVED PARAMETERS")
@@ -83,7 +83,7 @@ def example_workflow():
     print("=" * 70)
     print("""
 1. Run fitting on your training data:
-   python concentration_EXP/fit_exponential.py
+   python concentration_EXP/train.py
 
 2. Inspect the fit quality:
    - Check R2 values in exp_fit_params.csv
@@ -95,7 +95,7 @@ def example_workflow():
    python concentration_EXP/predict.py --roi-csv <new_data> --channel <best_channel>
 
 For more options, see:
-   python concentration_EXP/fit_exponential.py --help
+   python concentration_EXP/train.py --help
    python concentration_EXP/predict.py --help
     """)
     

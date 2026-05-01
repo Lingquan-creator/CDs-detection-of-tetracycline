@@ -83,7 +83,7 @@ class ResultVisualizer:
     
     def _plot_single_scatter(self, ax, df, title):
         y_true = df['conc_true'].values
-        y_pred = df['posterior_mean'].values
+        y_pred = df['posterior_median'].values
         
         residuals = y_pred - y_true
         r2 = 1 - np.sum(residuals**2) / np.sum((y_true - y_true.mean())**2)
@@ -130,7 +130,8 @@ class ResultVisualizer:
     
     def _plot_residual_analysis(self, axes, df, title):
         y_true = df['conc_true'].values
-        residuals = df['residual_mean'].values
+        residual_col = 'residual_median' if 'residual_median' in df.columns else 'residual_mean'
+        residuals = df[residual_col].values
         
         ax = axes[0]
         ax.scatter(y_true, residuals, alpha=0.6, s=60, color='#A23B72')
@@ -168,7 +169,7 @@ class ResultVisualizer:
     def _plot_single_uncertainty(self, ax, df, title):
         x = np.arange(len(df))
         y_true = df['conc_true'].values
-        y_pred = df['posterior_mean'].values
+        y_pred = df['posterior_median'].values
         ci_low = df['ci_90_low'].values
         ci_high = df['ci_90_high'].values
         
@@ -233,9 +234,9 @@ class ResultVisualizer:
             if self.loo_summary is not None:
                 summary_row = self.loo_summary[self.loo_summary['filename'] == filename]
                 if not summary_row.empty:
-                    post_mean = summary_row['posterior_mean'].iloc[0]
-                    ax.axvline(post_mean, color='blue', linestyle='-', 
-                              linewidth=2, alpha=0.7, label=f'Posterior mean={post_mean:.6g} uM')
+                    post_median = summary_row['posterior_median'].iloc[0]
+                    ax.axvline(post_median, color='blue', linestyle='-', 
+                              linewidth=2, alpha=0.7, label=f'Posterior median={post_median:.6g} uM')
             
             ax.set_xlabel('Concentration (uM)', fontsize=10)
             ax.set_ylabel('Probability density', fontsize=10)
@@ -264,7 +265,7 @@ class ResultVisualizer:
                 continue
             
             y_true = df['conc_true'].values
-            y_pred = df['posterior_mean'].values
+            y_pred = df['posterior_median'].values
             residuals = y_pred - y_true
             
             r2 = 1 - np.sum(residuals**2) / np.sum((y_true - y_true.mean())**2)

@@ -125,6 +125,55 @@ def resolve_use_bg(df: pd.DataFrame, g_mode: str, use_bg_arg: str) -> bool:
     return has_background_columns(df, g_mode)
 
 
+def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: str) -> pd.DataFrame:
+    if feature_set == "full":
+        return feature_df
+    if feature_set not in {"compact", "compact_exposure"}:
+        raise ValueError(f"Unsupported feature set: {feature_set}")
+
+    no_exposure_columns = (
+        ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Delta_RG", "Ratio_BG", "Var_G")
+        if use_bg
+        else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Delta_RG", "Ratio_BG", "Var_G")
+    )
+    exposure_columns = (
+        (
+            "ln_R_sig",
+            "ln_G_sig",
+            "ln_B_sig",
+            "ln_R_sig_per_exp",
+            "ln_G_sig_per_exp",
+            "ln_B_sig_per_exp",
+            "Ratio_RG",
+            "Delta_RG",
+            "Ratio_BG",
+            "Var_G",
+            "exposure_time",
+            "ln_exposure",
+        )
+        if use_bg
+        else (
+            "ln_R",
+            "ln_G",
+            "ln_B",
+            "ln_R_per_exp",
+            "ln_G_per_exp",
+            "ln_B_per_exp",
+            "Ratio_RG",
+            "Delta_RG",
+            "Ratio_BG",
+            "Var_G",
+            "exposure_time",
+            "ln_exposure",
+        )
+    )
+    selected_columns = exposure_columns if feature_set == "compact_exposure" else no_exposure_columns
+    missing = [column for column in selected_columns if column not in feature_df.columns]
+    if missing:
+        raise ValueError(f"Cannot build {feature_set} feature set; missing columns: {missing}")
+    return feature_df.loc[:, list(selected_columns)]
+
+
 def load_training_dataframe(roi_csv: Path) -> Tuple[pd.DataFrame, np.ndarray]:
     if not roi_csv.exists():
         raise FileNotFoundError(f"ROI CSV not found: {roi_csv}")
@@ -167,12 +216,16 @@ def gaussian_nll(
     mu: torch.Tensor,
     std: torch.Tensor,
     sample_weight: Optional[torch.Tensor] = None,
+    std_reg_lambda: float = 0.0,
 ) -> torch.Tensor:
     var = std.pow(2)
     loss = 0.5 * torch.log(var) + 0.5 * (target - mu).pow(2) / var + 0.5 * math.log(2.0 * math.pi)
     if sample_weight is not None:
         loss = loss * sample_weight
-    return loss.mean()
+    base_loss = loss.mean()
+    if std_reg_lambda > 0.0:
+        base_loss = base_loss + float(std_reg_lambda) * std.pow(2).mean()
+    return base_loss
 
 
 def fit_model(
@@ -186,11 +239,14 @@ def fit_model(
     epochs: int,
     patience: int,
     min_std: float,
+    std_reg_lambda: float,
+    max_std_log: float,
     weight_eps: float,
     grad_clip_norm: float,
     seed: int,
     g_mode: str,
     use_bg: bool,
+    active_feature_names: Optional[Sequence[str]] = None,
     reference_concentrations: Optional[Sequence[float]] = None,
 ) -> Dict[str, object]:
     set_global_seed(seed)
@@ -219,7 +275,7 @@ def fit_model(
         model.train()
         optimizer.zero_grad(set_to_none=True)
         mu, std = model(x_tensor)
-        loss = gaussian_nll(y_tensor, mu, std, sample_weight=w_tensor)
+        loss = gaussian_nll(y_tensor, mu, std, sample_weight=w_tensor, std_reg_lambda=std_reg_lambda)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=float(grad_clip_norm))
         optimizer.step()
@@ -234,6 +290,9 @@ def fit_model(
 
     model.load_state_dict(best_state)
     model.eval()
+    with torch.no_grad():
+        train_mu, train_std = model(x_tensor)
+        best_train_nll = float(gaussian_nll(y_tensor, train_mu, train_std, sample_weight=w_tensor).cpu().item())
 
     bundle = {
         "state_dict": {name: tensor.detach().cpu() for name, tensor in model.state_dict().items()},
@@ -241,11 +300,13 @@ def fit_model(
         "hidden_dim": int(hidden_dim),
         "dropout": float(dropout),
         "min_std": float(min_std),
+        "std_reg_lambda": float(std_reg_lambda),
+        "max_std_log": float(max_std_log),
         "feature_mean": np.asarray(feature_mean, dtype=np.float64),
         "feature_std": np.asarray(feature_std, dtype=np.float64),
         "target_log_mean": float(target_log_mean),
         "target_log_std": float(target_log_std),
-        "feature_names": tuple(feature_names(use_bg)),
+        "feature_names": tuple(active_feature_names if active_feature_names is not None else feature_names(use_bg)),
         "reference_concentrations": np.asarray(
             reference_concentrations if reference_concentrations is not None else np.sort(np.unique(y)),
             dtype=np.float64,
@@ -256,7 +317,8 @@ def fit_model(
         "seed": int(seed),
         "epochs_requested": int(epochs),
         "epochs_trained": int(best_epoch + 1),
-        "best_train_nll": float(best_loss),
+        "best_train_nll": best_train_nll,
+        "best_train_loss": float(best_loss),
     }
     return bundle
 
@@ -302,7 +364,10 @@ def posterior_from_bundle(bundle: Dict[str, object], X: np.ndarray) -> Tuple[np.
     target_log_mean = float(bundle["target_log_mean"])
     target_log_std = float(bundle["target_log_std"])
     mu_log = target_log_mean + target_log_std * mu_std_np
+    max_std_log = bundle.get("max_std_log")
     std_log = np.maximum(target_log_std * std_std_np, 1e-6)
+    if max_std_log is not None and np.isfinite(float(max_std_log)) and float(max_std_log) > 0.0:
+        std_log = np.minimum(std_log, float(max_std_log))
     return mu_log, std_log
 
 
@@ -439,17 +504,20 @@ def build_summary_frame(
     out_df = out_df.merge(most_prob, on="filename", how="left")
     out_df["residual_mean"] = out_df["posterior_mean"] - out_df["conc_true"]
     out_df["abs_error_mean"] = np.abs(out_df["residual_mean"])
+    out_df["residual_median"] = out_df["posterior_median"] - out_df["conc_true"]
+    out_df["abs_error_median"] = np.abs(out_df["residual_median"])
     return out_df, prob_df
 
 
-def evaluate_summary(summary_df: pd.DataFrame) -> Dict[str, float]:
+def evaluate_summary(summary_df: pd.DataFrame, point_col: str = "posterior_median") -> Dict[str, float]:
     y_true = summary_df["conc_true"].to_numpy(dtype=np.float64)
-    y_pred = summary_df["posterior_mean"].to_numpy(dtype=np.float64)
+    y_pred = summary_df[point_col].to_numpy(dtype=np.float64)
     return {
         "r2": float(r2_score(y_true, y_pred)),
         "rmse": float(np.sqrt(mean_squared_error(y_true, y_pred))),
         "mae": float(mean_absolute_error(y_true, y_pred)),
         "mean_nll": float(np.mean(summary_df["nll"].to_numpy(dtype=np.float64))),
+        "point_estimate": point_col,
     }
 
 
@@ -464,11 +532,14 @@ def run_leave_one_out(
     epochs: int,
     patience: int,
     min_std: float,
+    std_reg_lambda: float,
+    max_std_log: float,
     weight_eps: float,
     grad_clip_norm: float,
     seed: int,
     g_mode: str,
     use_bg: bool,
+    active_feature_names: Sequence[str],
 ) -> Tuple[np.ndarray, np.ndarray]:
     loo = LeaveOneOut()
     mu_log_pred = np.zeros_like(y, dtype=np.float64)
@@ -485,11 +556,14 @@ def run_leave_one_out(
             epochs=epochs,
             patience=patience,
             min_std=min_std,
+            std_reg_lambda=std_reg_lambda,
+            max_std_log=max_std_log,
             weight_eps=weight_eps,
             grad_clip_norm=grad_clip_norm,
             seed=seed + fold_idx + 1,
             g_mode=g_mode,
             use_bg=use_bg,
+            active_feature_names=active_feature_names,
         )
         mu_log_fold, std_log_fold = posterior_from_bundle(fold_bundle, X[test_idx])
         mu_log_pred[test_idx] = mu_log_fold
@@ -521,7 +595,7 @@ def draw_result_plot(
 
     def plot_summary(ax: plt.Axes, summary_df: pd.DataFrame, title: str, metrics: Dict[str, float], color: str) -> None:
         x = np.maximum(summary_df["conc_true"].to_numpy(dtype=np.float64), TARGET_EPS)
-        y = np.maximum(summary_df["posterior_mean"].to_numpy(dtype=np.float64), TARGET_EPS)
+        y = np.maximum(summary_df["posterior_median"].to_numpy(dtype=np.float64), TARGET_EPS)
         lower = np.maximum(summary_df[ci_low_col].to_numpy(dtype=np.float64), TARGET_EPS)
         upper = np.maximum(summary_df[ci_high_col].to_numpy(dtype=np.float64), TARGET_EPS)
         yerr = np.vstack((np.maximum(y - lower, 0.0), np.maximum(upper - y, 0.0)))
@@ -534,7 +608,7 @@ def draw_result_plot(
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlabel("True concentration (uM)")
-        ax.set_ylabel("Posterior mean (uM)")
+        ax.set_ylabel("Posterior median (uM)")
         ax.set_title(
             f"{title}\nR2={metrics['r2']:.6g}, RMSE={metrics['rmse']:.6g}, "
             f"MAE={metrics['mae']:.6g}, NLL={metrics['mean_nll']:.6g}"
@@ -595,12 +669,15 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
         help="Use background-subtracted features when available.",
     )
     parser.add_argument("--hidden-dim", type=int, default=default_cfg.hidden_dim, help="Hidden layer width.")
+    parser.add_argument("--feature-set", choices=["full", "compact", "compact_exposure"], default=default_cfg.feature_set, help="Feature set used for training.")
     parser.add_argument("--dropout", type=float, default=default_cfg.dropout, help="Dropout rate.")
     parser.add_argument("--learning-rate", type=float, default=default_cfg.learning_rate, help="AdamW learning rate.")
     parser.add_argument("--weight-decay", type=float, default=default_cfg.weight_decay, help="AdamW weight decay.")
     parser.add_argument("--epochs", type=int, default=default_cfg.epochs, help="Maximum training epochs.")
     parser.add_argument("--patience", type=int, default=default_cfg.patience, help="Early stopping patience.")
     parser.add_argument("--min-std", type=float, default=default_cfg.min_std, help="Posterior std floor in z-space.")
+    parser.add_argument("--std-reg-lambda", type=float, default=default_cfg.std_reg_lambda, help="L2 penalty on predicted posterior std.")
+    parser.add_argument("--max-std-log", type=float, default=default_cfg.max_std_log, help="Posterior std ceiling after converting back to log-concentration space.")
     parser.add_argument("--weight-eps", type=float, default=default_cfg.weight_eps, help="Sample weight denominator offset.")
     parser.add_argument("--grad-clip-norm", type=float, default=default_cfg.grad_clip_norm, help="Gradient clipping norm.")
     parser.add_argument("--seed", type=int, default=default_cfg.seed, help="Random seed.")
@@ -633,11 +710,12 @@ def main() -> None:
     df, y_true = load_training_dataframe(args.roi_csv)
     use_bg = resolve_use_bg(df, args.g_mode, args.use_bg)
     feature_df = build_feature_frame(df, g_mode=args.g_mode, use_bg=use_bg)
+    feature_df = select_feature_set(feature_df, use_bg=use_bg, feature_set=args.feature_set)
     X = feature_df.to_numpy(dtype=np.float64)
     reference_concentrations = np.sort(np.unique(y_true))
 
     print(f"Training data: {args.roi_csv} (n={len(df)})")
-    print(f"Features: g_mode={args.g_mode}, use_bg={use_bg}, columns={list(feature_df.columns)}")
+    print(f"Features: g_mode={args.g_mode}, use_bg={use_bg}, feature_set={args.feature_set}, columns={list(feature_df.columns)}")
 
     bundle = fit_model(
         X,
@@ -649,11 +727,14 @@ def main() -> None:
         epochs=int(args.epochs),
         patience=int(args.patience),
         min_std=float(args.min_std),
+        std_reg_lambda=float(args.std_reg_lambda),
+        max_std_log=float(args.max_std_log),
         weight_eps=float(args.weight_eps),
         grad_clip_norm=float(args.grad_clip_norm),
         seed=int(args.seed),
         g_mode=args.g_mode,
         use_bg=use_bg,
+        active_feature_names=list(feature_df.columns),
         reference_concentrations=reference_concentrations,
     )
 
@@ -677,11 +758,14 @@ def main() -> None:
         epochs=int(args.epochs),
         patience=int(args.patience),
         min_std=float(args.min_std),
+        std_reg_lambda=float(args.std_reg_lambda),
+        max_std_log=float(args.max_std_log),
         weight_eps=float(args.weight_eps),
         grad_clip_norm=float(args.grad_clip_norm),
         seed=int(args.seed),
         g_mode=args.g_mode,
         use_bg=use_bg,
+        active_feature_names=list(feature_df.columns),
     )
     loo_summary, loo_prob_df = build_summary_frame(
         df,
@@ -696,6 +780,7 @@ def main() -> None:
     loo_metrics = evaluate_summary(loo_summary)
 
     bundle["confidence"] = float(args.confidence)
+    bundle["feature_set"] = str(args.feature_set)
     bundle["train_metrics"] = train_metrics
     bundle["loo_metrics"] = loo_metrics
 

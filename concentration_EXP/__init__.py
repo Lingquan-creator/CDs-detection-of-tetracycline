@@ -5,7 +5,7 @@ This package provides tools for fitting exponential models to ROI RGB statistics
 and inverting them to predict chemical concentrations.
 
 Main modules:
-    - fit_exponential: Fit exponential models and generate predictions
+    - train: Fit exponential models and generate predictions
     - predict: Use saved parameters to predict concentrations
     - config: Configuration and default paths
     - physics_features: Utilities for concentration extraction

@@ -31,17 +31,20 @@ PREDICT_PLOT_SUFFIX = "_pred_concentration_gs.png"
 
 DEFAULT_G_MODE: Literal["g1", "avg"] = "avg"
 DEFAULT_USE_BG = "auto"  # auto -> use background columns when available
+DEFAULT_FEATURE_SET: Literal["full", "compact", "compact_exposure"] = "compact"
 TARGET_EPS = 1e-6
 DEFAULT_CONFIDENCE = 0.90
 
 # Optimization defaults for the amortized posterior network.
-HIDDEN_DIM = 16
+HIDDEN_DIM = 8
 DROPOUT = 0.05
 LEARNING_RATE = 1e-2
 WEIGHT_DECAY = 1e-3
 EPOCHS = 2500
 PATIENCE = 250
 MIN_STD = 0.08          # posterior std floor in standardized log-space
+STD_REG_LAMBDA = 0.01   # penalty on predicted posterior std to avoid variance blow-up
+MAX_STD_LOG = 2.0       # posterior std ceiling after converting back to log-concentration space
 WEIGHT_EPS = 25.0       # sample weight = 1 / (concentration + WEIGHT_EPS)
 GRAD_CLIP_NORM = 5.0
 SEED = 42
@@ -53,6 +56,7 @@ class TrainConfig:
     output_dir: Path = OUTPUT_DIR
     g_mode: Literal["g1", "avg"] = DEFAULT_G_MODE
     use_bg: str = DEFAULT_USE_BG
+    feature_set: Literal["full", "compact", "compact_exposure"] = DEFAULT_FEATURE_SET
     hidden_dim: int = HIDDEN_DIM
     dropout: float = DROPOUT
     learning_rate: float = LEARNING_RATE
@@ -60,6 +64,8 @@ class TrainConfig:
     epochs: int = EPOCHS
     patience: int = PATIENCE
     min_std: float = MIN_STD
+    std_reg_lambda: float = STD_REG_LAMBDA
+    max_std_log: float = MAX_STD_LOG
     weight_eps: float = WEIGHT_EPS
     grad_clip_norm: float = GRAD_CLIP_NORM
     seed: int = SEED

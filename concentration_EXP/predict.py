@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 from config import ExpConfig
-from fit_exponential import build_corrected_channels, invert_exponential_intensity
+from train import build_corrected_channels, invert_exponential_intensity
 from physics_features import extract_concentration_from_name
 
 matplotlib.use("Agg")

@@ -138,6 +138,8 @@ def build_inference_summary(
         out_df["conc_true"] = conc_true_np
         out_df["residual_mean"] = out_df["posterior_mean"] - out_df["conc_true"]
         out_df["abs_error_mean"] = np.abs(out_df["residual_mean"])
+        out_df["residual_median"] = out_df["posterior_median"] - out_df["conc_true"]
+        out_df["abs_error_median"] = np.abs(out_df["residual_median"])
         out_df["nll"] = -shifted_lognormal_logpdf(conc_true_np, mu_log, std_log, target_eps)
 
     return out_df, prob_df
@@ -154,10 +156,10 @@ def draw_prediction_plot(summary_df: pd.DataFrame, out_path: Path, confidence: f
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig, axes = plt.subplots(1, 2, figsize=(13, 5), dpi=150)
 
-    mean_col = "posterior_mean"
+    point_col = "posterior_median"
     ci_low_col = f"ci_{int(confidence * 100):02d}_low"
     ci_high_col = f"ci_{int(confidence * 100):02d}_high"
-    y_pred = summary_df[mean_col].to_numpy(dtype=np.float64)
+    y_pred = summary_df[point_col].to_numpy(dtype=np.float64)
 
     if "conc_true" in summary_df.columns:
         y_true = summary_df["conc_true"].to_numpy(dtype=np.float64)
@@ -170,7 +172,7 @@ def draw_prediction_plot(summary_df: pd.DataFrame, out_path: Path, confidence: f
             high = float(max(np.max(x), np.max(y)))
             axes[0].plot([low, high], [low, high], "k--", linewidth=1.0)
             axes[0].set_xlabel("True concentration (uM)")
-            axes[0].set_ylabel("Posterior mean (uM)")
+            axes[0].set_ylabel("Posterior median (uM)")
             axes[0].set_title("GS Prediction vs Truth")
             axes[0].grid(alpha=0.25)
 
@@ -188,7 +190,7 @@ def draw_prediction_plot(summary_df: pd.DataFrame, out_path: Path, confidence: f
                 color="#1f77b4",
             )
             axes[1].set_xlabel("Sample index")
-            axes[1].set_ylabel("Posterior mean +/- CI (uM)")
+            axes[1].set_ylabel("Posterior median +/- CI (uM)")
             axes[1].set_title(f"Uncertainty ({int(confidence * 100)}% CI)")
             axes[1].grid(alpha=0.25)
         else:
@@ -196,14 +198,14 @@ def draw_prediction_plot(summary_df: pd.DataFrame, out_path: Path, confidence: f
             axes[1].text(0.5, 0.5, "No finite labels", ha="center", va="center")
     else:
         axes[0].hist(y_pred[np.isfinite(y_pred)], bins=20, color="#1f77b4", alpha=0.8)
-        axes[0].set_xlabel("Posterior mean (uM)")
+        axes[0].set_xlabel("Posterior median (uM)")
         axes[0].set_ylabel("Count")
         axes[0].set_title("Prediction Distribution")
         axes[0].grid(alpha=0.25)
 
         posterior_std = summary_df["posterior_std"].to_numpy(dtype=np.float64)
         axes[1].scatter(y_pred, posterior_std, s=16, alpha=0.7, color="#d62728")
-        axes[1].set_xlabel("Posterior mean (uM)")
+        axes[1].set_xlabel("Posterior median (uM)")
         axes[1].set_ylabel("Posterior std (uM)")
         axes[1].set_title("Uncertainty vs Prediction")
         axes[1].grid(alpha=0.25)

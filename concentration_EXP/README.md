@@ -33,16 +33,16 @@ pip install numpy pandas scipy
 
 ```bash
 # 使用默认配置拟合
-python concentration_EXP/fit_exponential.py
+python concentration_EXP/train.py
 
 # 指定输入文件
-python concentration_EXP/fit_exponential.py --roi-csv path/to/roi_statistics.csv
+python concentration_EXP/train.py --roi-csv path/to/roi_statistics.csv
 
 # 使用平均绿色通道进行反演
-python concentration_EXP/fit_exponential.py --channel G_corr
+python concentration_EXP/train.py --channel G_corr
 
 # 调整低浓度加权参数
-python concentration_EXP/fit_exponential.py --weight-eps 10.0
+python concentration_EXP/train.py --weight-eps 10.0
 ```
 
 ## 📁 输入要求
@@ -174,7 +174,7 @@ python concentration_EXP/fit_exponential.py --weight-eps 10.0
 concentration_EXP/
 ├── config.py              # 配置参数
 ├── physics_features.py    # 浓度提取工具
-├── fit_exponential.py     # 主程序：拟合和反演
+├── train.py               # 主程序：拟合和反演
 ├── README.md             # 本文档
 └── exp_fit_output/       # 输出目录（自动创建）
     ├── exp_fit_params.csv

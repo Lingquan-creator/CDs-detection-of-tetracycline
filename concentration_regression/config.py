@@ -18,6 +18,7 @@ from physics_features import DEFAULT_G_MODE
 TARGET_TRANSFORM = "log"  # log-target regression (see improve2.md)
 TARGET_EPS = 1e-6         # small constant to avoid log(0) and for inverse transform
 DEFAULT_USE_BG = False    # background subtraction is optional; set True if bg_* columns are present
+DEFAULT_FEATURE_SET: Literal["full", "compact", "compact_exposure"] = "compact"
 # Expanded alpha grid to include large regularization for smoothing low-concentration noise
 # REMOVED small alphas to force smoother models and avoid overfitting noise.
 # FORCED high alphas (starting at 50.0) to combat multicollinearity-induced oscillation.
@@ -49,6 +50,7 @@ class TrainConfig:
     alpha: float = 0.5
     g_mode: Literal["g1", "avg"] = DEFAULT_G_MODE
     use_bg: bool = DEFAULT_USE_BG
+    feature_set: Literal["full", "compact", "compact_exposure"] = DEFAULT_FEATURE_SET
 
     @property
     def model_path(self) -> Path:

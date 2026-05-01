@@ -43,10 +43,10 @@
     - `isotonic`: 训练好的保序回归校准器 (IsotonicRegression)。
     - `g_mode`, `use_bg`, `feature_names`: 训练时选定的最佳策略元数据。
     - `sklearn_version`, `python_version`, `bundle_created_utc`: 训练环境信息（用于排查版本一致性问题）。
-  - **用途**：推理脚本 `rgb_to_concentration.py` 的唯一输入。
+  - **用途**：推理脚本 `predict.py` 的主要输入。
   - **版本兼容提示**：模型文件使用 joblib/pickle 序列化，建议训练与推理使用相同的 scikit-learn 版本。
     - 出现版本不一致警告时：优先重新训练（`python concentration/rgb_exponential_fit.py --method ridge`）。
-    - 若仅需减少/消除重复警告（并理解风险）：可用 `python concentration/rgb_to_concentration.py --resave-model` 重新保存 bundle。
+    - 若仅需减少/消除重复警告（并理解风险）：优先重新训练并重新保存模型 bundle。
 
 ### 1.1 指数拟合输出（无需模型文件）
 - **`rgb_fit_params.csv`**：指数拟合参数（按通道）。
@@ -73,7 +73,7 @@
 # 指数拟合（默认）：拟合 I = a*exp(b*C)+c 并反推浓度
 python concentration/rgb_exponential_fit.py
 
-# 岭回归训练：生成 concentration_model_v1.pkl 等（用于 rgb_to_concentration.py）
+# 岭回归训练：生成 concentration_model_v1.pkl 等
 python concentration/rgb_exponential_fit.py --method ridge
 ```
 
@@ -81,13 +81,13 @@ python concentration/rgb_exponential_fit.py --method ridge
 **批量预测 (Batch Mode)**：
 ```bash
 # 读取 ROI 统计 CSV，生成预测结果
-python concentration/rgb_to_concentration.py --roi-csv pic_RGB/roi_results/roi_detailed_statistics.csv
+python concentration_regression/train.py --roi-csv pic_RGB/roi_results/roi_detailed_statistics.csv
 ```
 *注：输入 CSV 必须包含背景统计列 (bg_*)，否则脚本会报错。*
 
 **单点预测 (Single Mode, 调试用)**：
 ```bash
-python concentration/rgb_to_concentration.py \
+python concentration_regression/train.py \
   --model concentration/rgb_fit_output/concentration_model_v1.pkl \
   --r 25.5 --g1 40.2 --b 10.1 --var-g 205.0
 ```
@@ -100,7 +100,7 @@ concentration/
 ├── config.py               # [配置] 路径、超参数 (Alpha, Eps)
 ├── physics_features.py     # [核心] 物理特征计算逻辑
 ├── rgb_exponential_fit.py  # [拟合] 指数拟合(默认) / 岭回归训练(--method ridge)
-├── rgb_to_concentration.py # [推理] 加载模型预测
+├── train.py              # [训练] 训练 Ridge 模型并做 LOO 验证
 ├── METHODOLOGY.md          # [文档] 算法原理白皮书
 └── rgb_fit_output/         # [输出] 产物目录
 ```
