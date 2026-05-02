@@ -185,15 +185,15 @@ class AnalysisWorker(QThread):
                     current_roi_sel.center, (H, W), current_roi_sel.width, current_roi_sel.height, current_roi_sel.angle_deg
                 )
                 bg_mask = manual_tools.create_background_roi(
-                    current_bg_sel.center,
+                    current_bg_sel.outer_center,
                     (H, W),
-                    current_roi_sel.width,
-                    current_roi_sel.height,
-                    current_bg_sel.angle_deg,
-                    inner_offset_x=current_bg_sel.inner_x,
-                    inner_offset_y=current_bg_sel.inner_y,
-                    outer_offset_x=current_bg_sel.outer_x,
-                    outer_offset_y=current_bg_sel.outer_y,
+                    roi_angle=current_bg_sel.angle_deg,
+                    inner_center=current_bg_sel.inner_center,
+                    outer_center=current_bg_sel.outer_center,
+                    inner_width=current_bg_sel.inner_x,
+                    inner_height=current_bg_sel.inner_y,
+                    outer_width=current_bg_sel.outer_x,
+                    outer_height=current_bg_sel.outer_y,
                     exclude_mask=roi_mask,
                 )
 
@@ -250,15 +250,15 @@ class AnalysisWorker(QThread):
                         current_roi_sel.center, current_roi_sel.width, current_roi_sel.height, current_roi_sel.angle_deg
                     )
                     bg_outer_pts = manual_tools.get_rotated_box(
-                        current_bg_sel.center, 
-                        current_roi_sel.width + 2*current_bg_sel.outer_x, 
-                        current_roi_sel.height + 2*current_bg_sel.outer_y, 
+                        current_bg_sel.outer_center,
+                        current_bg_sel.outer_x,
+                        current_bg_sel.outer_y,
                         current_bg_sel.angle_deg
                     )
                     bg_inner_pts = manual_tools.get_rotated_box(
-                         current_bg_sel.center, 
-                        current_roi_sel.width + 2*current_bg_sel.inner_x, 
-                        current_roi_sel.height + 2*current_bg_sel.inner_y, 
+                        current_bg_sel.inner_center,
+                        current_bg_sel.inner_x,
+                        current_bg_sel.inner_y,
                         current_bg_sel.angle_deg
                     )
                     
@@ -336,9 +336,12 @@ class AnalysisWorker(QThread):
                 # Using dummy bbox since we didn't firmly calculate it for everything, or reuse the one from plotting
                 roi_res_obj = ROIResult(
                     filename=fname,
+                    concentration=None,
                     center_x=current_roi_sel.center[0], center_y=current_roi_sel.center[1],
                     width=current_roi_sel.width, height=current_roi_sel.height, angle_deg=current_roi_sel.angle_deg,
-                    bg_center_x=current_bg_sel.center[0], bg_center_y=current_bg_sel.center[1],
+                    bg_center_x=current_bg_sel.outer_center[0], bg_center_y=current_bg_sel.outer_center[1],
+                    bg_inner_center_x=current_bg_sel.inner_center[0], bg_inner_center_y=current_bg_sel.inner_center[1],
+                    bg_outer_center_x=current_bg_sel.outer_center[0], bg_outer_center_y=current_bg_sel.outer_center[1],
                     bg_inner_x=current_bg_sel.inner_x, bg_inner_y=current_bg_sel.inner_y,
                     bg_outer_x=current_bg_sel.outer_x, bg_outer_y=current_bg_sel.outer_y, bg_angle_deg=current_bg_sel.angle_deg,
                     bbox=(0,0,0,0), # Dummy
@@ -570,11 +573,38 @@ class LabAnalyzerWindow(QMainWindow):
                                 angle_deg=float(entry.get("angle_deg", 0.0)),
                             )
                             b = BackgroundSelection(
-                                center=(float(entry.get("bg_center_x", r.center[0])), float(entry.get("bg_center_y", r.center[1]))),
-                                inner_x=float(entry.get("bg_inner_x", 0)),
-                                inner_y=float(entry.get("bg_inner_y", 0)),
-                                outer_x=float(entry.get("bg_outer_x", 0)),
-                                outer_y=float(entry.get("bg_outer_y", 0)),
+                                center=(
+                                    float(entry.get("bg_outer_center_x", entry.get("bg_center_x", r.center[0]))),
+                                    float(entry.get("bg_outer_center_y", entry.get("bg_center_y", r.center[1]))),
+                                ),
+                                inner_center=(
+                                    float(entry.get("bg_inner_center_x", entry.get("bg_center_x", r.center[0]))),
+                                    float(entry.get("bg_inner_center_y", entry.get("bg_center_y", r.center[1]))),
+                                ),
+                                outer_center=(
+                                    float(entry.get("bg_outer_center_x", entry.get("bg_center_x", r.center[0]))),
+                                    float(entry.get("bg_outer_center_y", entry.get("bg_center_y", r.center[1]))),
+                                ),
+                                inner_x=(
+                                    float(entry.get("bg_inner_x", 0))
+                                    if "bg_inner_center_x" in entry
+                                    else r.width + 2.0 * float(entry.get("bg_inner_x", 0))
+                                ),
+                                inner_y=(
+                                    float(entry.get("bg_inner_y", 0))
+                                    if "bg_inner_center_y" in entry
+                                    else r.height + 2.0 * float(entry.get("bg_inner_y", 0))
+                                ),
+                                outer_x=(
+                                    float(entry.get("bg_outer_x", 0))
+                                    if "bg_outer_center_x" in entry
+                                    else r.width + 2.0 * float(entry.get("bg_outer_x", 0))
+                                ),
+                                outer_y=(
+                                    float(entry.get("bg_outer_y", 0))
+                                    if "bg_outer_center_y" in entry
+                                    else r.height + 2.0 * float(entry.get("bg_outer_y", 0))
+                                ),
                                 angle_deg=float(entry.get("bg_angle_deg", r.angle_deg)),
                             )
                             self.roi_cache[fname] = (r, b)
@@ -589,7 +619,7 @@ class LabAnalyzerWindow(QMainWindow):
                 for fname, pair in data.items():
                     try:
                         r = ROISelection.from_dict(pair.get("roi", {}))
-                        b = BackgroundSelection.from_dict(pair.get("bg", {}))
+                        b = BackgroundSelection.from_dict(pair.get("bg", {}), roi=r)
                         self.roi_cache[fname] = (r, b)
                     except:
                         continue
@@ -601,12 +631,14 @@ class LabAnalyzerWindow(QMainWindow):
                     # Create dummy entry dict for below logic
                     if "roi" in val:
                         r_curr = ROISelection.from_dict(val["roi"])
-                        b_curr = BackgroundSelection.from_dict(val["bg"])
+                        b_curr = BackgroundSelection.from_dict(val["bg"], roi=r_curr)
                         target_entry = {
                             "center_x": r_curr.center[0], "center_y": r_curr.center[1],
                             "width": r_curr.width, "height": r_curr.height,
                             "angle_deg": r_curr.angle_deg,
-                            "bg_center_x": b_curr.center[0], "bg_center_y": b_curr.center[1],
+                            "bg_center_x": b_curr.outer_center[0], "bg_center_y": b_curr.outer_center[1],
+                            "bg_inner_center_x": b_curr.inner_center[0], "bg_inner_center_y": b_curr.inner_center[1],
+                            "bg_outer_center_x": b_curr.outer_center[0], "bg_outer_center_y": b_curr.outer_center[1],
                             "bg_inner_x": b_curr.inner_x, "bg_inner_y": b_curr.inner_y,
                             "bg_outer_x": b_curr.outer_x, "bg_outer_y": b_curr.outer_y,
                             "bg_angle_deg": b_curr.angle_deg
@@ -622,13 +654,37 @@ class LabAnalyzerWindow(QMainWindow):
                     )
                     self.bg_selection = BackgroundSelection(
                         center=(
-                            float(target_entry.get("bg_center_x", self.roi_selection.center[0])),
-                            float(target_entry.get("bg_center_y", self.roi_selection.center[1])),
+                            float(target_entry.get("bg_outer_center_x", target_entry.get("bg_center_x", self.roi_selection.center[0]))),
+                            float(target_entry.get("bg_outer_center_y", target_entry.get("bg_center_y", self.roi_selection.center[1]))),
                         ),
-                        inner_x=float(target_entry.get("bg_inner_x", 0)),
-                        inner_y=float(target_entry.get("bg_inner_y", 0)),
-                        outer_x=float(target_entry.get("bg_outer_x", 0)),
-                        outer_y=float(target_entry.get("bg_outer_y", 0)),
+                        inner_center=(
+                            float(target_entry.get("bg_inner_center_x", target_entry.get("bg_center_x", self.roi_selection.center[0]))),
+                            float(target_entry.get("bg_inner_center_y", target_entry.get("bg_center_y", self.roi_selection.center[1]))),
+                        ),
+                        outer_center=(
+                            float(target_entry.get("bg_outer_center_x", target_entry.get("bg_center_x", self.roi_selection.center[0]))),
+                            float(target_entry.get("bg_outer_center_y", target_entry.get("bg_center_y", self.roi_selection.center[1]))),
+                        ),
+                        inner_x=(
+                            float(target_entry.get("bg_inner_x", 0))
+                            if "bg_inner_center_x" in target_entry
+                            else self.roi_selection.width + 2.0 * float(target_entry.get("bg_inner_x", 0))
+                        ),
+                        inner_y=(
+                            float(target_entry.get("bg_inner_y", 0))
+                            if "bg_inner_center_y" in target_entry
+                            else self.roi_selection.height + 2.0 * float(target_entry.get("bg_inner_y", 0))
+                        ),
+                        outer_x=(
+                            float(target_entry.get("bg_outer_x", 0))
+                            if "bg_outer_center_x" in target_entry
+                            else self.roi_selection.width + 2.0 * float(target_entry.get("bg_outer_x", 0))
+                        ),
+                        outer_y=(
+                            float(target_entry.get("bg_outer_y", 0))
+                            if "bg_outer_center_y" in target_entry
+                            else self.roi_selection.height + 2.0 * float(target_entry.get("bg_outer_y", 0))
+                        ),
                         angle_deg=float(target_entry.get("bg_angle_deg", self.roi_selection.angle_deg)),
                     )
                     self._update_roi_status_ui(json_path)

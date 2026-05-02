@@ -190,10 +190,12 @@ def test_parameter_adjustment():
         )
         bg_sel = BackgroundSelection(
             center=roi_sel.center,
-            inner_x=roi_params["bg_ring_inner_x"],
-            inner_y=roi_params["bg_ring_inner_y"],
-            outer_x=roi_params["bg_ring_outer_x"],
-            outer_y=roi_params["bg_ring_outer_y"],
+            inner_center=roi_sel.center,
+            outer_center=roi_sel.center,
+            inner_x=roi_sel.width + 2 * roi_params["bg_ring_inner_x"],
+            inner_y=roi_sel.height + 2 * roi_params["bg_ring_inner_y"],
+            outer_x=roi_sel.width + 2 * roi_params["bg_ring_outer_x"],
+            outer_y=roi_sel.height + 2 * roi_params["bg_ring_outer_y"],
             angle_deg=roi_sel.angle_deg,
         )
 

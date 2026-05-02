@@ -11,9 +11,9 @@ from typing import Any, Dict, Optional
 # Paths
 # ============================================
 PROJECT_DIR = Path(__file__).resolve().parent
-DATA_DIR = Path(os.environ.get("PIC_RGB_DATA_DIR", str(PROJECT_DIR / "dataset2"))).expanduser().resolve()
+DATA_DIR = Path(os.environ.get("PIC_RGB_DATA_DIR", str(PROJECT_DIR / "../dataset/food"))).expanduser().resolve()
 OUTPUT_DIR = Path(
-    os.environ.get("PIC_RGB_OUTPUT_DIR", str(PROJECT_DIR / "roi_results2"))
+    os.environ.get("PIC_RGB_OUTPUT_DIR", str(PROJECT_DIR / "../dataset/food"))
 ).expanduser().resolve()
 
 # ============================================
@@ -93,12 +93,12 @@ SELECTION_CACHE_PATH = OUTPUT_DIR / "roi_selection_cache.json"
 # GUI shortcuts (for quick reference / help screens)
 # ============================================
 GUI_SHORTCUTS = [
-    "Mouse drag: draw ROI (keeps current angle)",
-    "Tab: toggle ROI / BG ring",
+    "Mouse drag: draw the active box (ROI / BG inner / BG outer)",
+    "Tab: cycle ROI / BG inner / BG outer",
     "W/A/S/D: move active region center",
-    "Arrows (BG active): adjust outer ring X/Y",
-    "E/R: rotate +/- (step=angle_step_deg); B: align BG center to ROI",
-    "Enter: confirm | Q/ESC: cancel",
+    "Arrows: adjust active box width/height",
+    "Q/E: rotate +/- (step=angle_step_deg); B: align BG box centers to ROI",
+    "Enter: confirm | ESC: cancel",
 ]
 
 # ============================================

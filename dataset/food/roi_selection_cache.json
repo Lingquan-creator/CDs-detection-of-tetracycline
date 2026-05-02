@@ -1,0 +1,398 @@
+{
+  "chicken0.dng": {
+    "roi": {
+      "center": [
+        1940.6027397260273,
+        1692.8219178082193
+      ],
+      "width": 383.1232876712327,
+      "height": 1365.917808219178,
+      "angle_deg": 0.0
+    },
+    "bg": {
+      "center": [
+        1950.0,
+        1350.0
+      ],
+      "inner_x": 150.0,
+      "inner_y": 510.0,
+      "outer_x": 300.0,
+      "outer_y": 550.0,
+      "angle_deg": 0.0
+    }
+  },
+  "chicken120.dng": {
+    "roi": {
+      "center": [
+        1992.6575342465753,
+        1824.0
+      ],
+      "width": 403.94520547945194,
+      "height": 1486.6849315068494,
+      "angle_deg": 0.0
+    },
+    "bg": {
+      "center": [
+        1950.0,
+        1414.0
+      ],
+      "inner_x": 150.0,
+      "inner_y": 560.0,
+      "outer_x": 240.0,
+      "outer_y": 650.0,
+      "angle_deg": 0.0
+    }
+  },
+  "chicken150.dng": {
+    "roi": {
+      "center": [
+        2020.0,
+        1687.0
+      ],
+      "width": 420.0,
+      "height": 1478.0,
+      "angle_deg": 2.1
+    },
+    "bg": {
+      "center": [
+        2026.0,
+        1306.0
+      ],
+      "inner_x": 140.0,
+      "inner_y": 520.0,
+      "outer_x": 260.0,
+      "outer_y": 521.0,
+      "angle_deg": 2.1
+    }
+  },
+  "chicken180.dng": {
+    "roi": {
+      "center": [
+        1784.4383561643835,
+        1755.2876712328766
+      ],
+      "width": 403.94520547945194,
+      "height": 1457.5342465753426,
+      "angle_deg": 0.0
+    },
+    "bg": {
+      "center": [
+        1783.0,
+        1363.0
+      ],
+      "inner_x": 140.0,
+      "inner_y": 550.0,
+      "outer_x": 260.0,
+      "outer_y": 580.0,
+      "angle_deg": 0.0
+    }
+  },
+  "chicken210.dng": {
+    "roi": {
+      "center": [
+        1913.0,
+        1708.0
+      ],
+      "width": 431.0,
+      "height": 1487.0,
+      "angle_deg": 2.5
+    },
+    "bg": {
+      "center": [
+        1907.0,
+        1328.0
+      ],
+      "inner_x": 120.0,
+      "inner_y": 500.0,
+      "outer_x": 240.0,
+      "outer_y": 510.0,
+      "angle_deg": 2.5
+    }
+  },
+  "chicken240.dng": {
+    "roi": {
+      "center": [
+        1883.0,
+        1794.0
+      ],
+      "width": 412.0,
+      "height": 1445.0,
+      "angle_deg": 178.7
+    },
+    "bg": {
+      "center": [
+        1844.0,
+        1400.0
+      ],
+      "inner_x": 147.0,
+      "inner_y": 550.0,
+      "outer_x": 260.0,
+      "outer_y": 580.0,
+      "angle_deg": 178.7
+    }
+  },
+  "chicken30.dng": {
+    "roi": {
+      "center": [
+        1952.0,
+        1794.0
+      ],
+      "width": 408.0,
+      "height": 1461.0,
+      "angle_deg": 0.19999999999999998
+    },
+    "bg": {
+      "center": [
+        1948.0,
+        1400.0
+      ],
+      "inner_x": 150.0,
+      "inner_y": 550.0,
+      "outer_x": 300.0,
+      "outer_y": 560.0,
+      "angle_deg": 0.2
+    }
+  },
+  "chicken60.dng": {
+    "roi": {
+      "center": [
+        2244.0,
+        1749.0
+      ],
+      "width": 422.0,
+      "height": 1478.0,
+      "angle_deg": 179.4
+    },
+    "bg": {
+      "center": [
+        2200.0,
+        1350.0
+      ],
+      "inner_x": 160.0,
+      "inner_y": 550.0,
+      "outer_x": 300.0,
+      "outer_y": 600.0,
+      "angle_deg": 179.4
+    }
+  },
+  "chicken90.dng": {
+    "roi": {
+      "center": [
+        1638.6849315068494,
+        1799.0136986301372
+      ],
+      "width": 395.6164383561645,
+      "height": 1461.6986301369864,
+      "angle_deg": 0.0
+    },
+    "bg": {
+      "center": [
+        1650.0,
+        1400.0
+      ],
+      "inner_x": 150.0,
+      "inner_y": 530.0,
+      "outer_x": 300.0,
+      "outer_y": 560.0,
+      "angle_deg": 0.0
+    }
+  },
+  "egg0.dng": {
+    "roi": {
+      "center": [
+        2073.0,
+        1684.0
+      ],
+      "width": 383.0,
+      "height": 1299.0,
+      "angle_deg": 179.0
+    },
+    "bg": {
+      "center": [
+        2044.0,
+        1320.0
+      ],
+      "inner_x": 140.0,
+      "inner_y": 550.0,
+      "outer_x": 260.0,
+      "outer_y": 590.0,
+      "angle_deg": 179.0
+    }
+  },
+  "egg120.dng": {
+    "roi": {
+      "center": [
+        1942.6849315068494,
+        1769.8630136986303
+      ],
+      "width": 395.6164383561645,
+      "height": 1461.6986301369864,
+      "angle_deg": 0.0
+    },
+    "bg": {
+      "center": [
+        1952.0,
+        1386.0
+      ],
+      "inner_x": 180.0,
+      "inner_y": 550.0,
+      "outer_x": 320.0,
+      "outer_y": 600.0,
+      "angle_deg": 0.0
+    }
+  },
+  "egg150.dng": {
+    "roi": {
+      "center": [
+        1995.0,
+        1749.0
+      ],
+      "width": 410.0,
+      "height": 1436.0,
+      "angle_deg": 179.20000000000002
+    },
+    "bg": {
+      "center": [
+        1972.0,
+        1350.0
+      ],
+      "inner_x": 140.0,
+      "inner_y": 550.0,
+      "outer_x": 240.0,
+      "outer_y": 600.0,
+      "angle_deg": 179.2
+    }
+  },
+  "egg180.dng": {
+    "roi": {
+      "center": [
+        1782.0,
+        1799.0
+      ],
+      "width": 430.0,
+      "height": 1486.0,
+      "angle_deg": 1.4
+    },
+    "bg": {
+      "center": [
+        1796.0,
+        1400.0
+      ],
+      "inner_x": 140.0,
+      "inner_y": 530.0,
+      "outer_x": 280.0,
+      "outer_y": 580.0,
+      "angle_deg": 1.4
+    }
+  },
+  "egg210.dng": {
+    "roi": {
+      "center": [
+        1859.3972602739727,
+        1740.7123287671234
+      ],
+      "width": 428.93150684931516,
+      "height": 1445.0410958904113,
+      "angle_deg": 0.0
+    },
+    "bg": {
+      "center": [
+        1830.0,
+        1350.0
+      ],
+      "inner_x": 140.0,
+      "inner_y": 530.0,
+      "outer_x": 280.0,
+      "outer_y": 580.0,
+      "angle_deg": 0.0
+    }
+  },
+  "egg240.dng": {
+    "roi": {
+      "center": [
+        1841.0,
+        1705.0
+      ],
+      "width": 428.0,
+      "height": 1474.0,
+      "angle_deg": 178.9
+    },
+    "bg": {
+      "center": [
+        1830.0,
+        1323.0
+      ],
+      "inner_x": 140.0,
+      "inner_y": 550.0,
+      "outer_x": 260.0,
+      "outer_y": 600.0,
+      "angle_deg": 178.9
+    }
+  },
+  "egg30.dng": {
+    "roi": {
+      "center": [
+        1798.4998903417375,
+        1759.0104712099417
+      ],
+      "width": 402.0,
+      "height": 1440.0,
+      "angle_deg": 1.2
+    },
+    "bg": {
+      "center": [
+        1800.0,
+        1397.0
+      ],
+      "inner_x": 160.0,
+      "inner_y": 560.0,
+      "outer_x": 300.0,
+      "outer_y": 600.0,
+      "angle_deg": 1.2
+    }
+  },
+  "egg60.dng": {
+    "roi": {
+      "center": [
+        1934.356164383562,
+        1888.5479452054794
+      ],
+      "width": 370.6301369863015,
+      "height": 1432.5479452054792,
+      "angle_deg": 0.0
+    },
+    "bg": {
+      "center": [
+        1900.0,
+        1500.0
+      ],
+      "inner_x": 160.0,
+      "inner_y": 530.0,
+      "outer_x": 320.0,
+      "outer_y": 531.0,
+      "angle_deg": 0.0
+    }
+  },
+  "egg90.dng": {
+    "roi": {
+      "center": [
+        2084.0,
+        1826.0
+      ],
+      "width": 426.0,
+      "height": 1457.0,
+      "angle_deg": 0.6
+    },
+    "bg": {
+      "center": [
+        2072.0,
+        1400.0
+      ],
+      "inner_x": 130.0,
+      "inner_y": 600.0,
+      "outer_x": 260.0,
+      "outer_y": 601.0,
+      "angle_deg": 0.6
+    }
+  }
+}

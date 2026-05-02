@@ -61,49 +61,59 @@ class ManualROITools:
         inner_offset_y: Optional[float] = None,
         outer_offset_x: Optional[float] = None,
         outer_offset_y: Optional[float] = None,
+        inner_center: Optional[Tuple[float, float]] = None,
+        outer_center: Optional[Tuple[float, float]] = None,
+        inner_width: Optional[float] = None,
+        inner_height: Optional[float] = None,
+        outer_width: Optional[float] = None,
+        outer_height: Optional[float] = None,
         exclude_mask: Optional[np.ndarray] = None,
     ) -> np.ndarray:
-        """创建空心矩形背景 ROI（支持独立中心与可调内外边距）。"""
+        """创建空心矩形背景 ROI，支持独立内外框中心与尺寸。"""
         H, W = shape
-        cx, cy = center
 
         w = roi_width if roi_width is not None else self.settings.fixed_roi_width
         h = roi_height if roi_height is not None else self.settings.fixed_roi_height
         a = roi_angle if roi_angle is not None else self.settings.roi_angle_deg
 
-        inner_gap_x = (
-            inner_offset_x
-            if inner_offset_x is not None
-            else (inner_offset if inner_offset is not None else self.settings.bg_ring_inner_x)
-        )
-        inner_gap_y = (
-            inner_offset_y
-            if inner_offset_y is not None
-            else (inner_offset if inner_offset is not None else self.settings.bg_ring_inner_y)
-        )
-        outer_gap_x = (
-            outer_offset_x
-            if outer_offset_x is not None
-            else (outer_offset if outer_offset is not None else self.settings.bg_ring_outer_x)
-        )
-        outer_gap_y = (
-            outer_offset_y
-            if outer_offset_y is not None
-            else (outer_offset if outer_offset is not None else self.settings.bg_ring_outer_y)
-        )
+        if inner_width is None or inner_height is None:
+            inner_gap_x = (
+                inner_offset_x
+                if inner_offset_x is not None
+                else (inner_offset if inner_offset is not None else self.settings.bg_ring_inner_x)
+            )
+            inner_gap_y = (
+                inner_offset_y
+                if inner_offset_y is not None
+                else (inner_offset if inner_offset is not None else self.settings.bg_ring_inner_y)
+            )
+            inner_width = w + 2 * inner_gap_x
+            inner_height = h + 2 * inner_gap_y
 
-        outer_width = w + 2 * outer_gap_x
-        outer_height = h + 2 * outer_gap_y
-        inner_width = w + 2 * inner_gap_x
-        inner_height = h + 2 * inner_gap_y
+        if outer_width is None or outer_height is None:
+            outer_gap_x = (
+                outer_offset_x
+                if outer_offset_x is not None
+                else (outer_offset if outer_offset is not None else self.settings.bg_ring_outer_x)
+            )
+            outer_gap_y = (
+                outer_offset_y
+                if outer_offset_y is not None
+                else (outer_offset if outer_offset is not None else self.settings.bg_ring_outer_y)
+            )
+            outer_width = w + 2 * outer_gap_x
+            outer_height = h + 2 * outer_gap_y
+
+        inner_cx, inner_cy = inner_center if inner_center is not None else center
+        outer_cx, outer_cy = outer_center if outer_center is not None else center
 
         outer_mask = np.zeros((H, W), dtype=np.uint8)
-        outer_rect = ((cx, cy), (outer_width, outer_height), a)
+        outer_rect = ((outer_cx, outer_cy), (outer_width, outer_height), a)
         outer_box = cv2.boxPoints(outer_rect)
         cv2.fillConvexPoly(outer_mask, np.int32(outer_box), 1)
 
         inner_mask = np.zeros((H, W), dtype=np.uint8)
-        inner_rect = ((cx, cy), (inner_width, inner_height), a)
+        inner_rect = ((inner_cx, inner_cy), (inner_width, inner_height), a)
         inner_box = cv2.boxPoints(inner_rect)
         cv2.fillConvexPoly(inner_mask, np.int32(inner_box), 1)
 

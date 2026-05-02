@@ -56,6 +56,10 @@ class ROIResult:
     angle_deg: float
     bg_center_x: float
     bg_center_y: float
+    bg_inner_center_x: float
+    bg_inner_center_y: float
+    bg_outer_center_x: float
+    bg_outer_center_y: float
     bg_inner_x: float
     bg_inner_y: float
     bg_outer_x: float
@@ -302,13 +306,37 @@ class ROIProcessor:
                         )
                         bg_sel = BackgroundSelection(
                             center=(
-                                float(entry.get("bg_center_x", roi_sel.center[0])),
-                                float(entry.get("bg_center_y", roi_sel.center[1])),
+                                float(entry.get("bg_outer_center_x", entry.get("bg_center_x", roi_sel.center[0]))),
+                                float(entry.get("bg_outer_center_y", entry.get("bg_center_y", roi_sel.center[1]))),
                             ),
-                            inner_x=float(entry.get("bg_inner_x", 0)),
-                            inner_y=float(entry.get("bg_inner_y", 0)),
-                            outer_x=float(entry.get("bg_outer_x", 0)),
-                            outer_y=float(entry.get("bg_outer_y", 0)),
+                            inner_center=(
+                                float(entry.get("bg_inner_center_x", entry.get("bg_center_x", roi_sel.center[0]))),
+                                float(entry.get("bg_inner_center_y", entry.get("bg_center_y", roi_sel.center[1]))),
+                            ),
+                            outer_center=(
+                                float(entry.get("bg_outer_center_x", entry.get("bg_center_x", roi_sel.center[0]))),
+                                float(entry.get("bg_outer_center_y", entry.get("bg_center_y", roi_sel.center[1]))),
+                            ),
+                            inner_x=(
+                                float(entry.get("bg_inner_x", 0))
+                                if "bg_inner_center_x" in entry
+                                else roi_sel.width + 2.0 * float(entry.get("bg_inner_x", 0))
+                            ),
+                            inner_y=(
+                                float(entry.get("bg_inner_y", 0))
+                                if "bg_inner_center_y" in entry
+                                else roi_sel.height + 2.0 * float(entry.get("bg_inner_y", 0))
+                            ),
+                            outer_x=(
+                                float(entry.get("bg_outer_x", 0))
+                                if "bg_outer_center_x" in entry
+                                else roi_sel.width + 2.0 * float(entry.get("bg_outer_x", 0))
+                            ),
+                            outer_y=(
+                                float(entry.get("bg_outer_y", 0))
+                                if "bg_outer_center_y" in entry
+                                else roi_sel.height + 2.0 * float(entry.get("bg_outer_y", 0))
+                            ),
                             angle_deg=float(entry.get("bg_angle_deg", roi_sel.angle_deg)),
                         )
                         cache[fname] = (roi_sel, bg_sel)
@@ -320,7 +348,7 @@ class ROIProcessor:
                 for fname, pair in data.items():
                     try:
                         roi_sel = ROISelection.from_dict(pair.get("roi", {}))
-                        bg_sel = BackgroundSelection.from_dict(pair.get("bg", {}))
+                        bg_sel = BackgroundSelection.from_dict(pair.get("bg", {}), roi=roi_sel)
                         cache[fname] = (roi_sel, bg_sel)
                     except Exception:
                         continue
@@ -536,7 +564,8 @@ class ROIProcessor:
             f"  ROI: center=({roi_sel.center[0]:.1f}, {roi_sel.center[1]:.1f}), size={roi_sel.width:.1f}x{roi_sel.height:.1f}, angle={roi_sel.angle_deg:.1f}°"
         )
         print(
-            f"  BG : center=({bg_sel.center[0]:.1f}, {bg_sel.center[1]:.1f}), inner=({bg_sel.inner_x:.1f},{bg_sel.inner_y:.1f})px, outer=({bg_sel.outer_x:.1f},{bg_sel.outer_y:.1f})px"
+            f"  BG : inner center=({bg_sel.inner_center[0]:.1f}, {bg_sel.inner_center[1]:.1f}), size={bg_sel.inner_x:.1f}x{bg_sel.inner_y:.1f}; "
+            f"outer center=({bg_sel.outer_center[0]:.1f}, {bg_sel.outer_center[1]:.1f}), size={bg_sel.outer_x:.1f}x{bg_sel.outer_y:.1f}"
         )
 
         result = self._process_loaded_image(
@@ -568,10 +597,12 @@ class ROIProcessor:
         )
         bg_sel = bg_selection or BackgroundSelection(
             center=roi_sel.center,
-            inner_x=float(self.settings.bg_ring_inner_x),
-            inner_y=float(self.settings.bg_ring_inner_y),
-            outer_x=float(self.settings.bg_ring_outer_x),
-            outer_y=float(self.settings.bg_ring_outer_y),
+            inner_center=roi_sel.center,
+            outer_center=roi_sel.center,
+            inner_x=float(roi_sel.width + 2 * self.settings.bg_ring_inner_x),
+            inner_y=float(roi_sel.height + 2 * self.settings.bg_ring_inner_y),
+            outer_x=float(roi_sel.width + 2 * self.settings.bg_ring_outer_x),
+            outer_y=float(roi_sel.height + 2 * self.settings.bg_ring_outer_y),
             angle_deg=float(roi_sel.angle_deg),
         )
 
@@ -590,7 +621,9 @@ class ROIProcessor:
 
         if bg_sel.outer_x <= bg_sel.inner_x:
             bg_sel = BackgroundSelection(
-                center=bg_sel.center,
+                center=bg_sel.outer_center,
+                inner_center=bg_sel.inner_center,
+                outer_center=bg_sel.outer_center,
                 inner_x=bg_sel.inner_x,
                 inner_y=bg_sel.inner_y,
                 outer_x=bg_sel.inner_x + 1,
@@ -599,7 +632,9 @@ class ROIProcessor:
             )
         if bg_sel.outer_y <= bg_sel.inner_y:
             bg_sel = BackgroundSelection(
-                center=bg_sel.center,
+                center=bg_sel.outer_center,
+                inner_center=bg_sel.inner_center,
+                outer_center=bg_sel.outer_center,
                 inner_x=bg_sel.inner_x,
                 inner_y=bg_sel.inner_y,
                 outer_x=bg_sel.outer_x,
@@ -631,15 +666,15 @@ class ROIProcessor:
             roi_sel.center, (H, W), roi_sel.width, roi_sel.height, roi_sel.angle_deg
         )
         bg_mask = self.manual.create_background_roi(
-            bg_sel.center,
+            bg_sel.outer_center,
             (H, W),
-            roi_sel.width,
-            roi_sel.height,
-            bg_sel.angle_deg,
-            inner_offset_x=bg_sel.inner_x,
-            inner_offset_y=bg_sel.inner_y,
-            outer_offset_x=bg_sel.outer_x,
-            outer_offset_y=bg_sel.outer_y,
+            roi_angle=bg_sel.angle_deg,
+            inner_center=bg_sel.inner_center,
+            outer_center=bg_sel.outer_center,
+            inner_width=bg_sel.inner_x,
+            inner_height=bg_sel.inner_y,
+            outer_width=bg_sel.outer_x,
+            outer_height=bg_sel.outer_y,
             exclude_mask=roi_mask,
         )
 
@@ -704,8 +739,12 @@ class ROIProcessor:
             width=float(roi_sel.width),
             height=float(roi_sel.height),
             angle_deg=float(roi_sel.angle_deg),
-            bg_center_x=bg_sel.center[0],
-            bg_center_y=bg_sel.center[1],
+            bg_center_x=bg_sel.outer_center[0],
+            bg_center_y=bg_sel.outer_center[1],
+            bg_inner_center_x=bg_sel.inner_center[0],
+            bg_inner_center_y=bg_sel.inner_center[1],
+            bg_outer_center_x=bg_sel.outer_center[0],
+            bg_outer_center_y=bg_sel.outer_center[1],
             bg_inner_x=float(bg_sel.inner_x),
             bg_inner_y=float(bg_sel.inner_y),
             bg_outer_x=float(bg_sel.outer_x),
@@ -790,22 +829,23 @@ class ROIProcessor:
             (result.center_x, result.center_y), result.width, result.height, result.angle_deg
         )
         bg_outer_box = self.manual.get_rotated_box(
-            (result.bg_center_x, result.bg_center_y),
-            result.width + 2 * result.bg_outer_x,
-            result.height + 2 * result.bg_outer_y,
+            (result.bg_outer_center_x, result.bg_outer_center_y),
+            result.bg_outer_x,
+            result.bg_outer_y,
             result.bg_angle_deg,
         )
         bg_inner_box = self.manual.get_rotated_box(
-            (result.bg_center_x, result.bg_center_y),
-            result.width + 2 * result.bg_inner_x,
-            result.height + 2 * result.bg_inner_y,
+            (result.bg_inner_center_x, result.bg_inner_center_y),
+            result.bg_inner_x,
+            result.bg_inner_y,
             result.bg_angle_deg,
         )
         ax.add_patch(plt.Polygon(bg_outer_box, closed=True, fill=False, edgecolor="orange", linewidth=2))
         ax.add_patch(plt.Polygon(bg_inner_box, closed=True, fill=False, edgecolor="orange", linewidth=1.5, linestyle="--"))
         ax.add_patch(plt.Polygon(roi_box, closed=True, fill=False, edgecolor="red", linewidth=2))
         ax.plot(result.center_x, result.center_y, "r+", markersize=12, markeredgewidth=2)
-        ax.plot(result.bg_center_x, result.bg_center_y, "yx", markersize=10, markeredgewidth=2)
+        ax.plot(result.bg_inner_center_x, result.bg_inner_center_y, "yx", markersize=10, markeredgewidth=2)
+        ax.plot(result.bg_outer_center_x, result.bg_outer_center_y, "yx", markersize=10, markeredgewidth=2)
         ax.set_title("RGB 伪彩 + ROI/BG")
         ax.axis("off")
 
@@ -910,7 +950,9 @@ class ROIProcessor:
         csv_path = output_dir / "roi_features.csv"
         with open(csv_path, "w", encoding="utf-8") as f:
             f.write(
-                "filename,concentration,center_x,center_y,width,height,angle_deg,bg_center_x,bg_center_y,bg_inner_x,bg_inner_y,bg_outer_x,bg_outer_y,bg_angle_deg,area,"
+                "filename,concentration,center_x,center_y,width,height,angle_deg,bg_center_x,bg_center_y,"
+                "bg_inner_center_x,bg_inner_center_y,bg_outer_center_x,bg_outer_center_y,"
+                "bg_inner_x,bg_inner_y,bg_outer_x,bg_outer_y,bg_angle_deg,area,"
             )
             f.write("R_mean,G1_mean,G2_mean,B_mean,")
             f.write("R_bg,G1_bg,G2_bg,B_bg,")
@@ -921,7 +963,9 @@ class ROIProcessor:
                 concentration_text = "" if r.concentration is None else f"{r.concentration:.8g}"
                 f.write(
                     f"{r.filename},{concentration_text},{r.center_x:.2f},{r.center_y:.2f},{r.width:.2f},{r.height:.2f},{r.angle_deg:.2f},"
-                    f"{r.bg_center_x:.2f},{r.bg_center_y:.2f},{r.bg_inner_x:.2f},{r.bg_inner_y:.2f},{r.bg_outer_x:.2f},{r.bg_outer_y:.2f},{r.bg_angle_deg:.2f},{r.area},"
+                    f"{r.bg_center_x:.2f},{r.bg_center_y:.2f},"
+                    f"{r.bg_inner_center_x:.2f},{r.bg_inner_center_y:.2f},{r.bg_outer_center_x:.2f},{r.bg_outer_center_y:.2f},"
+                    f"{r.bg_inner_x:.2f},{r.bg_inner_y:.2f},{r.bg_outer_x:.2f},{r.bg_outer_y:.2f},{r.bg_angle_deg:.2f},{r.area},"
                 )
                 f.write(
                     f"{r.R_mean:.2f},{r.G1_mean:.2f},{r.G2_mean:.2f},{r.B_mean:.2f},"
@@ -1011,7 +1055,9 @@ class ROIProcessor:
                     angle_deg=result.angle_deg,
                 )
                 bg_sel = BackgroundSelection(
-                    center=(result.bg_center_x, result.bg_center_y),
+                    center=(result.bg_outer_center_x, result.bg_outer_center_y),
+                    inner_center=(result.bg_inner_center_x, result.bg_inner_center_y),
+                    outer_center=(result.bg_outer_center_x, result.bg_outer_center_y),
                     inner_x=result.bg_inner_x,
                     inner_y=result.bg_inner_y,
                     outer_x=result.bg_outer_x,
@@ -1022,15 +1068,15 @@ class ROIProcessor:
                     roi_sel.center, (H, W), roi_sel.width, roi_sel.height, roi_sel.angle_deg
                 )
                 bg_mask = self.manual.create_background_roi(
-                    bg_sel.center,
+                    bg_sel.outer_center,
                     (H, W),
-                    roi_sel.width,
-                    roi_sel.height,
-                    bg_sel.angle_deg,
-                    inner_offset_x=bg_sel.inner_x,
-                    inner_offset_y=bg_sel.inner_y,
-                    outer_offset_x=bg_sel.outer_x,
-                    outer_offset_y=bg_sel.outer_y,
+                    roi_angle=bg_sel.angle_deg,
+                    inner_center=bg_sel.inner_center,
+                    outer_center=bg_sel.outer_center,
+                    inner_width=bg_sel.inner_x,
+                    inner_height=bg_sel.inner_y,
+                    outer_width=bg_sel.outer_x,
+                    outer_height=bg_sel.outer_y,
                     exclude_mask=roi_mask,
                 )
                 

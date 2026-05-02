@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-import math
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
@@ -29,6 +28,8 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QGroupBox,
     QPushButton,
+    QRadioButton,
+    QButtonGroup,
     QSizePolicy,
     QScrollArea,
     QGridLayout,
@@ -70,7 +71,7 @@ class ROISelection:
 
 @dataclass
 class BackgroundSelection:
-    """Represents the background ring region."""
+    """Represents the independent background inner and outer rectangles."""
 
     center: Tuple[float, float]
     inner_x: float
@@ -78,10 +79,21 @@ class BackgroundSelection:
     outer_x: float
     outer_y: float
     angle_deg: float
+    inner_center: Optional[Tuple[float, float]] = None
+    outer_center: Optional[Tuple[float, float]] = None
+
+    def __post_init__(self) -> None:
+        if self.inner_center is None:
+            self.inner_center = self.center
+        if self.outer_center is None:
+            self.outer_center = self.center
+        self.center = self.outer_center
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "center": [float(self.center[0]), float(self.center[1])],
+            "center": [float(self.outer_center[0]), float(self.outer_center[1])],
+            "inner_center": [float(self.inner_center[0]), float(self.inner_center[1])],
+            "outer_center": [float(self.outer_center[0]), float(self.outer_center[1])],
             "inner_x": float(self.inner_x),
             "inner_y": float(self.inner_y),
             "outer_x": float(self.outer_x),
@@ -90,16 +102,45 @@ class BackgroundSelection:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "BackgroundSelection":
+    def from_dict(cls, data: Dict[str, Any], roi: Optional[ROISelection] = None) -> "BackgroundSelection":
         center = data.get("center")
         if not isinstance(center, (list, tuple)) or len(center) != 2:
             raise ValueError("Invalid BG center in persisted data")
+        inner_center = data.get("inner_center")
+        outer_center = data.get("outer_center")
+        has_independent_boxes = (
+            isinstance(inner_center, (list, tuple))
+            and len(inner_center) == 2
+            and isinstance(outer_center, (list, tuple))
+            and len(outer_center) == 2
+        )
+        inner_x = float(data["inner_x"])
+        inner_y = float(data["inner_y"])
+        outer_x = float(data["outer_x"])
+        outer_y = float(data["outer_y"])
+        if roi is not None and not has_independent_boxes:
+            inner_x = float(roi.width) + 2.0 * inner_x
+            inner_y = float(roi.height) + 2.0 * inner_y
+            outer_x = float(roi.width) + 2.0 * outer_x
+            outer_y = float(roi.height) + 2.0 * outer_y
+        inner_center_tuple = (
+            (float(inner_center[0]), float(inner_center[1]))
+            if has_independent_boxes
+            else (float(center[0]), float(center[1]))
+        )
+        outer_center_tuple = (
+            (float(outer_center[0]), float(outer_center[1]))
+            if has_independent_boxes
+            else (float(center[0]), float(center[1]))
+        )
         return cls(
-            center=(float(center[0]), float(center[1])),
-            inner_x=float(data["inner_x"]),
-            inner_y=float(data["inner_y"]),
-            outer_x=float(data["outer_x"]),
-            outer_y=float(data["outer_y"]),
+            center=outer_center_tuple,
+            inner_center=inner_center_tuple,
+            outer_center=outer_center_tuple,
+            inner_x=inner_x,
+            inner_y=inner_y,
+            outer_x=outer_x,
+            outer_y=outer_y,
             angle_deg=float(data.get("angle_deg", 0.0)),
         )
 
@@ -149,7 +190,7 @@ class ImageWidget(QWidget):
         
         self.roi: Optional[ROISelection] = None
         self.bg: Optional[BackgroundSelection] = None
-        self.active_region = "roi"  # "roi" or "bg"
+        self.active_region = "roi"  # "roi", "bg_inner", or "bg_outer"
 
         # Zoom/Pan state
         self.scale_factor = 1.0
@@ -219,13 +260,15 @@ class ImageWidget(QWidget):
             painter.drawRect(rect)
 
     def _draw_overlays(self, painter: QPainter):
-        # ROI Pen
         roi_pen = QPen(Qt.red)
-        roi_pen.setWidthF(2.0 / self.scale_factor)
-        
-        # BG Pen
-        bg_pen = QPen(QColor(255, 165, 0)) # Orange
-        bg_pen.setWidthF(2.0 / self.scale_factor)
+        roi_pen.setWidthF((3.0 if self.active_region == "roi" else 2.0) / self.scale_factor)
+
+        bg_outer_pen = QPen(QColor(255, 140, 0))
+        bg_outer_pen.setWidthF((3.0 if self.active_region == "bg_outer" else 2.0) / self.scale_factor)
+
+        bg_inner_pen = QPen(QColor(255, 215, 0))
+        bg_inner_pen.setWidthF((3.0 if self.active_region == "bg_inner" else 2.0) / self.scale_factor)
+        bg_inner_pen.setStyle(Qt.DashLine)
 
         # Draw ROI
         roi_points = self.manual_tools.get_rotated_box(
@@ -240,26 +283,26 @@ class ImageWidget(QWidget):
 
         # Draw BG Outer
         bg_outer_points = self.manual_tools.get_rotated_box(
-            self.bg.center,
-            self.roi.width + 2 * self.bg.outer_x,
-            self.roi.height + 2 * self.bg.outer_y,
+            self.bg.outer_center,
+            self.bg.outer_x,
+            self.bg.outer_y,
             self.bg.angle_deg,
         )
-        painter.setPen(bg_pen)
+        painter.setPen(bg_outer_pen)
         painter.drawPolygon(QPolygonF([QPointF(*p) for p in bg_outer_points]))
 
         # Draw BG Inner
         bg_inner_points = self.manual_tools.get_rotated_box(
-            self.bg.center,
-            self.roi.width + 2 * self.bg.inner_x,
-            self.roi.height + 2 * self.bg.inner_y,
+            self.bg.inner_center,
+            self.bg.inner_x,
+            self.bg.inner_y,
             self.bg.angle_deg,
         )
-        painter.setPen(bg_pen)
+        painter.setPen(bg_inner_pen)
         painter.drawPolygon(QPolygonF([QPointF(*p) for p in bg_inner_points]))
         
-        # Draw BG Center
-        painter.drawPoint(QPointF(*self.bg.center))
+        painter.drawPoint(QPointF(*self.bg.inner_center))
+        painter.drawPoint(QPointF(*self.bg.outer_center))
 
     def _map_to_image(self, pos: QPointF) -> QPointF:
         """Map widget coordinates to image coordinates."""
@@ -289,7 +332,6 @@ class ImageWidget(QWidget):
             self.update()
 
     def _finalize_drag(self, start: QPointF, end: QPointF):
-        # Calculate new ROI from drag
         width = abs(end.x() - start.x())
         height = abs(end.y() - start.y())
         cx = (start.x() + end.x()) / 2
@@ -297,36 +339,81 @@ class ImageWidget(QWidget):
         
         if width < 5 or height < 5:
             return  # Ignoring accidental clicks
-        
-        # Update ROI
-        new_roi = ROISelection(
-            center=(cx, cy),
-            width=width,
-            height=height,
-            angle_deg=self.roi.angle_deg
-        )
-        
-        # Update BG center if BG is active, allowing split centers
-        new_bg_center = new_roi.center if self.active_region == "roi" else self.bg.center
-        if self.active_region == "bg":
-            # If we are dragging while BG is active, we don't move BG center by drag usually,
-            # but users might expect to draw a new BG region?
-            # For simplicity, drag always defines the main ROI box.
-            pass
-        else:
-             new_bg_center = new_roi.center
 
-        self.roi_updated.emit({"roi": new_roi, "bg_center": new_bg_center, "active_region": self.active_region})
+        if self.active_region == "roi":
+            self.roi_updated.emit(
+                {
+                    "roi": ROISelection(
+                        center=(cx, cy),
+                        width=width,
+                        height=height,
+                        angle_deg=self.roi.angle_deg,
+                    )
+                }
+            )
+            return
+
+        if self.active_region == "bg_inner":
+            self.roi_updated.emit(
+                {
+                    "bg": BackgroundSelection(
+                        center=self.bg.outer_center,
+                        inner_center=(cx, cy),
+                        outer_center=self.bg.outer_center,
+                        inner_x=width,
+                        inner_y=height,
+                        outer_x=self.bg.outer_x,
+                        outer_y=self.bg.outer_y,
+                        angle_deg=self.bg.angle_deg,
+                    )
+                }
+            )
+            return
+
+        if self.active_region == "bg_outer":
+            self.roi_updated.emit(
+                {
+                    "bg": BackgroundSelection(
+                        center=(cx, cy),
+                        inner_center=self.bg.inner_center,
+                        outer_center=(cx, cy),
+                        inner_x=self.bg.inner_x,
+                        inner_y=self.bg.inner_y,
+                        outer_x=width,
+                        outer_y=height,
+                        angle_deg=self.bg.angle_deg,
+                    )
+                }
+            )
 
 
 class ControlsWidget(QWidget):
     """Side panel for controls."""
     
     values_changed = Signal(object) # Emit full state or partial
+    active_region_changed = Signal(str)
     
     def __init__(self, settings: ROISettings, parent=None):
         super().__init__(parent)
+        self._updating_controls = False
         self.layout = QVBoxLayout(self)
+
+        self.mode_group = QGroupBox("Mouse Drag Target")
+        mode_layout = QVBoxLayout()
+        self.radio_roi = QRadioButton("ROI")
+        self.radio_bg_inner = QRadioButton("BG inner")
+        self.radio_bg_outer = QRadioButton("BG outer")
+        self.radio_roi.setChecked(True)
+        self.mode_buttons = QButtonGroup(self)
+        self.mode_buttons.setExclusive(True)
+        self.mode_buttons.addButton(self.radio_roi)
+        self.mode_buttons.addButton(self.radio_bg_inner)
+        self.mode_buttons.addButton(self.radio_bg_outer)
+        mode_layout.addWidget(self.radio_roi)
+        mode_layout.addWidget(self.radio_bg_inner)
+        mode_layout.addWidget(self.radio_bg_outer)
+        self.mode_group.setLayout(mode_layout)
+        self.layout.addWidget(self.mode_group)
         
         # --- ROI Group ---
         self.roi_group = QGroupBox("ROI Settings")
@@ -356,29 +443,34 @@ class ControlsWidget(QWidget):
         self.bg_group = QGroupBox("Background Settings")
         bg_layout = QGridLayout()
         
-        self.spin_bg_cx = self._create_spinbox(0, 10000, "BG Center X")
-        self.spin_bg_cy = self._create_spinbox(0, 10000, "BG Center Y")
-        
-        self.spin_bg_in_x = self._create_spinbox(0, 1000, "Inner X Offset")
-        self.spin_bg_in_y = self._create_spinbox(0, 1000, "Inner Y Offset")
-        self.spin_bg_out_x = self._create_spinbox(0, 1000, "Outer X Offset")
-        self.spin_bg_out_y = self._create_spinbox(0, 1000, "Outer Y Offset")
+        self.spin_bg_inner_cx = self._create_spinbox(0, 10000, "BG inner center X")
+        self.spin_bg_inner_cy = self._create_spinbox(0, 10000, "BG inner center Y")
+        self.spin_bg_in_x = self._create_spinbox(1, 5000, "BG inner width")
+        self.spin_bg_in_y = self._create_spinbox(1, 5000, "BG inner height")
+        self.spin_bg_outer_cx = self._create_spinbox(0, 10000, "BG outer center X")
+        self.spin_bg_outer_cy = self._create_spinbox(0, 10000, "BG outer center Y")
+        self.spin_bg_out_x = self._create_spinbox(1, 5000, "BG outer width")
+        self.spin_bg_out_y = self._create_spinbox(1, 5000, "BG outer height")
 
-        bg_layout.addWidget(QLabel("Center X:"), 0, 0)
-        bg_layout.addWidget(self.spin_bg_cx, 0, 1)
-        bg_layout.addWidget(QLabel("Center Y:"), 1, 0)
-        bg_layout.addWidget(self.spin_bg_cy, 1, 1)
-        bg_layout.addWidget(QLabel("Inner X:"), 2, 0)
+        bg_layout.addWidget(QLabel("Inner Cx:"), 0, 0)
+        bg_layout.addWidget(self.spin_bg_inner_cx, 0, 1)
+        bg_layout.addWidget(QLabel("Inner Cy:"), 1, 0)
+        bg_layout.addWidget(self.spin_bg_inner_cy, 1, 1)
+        bg_layout.addWidget(QLabel("Inner W:"), 2, 0)
         bg_layout.addWidget(self.spin_bg_in_x, 2, 1)
-        bg_layout.addWidget(QLabel("Inner Y:"), 3, 0)
+        bg_layout.addWidget(QLabel("Inner H:"), 3, 0)
         bg_layout.addWidget(self.spin_bg_in_y, 3, 1)
-        bg_layout.addWidget(QLabel("Outer X:"), 4, 0)
-        bg_layout.addWidget(self.spin_bg_out_x, 4, 1)
-        bg_layout.addWidget(QLabel("Outer Y:"), 5, 0)
-        bg_layout.addWidget(self.spin_bg_out_y, 5, 1)
+        bg_layout.addWidget(QLabel("Outer Cx:"), 4, 0)
+        bg_layout.addWidget(self.spin_bg_outer_cx, 4, 1)
+        bg_layout.addWidget(QLabel("Outer Cy:"), 5, 0)
+        bg_layout.addWidget(self.spin_bg_outer_cy, 5, 1)
+        bg_layout.addWidget(QLabel("Outer W:"), 6, 0)
+        bg_layout.addWidget(self.spin_bg_out_x, 6, 1)
+        bg_layout.addWidget(QLabel("Outer H:"), 7, 0)
+        bg_layout.addWidget(self.spin_bg_out_y, 7, 1)
         
-        self.btn_align_bg = QPushButton("Align BG to ROI Center")
-        bg_layout.addWidget(self.btn_align_bg, 6, 0, 1, 2)
+        self.btn_align_bg = QPushButton("Align BG Boxes to ROI Center")
+        bg_layout.addWidget(self.btn_align_bg, 8, 0, 1, 2)
         
         self.bg_group.setLayout(bg_layout)
         self.layout.addWidget(self.bg_group)
@@ -394,10 +486,22 @@ class ControlsWidget(QWidget):
             spin.valueChanged.connect(self._on_roi_changed)
         self.spin_roi_a.valueChanged.connect(self._on_roi_changed)
         
-        for spin in [self.spin_bg_cx, self.spin_bg_cy, self.spin_bg_in_x, self.spin_bg_in_y, self.spin_bg_out_x, self.spin_bg_out_y]:
+        for spin in [
+            self.spin_bg_inner_cx,
+            self.spin_bg_inner_cy,
+            self.spin_bg_in_x,
+            self.spin_bg_in_y,
+            self.spin_bg_outer_cx,
+            self.spin_bg_outer_cy,
+            self.spin_bg_out_x,
+            self.spin_bg_out_y,
+        ]:
             spin.valueChanged.connect(self._on_bg_changed)
             
         self.btn_align_bg.clicked.connect(self._on_align_bg)
+        self.radio_roi.toggled.connect(self._on_mode_changed)
+        self.radio_bg_inner.toggled.connect(self._on_mode_changed)
+        self.radio_bg_outer.toggled.connect(self._on_mode_changed)
 
     def _create_spinbox(self, min_val, max_val, tooltip):
         sb = QSpinBox()
@@ -413,6 +517,7 @@ class ControlsWidget(QWidget):
         return sb
 
     def update_from_selection(self, roi: ROISelection, bg: BackgroundSelection):
+        self._updating_controls = True
         self.blockSignals(True)
         self.spin_roi_cx.setValue(int(roi.center[0]))
         self.spin_roi_cy.setValue(int(roi.center[1]))
@@ -420,15 +525,30 @@ class ControlsWidget(QWidget):
         self.spin_roi_h.setValue(int(roi.height))
         self.spin_roi_a.setValue(roi.angle_deg)
         
-        self.spin_bg_cx.setValue(int(bg.center[0]))
-        self.spin_bg_cy.setValue(int(bg.center[1]))
+        self.spin_bg_inner_cx.setValue(int(bg.inner_center[0]))
+        self.spin_bg_inner_cy.setValue(int(bg.inner_center[1]))
         self.spin_bg_in_x.setValue(int(bg.inner_x))
         self.spin_bg_in_y.setValue(int(bg.inner_y))
+        self.spin_bg_outer_cx.setValue(int(bg.outer_center[0]))
+        self.spin_bg_outer_cy.setValue(int(bg.outer_center[1]))
         self.spin_bg_out_x.setValue(int(bg.outer_x))
         self.spin_bg_out_y.setValue(int(bg.outer_y))
         self.blockSignals(False)
+        self._updating_controls = False
+
+    def set_active_region(self, region: str):
+        self._updating_controls = True
+        if region == "roi":
+            self.radio_roi.setChecked(True)
+        elif region == "bg_inner":
+            self.radio_bg_inner.setChecked(True)
+        elif region == "bg_outer":
+            self.radio_bg_outer.setChecked(True)
+        self._updating_controls = False
 
     def _on_roi_changed(self):
+        if self._updating_controls:
+            return
         roi = ROISelection(
             center=(self.spin_roi_cx.value(), self.spin_roi_cy.value()),
             width=self.spin_roi_w.value(),
@@ -438,20 +558,35 @@ class ControlsWidget(QWidget):
         self.values_changed.emit({"roi": roi})
 
     def _on_bg_changed(self):
+        if self._updating_controls:
+            return
         bg = BackgroundSelection(
-            center=(self.spin_bg_cx.value(), self.spin_bg_cy.value()),
+            center=(self.spin_bg_outer_cx.value(), self.spin_bg_outer_cy.value()),
+            inner_center=(self.spin_bg_inner_cx.value(), self.spin_bg_inner_cy.value()),
+            outer_center=(self.spin_bg_outer_cx.value(), self.spin_bg_outer_cy.value()),
             inner_x=self.spin_bg_in_x.value(),
             inner_y=self.spin_bg_in_y.value(),
             outer_x=self.spin_bg_out_x.value(),
             outer_y=self.spin_bg_out_y.value(),
-            # Usually BG angle is same as ROI, but if we want to allow decoupled angle we could add control
             angle_deg=self.spin_roi_a.value() 
         )
         self.values_changed.emit({"bg": bg})
 
     def _on_align_bg(self):
-        self.spin_bg_cx.setValue(self.spin_roi_cx.value())
-        self.spin_bg_cy.setValue(self.spin_roi_cy.value())
+        self.spin_bg_inner_cx.setValue(self.spin_roi_cx.value())
+        self.spin_bg_inner_cy.setValue(self.spin_roi_cy.value())
+        self.spin_bg_outer_cx.setValue(self.spin_roi_cx.value())
+        self.spin_bg_outer_cy.setValue(self.spin_roi_cy.value())
+
+    def _on_mode_changed(self):
+        if self._updating_controls:
+            return
+        if self.radio_roi.isChecked():
+            self.active_region_changed.emit("roi")
+        elif self.radio_bg_inner.isChecked():
+            self.active_region_changed.emit("bg_inner")
+        elif self.radio_bg_outer.isChecked():
+            self.active_region_changed.emit("bg_outer")
 
 
 class ROISelectorWindow(QMainWindow):
@@ -480,10 +615,12 @@ class ROISelectorWindow(QMainWindow):
         )
         default_bg = BackgroundSelection(
             center=default_roi.center,
-            inner_x=float(settings.bg_ring_inner_x),
-            inner_y=float(settings.bg_ring_inner_y),
-            outer_x=float(settings.bg_ring_outer_x),
-            outer_y=float(settings.bg_ring_outer_y),
+            inner_center=default_roi.center,
+            outer_center=default_roi.center,
+            inner_x=float(default_roi.width + 2 * settings.bg_ring_inner_x),
+            inner_y=float(default_roi.height + 2 * settings.bg_ring_inner_y),
+            outer_x=float(default_roi.width + 2 * settings.bg_ring_outer_x),
+            outer_y=float(default_roi.height + 2 * settings.bg_ring_outer_y),
             angle_deg=float(settings.roi_angle_deg),
         )
         
@@ -519,10 +656,11 @@ class ROISelectorWindow(QMainWindow):
         # Connect Signals
         self.canvas.roi_updated.connect(self._on_canvas_interaction)
         self.controls.values_changed.connect(self._on_controls_interaction)
+        self.controls.active_region_changed.connect(self._set_active_region)
         self.controls.btn_confirm.clicked.connect(self._confirm_selection)
         
-        self.active_region_mode = "roi" # Used for keyboard shortcuts
-        self.canvas.set_active_region(self.active_region_mode)
+        self.active_region_mode = "roi"
+        self._set_active_region(self.active_region_mode)
         
         # Install Event Filter to hijack navigation keys from SpinBoxes
         self.installEventFilter(self)
@@ -544,100 +682,44 @@ class ROISelectorWindow(QMainWindow):
         return super().eventFilter(obj, event)
 
     def _on_canvas_interaction(self, data):
-        # Data contains new roi, and potentially new bg center
         if "roi" in data:
             self.roi = data["roi"]
-        if "bg_center" in data:
-            old_bg = self.bg
-            self.bg = BackgroundSelection(
-                center=data["bg_center"],
-                inner_x=old_bg.inner_x,
-                inner_y=old_bg.inner_y,
-                outer_x=old_bg.outer_x,
-                outer_y=old_bg.outer_y,
-                angle_deg=old_bg.angle_deg
-            )
-            # Ensure ROI angle updates BG
-            self.bg.angle_deg = self.roi.angle_deg
+        if "bg" in data:
+            self.bg = data["bg"]
+        self.bg.angle_deg = self.roi.angle_deg
 
         self.canvas.set_data(self.roi, self.bg)
         self.controls.update_from_selection(self.roi, self.bg)
 
     def _on_controls_interaction(self, data):
-        # Handle logic for anchored resizing if parameters changed via spinbox
-        # However, spinbox interaction is absolute. We need to detect delta.
-        # This function receives the *new* ROI/BG object constructed from spinbox values.
-        # It's easier to just apply them directly.
-        # Use helper for anchored resizing only if needed.
-        # But wait, user requested "In adjusting roi and bg ring" -> likely meaning all adjustments?
-        # If user types in a number, do they expect the box to grow from center or corner?
-        # Usually from center is standard for spinboxes unless specified. 
-        # But for consistency, let's try to apply the anchor logic here too if we can transform the event.
-        # But we receive the final object here. We need the old one to compute delta.
-        
-        # Current logic replaces self.roi / self.bg.
         if "roi" in data:
             new_roi = data["roi"]
-            # Detect dimension change
-            d_w = new_roi.width - self.roi.width
-            d_h = new_roi.height - self.roi.height
-            d_a = new_roi.angle_deg - self.roi.angle_deg
-            
-            # If size changed, we might want to shift center to maintain anchor
-            # UNLESS the center was ALSO changed by the user (spinbox).
-            # If user edits Width, center remains same in 'new_roi' (as constructed in _on_roi_changed).
-            # So d_center is 0.
-            if abs(d_w) > 1e-4 or abs(d_h) > 1e-4:
-                 # Calculate shift needed to keep anchor
-                 # shift logic matches _handle_global_key logic
-                 angle_rad = math.radians(self.roi.angle_deg)
-                 # dx local = d_w / 2
-                 # dy local = -d_h / 2
-                 # Global shift:
-                 shift_x = (d_w / 2) * math.cos(angle_rad) + (d_h / 2) * math.sin(angle_rad)
-                 shift_y = (d_w / 2) * math.sin(angle_rad) - (d_h / 2) * math.cos(angle_rad)
-                 
-                 # Apply shift to the NEW center
-                 new_cx = new_roi.center[0] + shift_x
-                 new_cy = new_roi.center[1] + shift_y
-                 
-                 new_roi.center = (new_cx, new_cy)
-
             self.roi = new_roi
-            # Also sync angle to BG if needed
             self.bg = BackgroundSelection(
-                center=self.bg.center, # BG center kept separate unless aligned
+                center=self.bg.outer_center,
+                inner_center=self.bg.inner_center,
+                outer_center=self.bg.outer_center,
                 inner_x=self.bg.inner_x,
                 inner_y=self.bg.inner_y,
-                outer_x=self.bg.outer_x, # BG outer kept same
+                outer_x=self.bg.outer_x,
                 outer_y=self.bg.outer_y,
                 angle_deg=self.roi.angle_deg
             )
             
         if "bg" in data:
-            # Similar logic for BG?
-            new_bg = data["bg"]
-            # Check for Outer Offset change
-            d_ox = new_bg.outer_x - self.bg.outer_x
-            d_oy = new_bg.outer_y - self.bg.outer_y
-            
-            if abs(d_ox) > 1e-4 or abs(d_oy) > 1e-4:
-                 # For BG, width change = 2 * d_ox
-                 # So d_w_bg = 2 * d_ox
-                 angle_rad = math.radians(self.bg.angle_deg)
-                 # shift = (d_w_bg / 2) = d_ox
-                 shift_x = d_ox * math.cos(angle_rad) + d_oy * math.sin(angle_rad)
-                 shift_y = d_ox * math.sin(angle_rad) - d_oy * math.cos(angle_rad)
-                 
-                 new_cx = new_bg.center[0] + shift_x
-                 new_cy = new_bg.center[1] + shift_y
-                 new_bg.center = (new_cx, new_cy)
-
-            self.bg = new_bg
+            self.bg = data["bg"]
             
         self.canvas.set_data(self.roi, self.bg)
-        # Update spinboxes again to reflect the shifted center
         self.controls.update_from_selection(self.roi, self.bg)
+
+    def _set_active_region(self, region: str):
+        if region not in {"roi", "bg_inner", "bg_outer"}:
+            return
+        self.active_region_mode = region
+        self.canvas.set_active_region(region)
+        self.controls.set_active_region(region)
+        if self.statusBar():
+            self.statusBar().showMessage(f"Active Region: {region.upper()}", 2000)
 
     def _confirm_selection(self):
         self.result = (self.roi, self.bg)
@@ -662,11 +744,9 @@ class ROISelectorWindow(QMainWindow):
             self.close()
             return
         elif key == Qt.Key_Tab:
-            self.active_region_mode = "bg" if self.active_region_mode == "roi" else "roi"
-            self.canvas.set_active_region(self.active_region_mode)
-            # Ensure statusBar() is available (QMainWindow has it)
-            if self.statusBar():
-                self.statusBar().showMessage(f"Active Region: {self.active_region_mode.upper()}", 2000)
+            order = ["roi", "bg_inner", "bg_outer"]
+            next_idx = (order.index(self.active_region_mode) + 1) % len(order)
+            self._set_active_region(order[next_idx])
             return
 
         # --- Movement (WASD) ---
@@ -688,10 +768,24 @@ class ROISelectorWindow(QMainWindow):
                     height=self.roi.height,
                     angle_deg=self.roi.angle_deg
                 )
-            else:
-                new_center = (self.bg.center[0] + dx, self.bg.center[1] + dy)
+            elif self.active_region_mode == "bg_inner":
+                new_inner_center = (self.bg.inner_center[0] + dx, self.bg.inner_center[1] + dy)
                 self.bg = BackgroundSelection(
-                    center=new_center,
+                    center=self.bg.outer_center,
+                    inner_center=new_inner_center,
+                    outer_center=self.bg.outer_center,
+                    inner_x=self.bg.inner_x,
+                    inner_y=self.bg.inner_y,
+                    outer_x=self.bg.outer_x,
+                    outer_y=self.bg.outer_y,
+                    angle_deg=self.bg.angle_deg,
+                )
+            else:
+                new_outer_center = (self.bg.outer_center[0] + dx, self.bg.outer_center[1] + dy)
+                self.bg = BackgroundSelection(
+                    center=new_outer_center,
+                    inner_center=self.bg.inner_center,
+                    outer_center=new_outer_center,
                     inner_x=self.bg.inner_x,
                     inner_y=self.bg.inner_y,
                     outer_x=self.bg.outer_x,
@@ -717,97 +811,44 @@ class ROISelectorWindow(QMainWindow):
             self.controls.update_from_selection(self.roi, self.bg)
             return
 
-        # --- Resizing (Arrow Keys) ---
-        # If BG active -> Adjust Background Ring
-        # If ROI active -> Adjust ROI size (Optional extension over legacy)
         size_step = 1.0 if (modifiers & Qt.ShiftModifier) else float(self.settings.size_step)
         
-        # --- Resizing (Arrow Keys) ---
-        # If BG active -> Adjust Background Ring
-        # If ROI active -> Adjust ROI size (Optional extension over legacy)
-        size_step = 1.0 if (modifiers & Qt.ShiftModifier) else float(self.settings.size_step)
-        
-        if self.active_region_mode == "bg":
-            d_outer_x, d_outer_y = 0.0, 0.0
-            if key == Qt.Key_Up: d_outer_y = -size_step
-            elif key == Qt.Key_Down: d_outer_y = size_step
-            elif key == Qt.Key_Left: d_outer_x = -size_step
-            elif key == Qt.Key_Right: d_outer_x = size_step
-            
-            if d_outer_x != 0 or d_outer_y != 0:
-                new_outer_x = max(self.bg.inner_x + 1, self.bg.outer_x + d_outer_x)
-                new_outer_y = max(self.bg.inner_y + 1, self.bg.outer_y + d_outer_y)
-                
-                # Logic to shift center to keep Bottom/Left fixed
-                angle_rad = math.radians(self.bg.angle_deg)
-                
-                # For BG Ring Outer offset, d_outer adds to BOTH sides.
-                # Total Width change is 2 * d_outer_x.
-                # Center shift to keep left fixed = + (2*d_outer_x)/2 = + d_outer_x (along local X)
-                # Height change is 2 * d_outer_y.
-                # Center shift to keep bottom fixed = - (2*d_outer_y)/2 = - d_outer_y (along local Y)
-                
-                # Local Shift vector (dx_local, dy_local)
-                dx_local = d_outer_x
-                dy_local = -d_outer_y
-                
-                # Rotate to Global
-                shift_x = dx_local * math.cos(angle_rad) - dy_local * math.sin(angle_rad)
-                shift_y = dx_local * math.sin(angle_rad) + dy_local * math.cos(angle_rad)
-                
-                new_cx = self.bg.center[0] + shift_x
-                new_cy = self.bg.center[1] + shift_y
-                
-                self.bg.outer_x = new_outer_x
-                self.bg.outer_y = new_outer_y
-                self.bg.center = (new_cx, new_cy)
-                
-                self.canvas.set_data(self.roi, self.bg)
-                self.controls.update_from_selection(self.roi, self.bg)
-        
-        elif self.active_region_mode == "roi":
-            # Extension: Allow resizing ROI with arrows
-            d_w, d_h = 0.0, 0.0
-            if key == Qt.Key_Up: d_h = -size_step
-            elif key == Qt.Key_Down: d_h = size_step
-            elif key == Qt.Key_Left: d_w = -size_step
-            elif key == Qt.Key_Right: d_w = size_step
-            
-            if d_w != 0 or d_h != 0:
-                 new_w = max(10, self.roi.width + d_w)
-                 new_h = max(10, self.roi.height + d_h)
-                 
-                 # Logic to shift center to keep Bottom/Left fixed
-                 angle_rad = math.radians(self.roi.angle_deg)
-                 
-                 # Width change d_w. Keep Left Edge fixed.
-                 # Center moves Right by d_w / 2 (Local X)
-                 # Height change d_h. Keep Bottom Edge (max Y) fixed.
-                 # Center moves Up by d_h / 2 (Local Y is negative)
-                 
-                 dx_local = d_w / 2.0
-                 dy_local = -d_h / 2.0
-                 
-                 # Rotate to Global (Standard Rotation Matrix for CCW visual)
-                 # x' = x cos - y sin
-                 # y' = x sin + y cos
-                 shift_x = dx_local * math.cos(angle_rad) - dy_local * math.sin(angle_rad)
-                 shift_y = dx_local * math.sin(angle_rad) + dy_local * math.cos(angle_rad)
-                 
-                 new_cx = self.roi.center[0] + shift_x
-                 new_cy = self.roi.center[1] + shift_y
-                 
-                 self.roi.width = new_w
-                 self.roi.height = new_h
-                 self.roi.center = (new_cx, new_cy)
-                 
-                 self.canvas.set_data(self.roi, self.bg)
-                 self.controls.update_from_selection(self.roi, self.bg)
+        d_w, d_h = 0.0, 0.0
+        if key == Qt.Key_Up:
+            d_h = -size_step
+        elif key == Qt.Key_Down:
+            d_h = size_step
+        elif key == Qt.Key_Left:
+            d_w = -size_step
+        elif key == Qt.Key_Right:
+            d_w = size_step
+
+        if d_w != 0 or d_h != 0:
+            if self.active_region_mode == "roi":
+                self.roi.width = max(10, self.roi.width + d_w)
+                self.roi.height = max(10, self.roi.height + d_h)
+            elif self.active_region_mode == "bg_inner":
+                self.bg.inner_x = max(5, self.bg.inner_x + d_w)
+                self.bg.inner_y = max(5, self.bg.inner_y + d_h)
+            elif self.active_region_mode == "bg_outer":
+                self.bg.outer_x = max(5, self.bg.outer_x + d_w)
+                self.bg.outer_y = max(5, self.bg.outer_y + d_h)
+            self.canvas.set_data(self.roi, self.bg)
+            self.controls.update_from_selection(self.roi, self.bg)
+            return
 
         # --- Misc (B) ---
         if key == Qt.Key_B:
-            # Check for B key to align BG center
-            self.bg.center = self.roi.center
+            self.bg = BackgroundSelection(
+                center=self.roi.center,
+                inner_center=self.roi.center,
+                outer_center=self.roi.center,
+                inner_x=self.bg.inner_x,
+                inner_y=self.bg.inner_y,
+                outer_x=self.bg.outer_x,
+                outer_y=self.bg.outer_y,
+                angle_deg=self.bg.angle_deg,
+            )
             self.canvas.set_data(self.roi, self.bg)
             self.controls.update_from_selection(self.roi, self.bg)
 
