@@ -11,9 +11,9 @@ from typing import Any, Dict, Optional
 # Paths
 # ============================================
 PROJECT_DIR = Path(__file__).resolve().parent
-DATA_DIR = Path(os.environ.get("PIC_RGB_DATA_DIR", str(PROJECT_DIR / "../dataset/food"))).expanduser().resolve()
+DATA_DIR = Path(os.environ.get("PIC_RGB_DATA_DIR", str(PROJECT_DIR / "../dataset/xiaomi"))).expanduser().resolve()
 OUTPUT_DIR = Path(
-    os.environ.get("PIC_RGB_OUTPUT_DIR", str(PROJECT_DIR / "../dataset/food"))
+    os.environ.get("PIC_RGB_OUTPUT_DIR", str(PROJECT_DIR / "../dataset/xiaomi"))
 ).expanduser().resolve()
 
 # ============================================
@@ -85,7 +85,7 @@ VISUALIZATION_FIGSIZE = (15, 10)
 # When True, reuse cached ROI/BG selections for images with the same filename.
 # Sources: existing `roi_results/roi_results.json` (previous runs) + a lightweight cache file
 # for single-image runs. With reuse enabled and a match found, GUI is skipped.
-REUSE_LAST_SELECTION = False
+REUSE_LAST_SELECTION = True
 # JSON file to store per-image ROI/BG selections (used as a lightweight cache for single runs).
 SELECTION_CACHE_PATH = OUTPUT_DIR / "roi_selection_cache.json"
 

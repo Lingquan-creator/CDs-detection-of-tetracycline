@@ -1,43 +1,39 @@
 # concentration_EXP 算法说明
 
-本目录实现基于指数衰减模型的浓度反演。核心假设是 ROI 的背景扣除后光强会随浓度单调衰减，可用
+本目录实现基于指数衰减模型的浓度反演。核心思想是把 ROI 的背景扣除信号视为随浓度单调变化的响应，并对每个候选通道分别拟合：
 
 ```text
 I(C) = a * exp(b * C) + c
 ```
 
-拟合，其中 `C` 是浓度，`I` 是某个颜色通道的校正光强，约束上通常希望 `a > 0`、`b <= 0`。
+其中 `C` 是浓度，`I` 是曝光归一化后的通道信号。预测时使用选定通道把指数函数反解成浓度。
 
 ## 主要代码
 
-- `train.py`: 训练指数模型，并用训练集反演浓度。
-- `predict.py`: 加载已拟合参数，对新的 ROI 统计 CSV 反演浓度。
-- `config.py`: 默认输入输出路径与默认通道。
-- `physics_features.py`: 从文件名解析浓度/曝光时间，并提供共享特征工具。
+- `train.py`: 读取 ROI 统计 CSV，拟合指数模型，输出训练集反演结果和图。
+- `predict.py`: 读取已保存的指数参数，对新 ROI CSV 做浓度反演。
+- `config.py`: 默认输入输出路径、默认反演通道和拟合权重参数。
+- `physics_features.py`: 解析文件名中的浓度/曝光时间，并提供通用物理特征工具。
 
 ## 算法输入
 
-算法层面的输入是每个样品的：
+算法层面的输入是：
 
-- 已知浓度 `C`，从 `filename` 文件名解析得到，例如 `12.dng` 表示 12 uM。
-- ROI 与背景的 RAW 通道均值：`roi_R_mean`、`roi_G1_mean`、`roi_G2_mean`、`roi_B_mean` 以及对应的 `bg_*_mean`。
-- 可选曝光时间 `exposure_time`，或从文件名 `浓度_曝光时间.dng` 解析；缺失时使用默认曝光。
+- 样品真实浓度 `C`，从 `filename` 中解析，例如 `120.dng` 或 `chicken120.dng`。
+- ROI 与背景 RAW 通道均值：`roi_R_mean`, `roi_G1_mean`, `roi_G2_mean`, `roi_B_mean` 和对应 `bg_*_mean`。
+- 可选曝光时间 `exposure_time`，缺失时使用默认曝光。
+- 可选 ROI 分布参数：`roi_*_gauss_mu`, `roi_*_gamma_shape`, `roi_*_gamma_scale`。
 
 实际默认输入文件：
 
-- `pic_RGB/roi_results/roi_detailed_statistics.csv`
+- `dataset/food/roi_detailed_statistics.csv`
 
-这个 CSV 必须至少包含：
-
-- `filename`
-- `roi_R_mean`, `roi_G1_mean`, `roi_B_mean`
-- `bg_R_mean`, `bg_G1_mean`, `bg_B_mean`
-- 如果使用双绿通道，还会使用 `roi_G2_mean`, `bg_G2_mean`
+批处理脚本 `OUTPUT/run_dataset_concentration_training.sh` 会递归查找 `dataset/**/roi_detailed_statistics.csv`，跳过 `dataset/food` 作为测试集，并把每个训练集的输出写到对应 `OUTPUT/<dataset>/...` 目录。
 
 ## 处理流程
 
-1. 读取 `roi_detailed_statistics.csv`。
-2. 从 `filename` 解析真实浓度 `conc_true`，丢弃无法解析浓度的行。
+1. 读取 ROI CSV，要求至少包含 `filename` 和 ROI/BG 均值列。
+2. 从 `filename` 提取真实浓度 `conc_true`，丢弃无法解析浓度的样品。
 3. 构造背景扣除通道：
 
    ```text
@@ -48,59 +44,60 @@ I(C) = a * exp(b * C) + c
    B_corr  = max(roi_B_mean  - bg_B_mean,  0)
    ```
 
-4. 对每个通道再做曝光归一化：
+4. 对每个强度通道做曝光归一化：
 
    ```text
-   channel_per_exp = channel_corr / exposure_time
+   channel_per_exp = channel / exposure_time
    ```
 
-5. 对 `R_corr`、`G1_corr`、`G2_corr`、`G_corr`、`B_corr` 分别拟合指数模型。拟合时使用 `scipy.optimize.curve_fit`，并用 `weight_eps` 让低浓度样品在拟合中有更高权重。
-6. 默认选定 `G1_corr` 通道，将指数模型反解为浓度：
+5. 如果 CSV 中存在 ROI 分布参数，还会追加变换通道：
 
    ```text
-   C_pred = ln((I - c) / a) / b
+   exp_roi_*_gauss_mu      = exp(roi_*_gauss_mu / 1000)
+   log_roi_*_gamma_shape   = log(max(roi_*_gamma_shape, eps))
+   sqrt_roi_*_gamma_scale  = sqrt(max(roi_*_gamma_scale, 0))
    ```
 
-   其中 `(I - c) / a` 会被裁剪到合法范围，避免 `log(0)` 或负数。
-7. 计算残差、R2、RMSE，并绘制通道拟合曲线和浓度预测图。
+   如果存在 `roi_*_gauss_shape`，代码会优先使用它；当前数据通常是 `gamma_shape`。
+
+6. 对所有候选通道分别拟合 `I(C) = a * exp(b*C) + c`。拟合使用 `scipy.optimize.curve_fit`，并用 `weight_eps` 提高低浓度样品权重。
+7. 默认使用 `G1_corr` 反演浓度：
+
+   ```text
+   C_pred = log((I - c) / a) / b
+   ```
+
+   反演前会裁剪 `(I - c) / a`，避免负数或 `log(0)`。
+8. 输出每个样品的预测浓度、残差、R2/RMSE，并绘制拟合图。
 
 ## 算法输出
 
 算法层面的输出是：
 
-- 每个通道的指数模型参数 `a`, `b`, `c`。
-- 每个样品的反演浓度 `conc_pred`。
-- 与真实浓度的误差 `residual`。
-- 拟合质量指标 `r2`, `rmse`。
+- 每个候选通道的指数参数 `a`, `b`, `c`。
+- 每个通道的拟合质量 `r2`, `rmse`。
+- 选定通道的反演浓度 `conc_pred` 和残差。
 
-实际默认输出文件位于 `concentration_EXP/exp_fit_output/`：
+实际默认输出目录：
 
-- `exp_fit_params.csv`: 每个通道的 `a`, `b`, `c`, `r2`, `rmse`。
-- `exp_fit_predictions.csv`: 每个通道的实测曝光归一化光强和模型拟合光强。
-- `roi_detailed_statistics_pred_concentration_exp.csv`: 选定通道反演出的浓度结果。
-- `exp_fit_evaluation.png`: 各通道指数拟合曲线和浓度反演效果图。
+- `concentration_EXP/exp_fit_output/`
+
+默认输出文件：
+
+- `exp_fit_params.csv`: 每个通道的指数参数和拟合指标。
+- `exp_fit_predictions.csv`: 各通道实测信号和拟合信号。
+- `<roi_csv_stem>_pred_concentration_exp.csv`: 选定通道反演浓度。
+- `exp_fit_evaluation.png`: 通道拟合曲线和浓度反演图。
+
+批处理训练时实际输出文件名由脚本指定，例如：
+
+- `OUTPUT/mate20x/exp_fit_params.csv`
+- `OUTPUT/mate20x/exp_concentration_predictions.csv`
+- `OUTPUT/mate20x/exp_fit_evaluation.png`
 
 ## 使用方式
 
-训练并反演默认 CSV：
-
 ```bash
 python concentration_EXP/train.py
-```
-
-指定输入和通道：
-
-```bash
-python concentration_EXP/train.py \
-  --roi-csv pic_RGB/roi_results/roi_detailed_statistics.csv \
-  --channel G_corr
-```
-
-用已保存参数预测新 CSV：
-
-```bash
-python concentration_EXP/predict.py \
-  --params concentration_EXP/exp_fit_output/exp_fit_params.csv \
-  --roi-csv pic_RGB/roi_results/roi_detailed_statistics.csv \
-  --channel G1_corr
+python concentration_EXP/predict.py --params concentration_EXP/exp_fit_output/exp_fit_params.csv --roi-csv dataset/food/roi_detailed_statistics.csv
 ```

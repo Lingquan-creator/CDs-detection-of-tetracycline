@@ -238,10 +238,12 @@ def main() -> None:
 
     g_mode = str(bundle["g_mode"])
     use_bg = bool(bundle["use_bg"])
+    dataset_use_bg = use_bg
     if use_bg and not has_background_columns(df, g_mode):
-        raise ValueError("Model expects background columns, but the input CSV does not contain them.")
+        print("WARNING: model expects bg_* columns, input CSV has none, fallback to non-bg features.")
+        dataset_use_bg = False
 
-    feature_df = build_feature_frame(df, g_mode=g_mode, use_bg=use_bg)
+    feature_df = build_feature_frame(df, g_mode=g_mode, use_bg=dataset_use_bg)
     expected_features = [str(name) for name in bundle["feature_names"]]
     model_features = select_model_features(feature_df, expected_features)
 

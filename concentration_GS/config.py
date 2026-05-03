@@ -15,7 +15,7 @@ from typing import Literal
 
 
 BASE_DIR = Path(__file__).resolve().parent
-ROI_STATS_PATH = BASE_DIR.parent / "pic_RGB" / "roi_results" / "roi_detailed_statistics.csv"
+ROI_STATS_PATH = BASE_DIR.parent / "dataset" / "food" / "roi_detailed_statistics.csv"
 OUTPUT_DIR = BASE_DIR / "amortized_output"
 
 MODEL_FILENAME = "amortized_posterior_model.pt"
@@ -30,8 +30,8 @@ PREDICT_GRID_SUFFIX = "_pred_concentration_gs_prob.csv"
 PREDICT_PLOT_SUFFIX = "_pred_concentration_gs.png"
 
 DEFAULT_G_MODE: Literal["g1", "avg"] = "avg"
-DEFAULT_USE_BG = "auto"  # auto -> use background columns when available
-DEFAULT_FEATURE_SET: Literal["full", "compact", "compact_exposure"] = "compact"
+DEFAULT_USE_BG = "true"
+DEFAULT_FEATURE_SET: Literal["full", "compact", "compact_exposure"] = "full"
 TARGET_EPS = 1e-6
 DEFAULT_CONFIDENCE = 0.90
 

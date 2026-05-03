@@ -4,7 +4,7 @@
 
 ## 主要代码
 
-- `convert_raw_to_dng.py`: RAW 尺寸推断、Bayer 数据解码、DNG 写入、元数据收集和 ROI 分析都在这个脚本中。
+- `convert_raw_to_dng.py`: RAW 文件收集、尺寸推断、Bayer 数据解码、DNG 写入、元数据收集、ROI 分析和输出校验。
 
 ## 算法输入
 
@@ -15,6 +15,7 @@
 - Bayer 排列，例如 `RGGB`, `GRBG`, `BGGR`, `GBRG`。
 - RAW 数据存储方式，例如直接平面或带行 padding 的格式。
 - DNG 元数据：相机 make/model、曝光时间、ISO、黑电平、白电平等。
+- 可选 ROI：`x, y, w, h`。
 
 实际默认输入：
 
@@ -23,9 +24,9 @@
 常用命令行参数：
 
 - `--input`: RAW 文件或目录。
-- `--output`: DNG 文件或输出目录。
+- `--output`: DNG 文件或输出目录，默认 `to_dng/output/`。
 - `--input-glob`: 批量匹配规则，默认 `*.raw`。
-- `--pattern`: Bayer pattern，默认 `BAYGRB`，会标准化为 DNG 支持的 pattern。
+- `--pattern`: Bayer pattern，默认会标准化为 DNG 支持的 pattern。
 - `--width`, `--height`: 手动指定尺寸。
 - `--conversion`: RAW 解码方式。
 - `--black-level`, `--white-level`: 写入 DNG 的黑白电平。
@@ -36,30 +37,21 @@
 1. 收集输入 RAW 文件。如果 `--input` 是目录，则按 `--input-glob` 批量处理。
 2. 将 RAW 文件读为 `uint8` 数组。
 3. 推断或读取图像尺寸：
-
    - 优先使用 `--width` 和 `--height`。
    - 否则根据字节数和常见宽高比推断。
-
 4. 根据 `--conversion` 将字节流解码成二维 Bayer 平面。
 5. 如果启用 ROI 模式：
-
    - 使用 `--roi x,y,w,h` 或交互式框选得到 ROI。
    - 裁剪 ROI 到图像范围内。
    - 计算 ROI 的 mean、std、min、max 等统计量。
    - 保存 ROI JSON。
-
 6. 如果不是 `--roi-only`，继续收集元数据：
-
    - 命令行参数。
    - 同名 sidecar JSON，例如 `.json`, `.meta.json`, `.metadata.json`。
    - 文件名中可能包含的曝光/ISO 信息。
-
-7. 使用 `tifffile` 写入 DNG：
-
+7. 使用 `tifffile` 写入未压缩 DNG：
    - 写入 RAW Bayer 平面。
    - 写入 CFA pattern、black level、white level、make/model、曝光等标签。
-   - 输出未压缩的最小 DNG。
-
 8. 可选用 `rawpy` 重新打开输出 DNG 做校验。
 
 ## 算法输出
@@ -73,8 +65,8 @@
 实际默认输出：
 
 - DNG 输出目录：`to_dng/output/`
-- 单文件转换时输出 `.dng`。
-- ROI 模式输出 JSON，默认跟随输入文件名生成。
+- 单文件转换时输出 `<input_stem>.dng`。
+- ROI 模式输出 `<input_stem>.roi.json`，或 `--roi-output` 指定的 JSON。
 
 ROI JSON 通常包含：
 
@@ -86,30 +78,8 @@ ROI JSON 通常包含：
 
 ## 使用方式
 
-批量转换默认目录：
-
 ```bash
 python to_dng/convert_raw_to_dng.py
-```
-
-指定单个 RAW：
-
-```bash
-python to_dng/convert_raw_to_dng.py \
-  --input sample.raw \
-  --output sample.dng \
-  --width 4000 \
-  --height 3000 \
-  --pattern GRBG
-```
-
-只做 ROI 统计，不写 DNG：
-
-```bash
-python to_dng/convert_raw_to_dng.py \
-  --input sample.raw \
-  --width 4000 \
-  --height 3000 \
-  --roi 100,100,200,200 \
-  --roi-only
+python to_dng/convert_raw_to_dng.py --input sample.raw --output sample.dng --width 4000 --height 3000 --pattern GRBG
+python to_dng/convert_raw_to_dng.py --input sample.raw --width 4000 --height 3000 --roi 100,100,200,200 --roi-only
 ```

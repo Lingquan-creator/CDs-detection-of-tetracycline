@@ -1,15 +1,15 @@
 # pic_RGB 算法说明
 
-本目录负责从 DNG/RAW 图像中选取样品 ROI 和背景区域，提取 R/G1/G2/B 四通道统计量，并生成后续浓度反演使用的 `roi_detailed_statistics.csv`。
+本目录负责从 DNG/RAW 图像中选取样品 ROI 和背景区域，提取 R/G1/G2/B 四通道统计量，并生成浓度反演使用的 CSV/NPY/JSON 文件。
 
 ## 主要代码
 
-- `roi_processor.py`: 主流程，批量读取 DNG、调用 GUI 选择 ROI/BG、计算统计量并保存结果。
-- `roi_gui.py`: 交互式 ROI 和背景环选择界面。
+- `roi_processor.py`: 主流程，批量读取 DNG，复用缓存或调用 GUI 选择 ROI/BG，计算统计量并保存结果。
+- `roi_gui.py`: 交互式 ROI、背景内框、背景外框选择界面。
 - `roi_manual.py`: 根据中心、宽高、角度生成旋转矩形 ROI mask 和背景环 mask。
-- `roi_distribution_features.py`: 计算强度分布特征，例如高斯/泊松/Gamma 拟合、矩、熵、FFT、MGF。
-- `roi_config.py`: 输入输出目录、ROI 尺寸、背景环尺寸、GUI 步长等配置。
-- `analyze_statistics.py`: 查看和分析详细统计 CSV 的示例脚本。
+- `roi_distribution_features.py`: 计算高斯/泊松/Gamma、矩、熵、FFT、MGF 等分布特征。
+- `roi_config.py`: 输入输出路径、默认 ROI 参数、缓存复用和可视化配置。
+- `analyze_statistics.py`: 查看和分析统计 CSV 的辅助脚本。
 
 ## 算法输入
 
@@ -17,21 +17,29 @@
 
 - 一张或多张 Bayer DNG 图像。
 - ROI 几何参数：中心、宽、高、旋转角。
-- 背景环几何参数：中心、内外扩展尺寸、旋转角。
-- 可选元数据：浓度、曝光时间、ISO、白电平、黑电平、显示增益等。
+- 背景内框和外框几何参数：各自中心、宽、高、旋转角。
+- 可选元数据：浓度、曝光时间、ISO、黑电平、白电平、显示增益等。
 
-实际默认输入：
+当前实际默认输入/输出路径来自 `roi_config.py`：
 
-- 图像目录：`pic_RGB/dataset2/`
-- 文件类型：`*.dng`
-- 可选目录元数据：输入图像同目录下的 `metadata.txt`
+- `DATA_DIR = dataset/xiaomi`
+- `OUTPUT_DIR = dataset/xiaomi`
+- `REUSE_LAST_SELECTION = True`
+- `SELECTION_CACHE_PATH = dataset/xiaomi/roi_selection_cache.json`
 
-默认路径可通过环境变量覆盖：
+路径可用环境变量覆盖：
 
 ```bash
 PIC_RGB_DATA_DIR=/path/to/dngs
 PIC_RGB_OUTPUT_DIR=/path/to/output
 ```
+
+常见实际输入文件：
+
+- `dataset/xiaomi/*.dng`
+- `dataset/mate3_2/*.dng`
+- `dataset/<name>/roi_selection_cache.json`
+- 可选 `dataset/<name>/metadata.txt`
 
 ## 处理流程
 
@@ -45,23 +53,16 @@ PIC_RGB_OUTPUT_DIR=/path/to/output
    B  = raw[1::2, 1::2]
    ```
 
-3. 从文件名解析浓度和曝光时间。支持类似：
-
-   ```text
-   12.dng
-   12_0.01.dng
-   12.1000.dng
-   ```
-
-4. 通过 GUI 或缓存确定 ROI 和背景环。ROI 是可旋转矩形，背景是扣除 ROI 后的空心矩形环。
-5. 为 ROI 和 BG 分别生成 mask。
-6. 对每个 RAW 通道计算统计量：
-
+3. 从文件名和目录元数据解析浓度、曝光时间、ISO 等信息。
+4. 确定 ROI/BG：
+   - 若缓存存在并启用 `REUSE_LAST_SELECTION`，直接复用缓存。
+   - 否则打开 GUI，由用户拖动选择当前激活框：ROI、BG inner 或 BG outer。
+5. 用 `roi_manual.py` 生成 ROI mask 和背景环 mask。背景环会排除 ROI 区域。
+6. 对 ROI 和 BG 分别计算四通道统计：
    - mean, var, std
    - median, p10, p50, p90
    - saturation_ratio
    - R/G, B/G, R/B, G1/G2 比值
-
 7. 计算背景扣除值：
 
    ```text
@@ -71,9 +72,8 @@ PIC_RGB_OUTPUT_DIR=/path/to/output
    B_corrected  = roi_B_mean  - bg_B_mean
    ```
 
-8. 可选计算显示 RGB：使用目录元数据中的 `R_gain`, `G_gain`, `B_gain`, `gamma`, `saturability` 对背景扣除值做显示变换。
-9. 计算 RAW/RGB 强度分布特征，用于更复杂的建模实验。
-10. 保存 JSON、CSV、NPY 和每张图的 ROI 可视化 PNG。
+8. 计算 RAW 四通道和显示 RGB 的分布特征。
+9. 保存 JSON、CSV、NPY 和每张图的 ROI 可视化 PNG。
 
 ## 算法输出
 
@@ -82,45 +82,38 @@ PIC_RGB_OUTPUT_DIR=/path/to/output
 - 每张图的 ROI/BG 几何位置。
 - ROI 和 BG 的四通道统计量。
 - 背景扣除后的 R/G1/G2/B 特征。
-- 分布统计特征。
+- RAW/RGB 分布统计特征。
 - 用于建模的特征矩阵。
 
-实际默认输出目录：
+实际输出目录是 `OUTPUT_DIR`。当前默认是：
 
-- `pic_RGB/roi_results2/`
+- `dataset/xiaomi`
 
 主要输出文件：
 
-- `roi_results.json`: 每张图的 ROI/BG 几何、通道均值、背景扣除值和元数据。
-- `roi_features.csv`: 简化特征表，包含背景扣除均值和显示 RGB。
+- `roi_results.json`: ROI/BG 几何、通道均值、背景扣除值和元数据。
+- `roi_selection_cache.json`: 可复用的 ROI/BG 选择缓存。
+- `roi_features.csv`: 简化特征表。
 - `feature_matrix.npy`: 4 维背景扣除特征矩阵 `[R, G1, G2, B]`。
 - `feature_matrix_full.npy`: RAW 均值 + RAW 分布 + RGB 分布的完整特征矩阵。
 - `feature_matrix_rgb_full.npy`: 显示 RGB + RGB 分布特征矩阵。
 - `roi_distribution_features.csv`: RAW 四通道分布特征。
 - `roi_rgb_distribution_features.csv`: RGB 三通道分布特征。
-- `roi_detailed_statistics.csv`: 后续浓度反演主要使用的详细统计 CSV。
+- `roi_detailed_statistics.csv`: 详细统计表，后续浓度反演主要使用。
 - `<filename>_roi.png`: 每张图的 ROI/BG 可视化。
 
 ## 使用方式
 
-批量处理默认目录：
+默认路径批量处理：
 
 ```bash
 python pic_RGB/roi_processor.py
 ```
 
-指定输入输出目录：
+指定数据集：
 
 ```bash
-PIC_RGB_DATA_DIR=pic_RGB/dataset2 \
-PIC_RGB_OUTPUT_DIR=pic_RGB/roi_results2 \
+PIC_RGB_DATA_DIR=dataset/mate3_2 \
+PIC_RGB_OUTPUT_DIR=dataset/mate3_2 \
 python pic_RGB/roi_processor.py
 ```
-
-后续三个浓度反演目录通常读取：
-
-```text
-pic_RGB/roi_results/roi_detailed_statistics.csv
-```
-
-或由批处理脚本读取 `dataset/*/roi_results/roi_detailed_statistics.csv`。

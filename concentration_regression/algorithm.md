@@ -1,6 +1,6 @@
 # concentration_regression 算法说明
 
-本目录实现基于物理特征和 Ridge 回归的浓度反演。核心思想是根据 Beer-Lambert 类关系，把背景扣除后的通道强度取对数，再用带强正则的线性模型预测浓度。
+本目录实现基于物理特征和 Ridge 回归的浓度反演。模型把 ROI/BG 统计转换成 Beer-Lambert 风格的对数强度、通道比值和分布变换特征，再用带强正则的线性模型预测浓度。
 
 ## 主要代码
 
@@ -13,126 +13,125 @@
 
 算法层面的输入是：
 
-- 样品真实浓度 `C`，从 `filename` 解析。
-- ROI 与背景通道统计。
-- 可选曝光时间。
+- 样品真实浓度 `C`，从 `filename` 中解析。
+- ROI 与背景通道统计：`roi_*_mean`, `bg_*_mean`, `roi_G*_var`。
+- 可选曝光时间 `exposure_time`。
+- 可选 ROI 分布参数：`roi_*_gauss_mu`, `roi_*_gamma_shape`, `roi_*_gamma_scale`。
 
 实际默认输入文件：
 
-- `pic_RGB/roi_results/roi_detailed_statistics.csv`
+- `dataset/food/roi_detailed_statistics.csv`
 
-默认先由 `physics_features.build_feature_frame()` 生成完整特征，再根据 `--feature-set` 选择实际训练列。当前支持：
+当前默认：
+
+- `use_bg=True`
+- `feature_set=full`
+- `target_transform=log`
+
+批处理脚本会用训练集下的 `roi_detailed_statistics.csv` 作为输入，`dataset/food` 保留为测试集。
+
+## 特征构造
+
+背景扣除信号：
 
 ```text
-compact:
-  ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG, Delta_RG, Ratio_BG, Var_G
-
-compact_exposure:
-  ln_R_sig, ln_G_sig, ln_B_sig,
-  ln_R_sig_per_exp, ln_G_sig_per_exp, ln_B_sig_per_exp,
-  Ratio_RG, Delta_RG, Ratio_BG, Var_G,
-  exposure_time, ln_exposure
+R_sig = max(roi_R_mean - bg_R_mean, clip_min)
+G_sig = max(avg(roi_G1_mean, roi_G2_mean) - avg(bg_G1_mean, bg_G2_mean), clip_min)
+B_sig = max(roi_B_mean - bg_B_mean, clip_min)
 ```
 
-如果不用背景扣除，`ln_*_sig` 会替换为 `ln_R`, `ln_G`, `ln_B`，`ln_*_sig_per_exp` 会替换为 `ln_*_per_exp`。
+基础物理特征：
 
-完整候选列包括：
+```text
+ln_R_sig, ln_G_sig, ln_B_sig
+ln_R_sig_per_exp, ln_G_sig_per_exp, ln_B_sig_per_exp
+Ratio_RG, Delta_RG, Ratio_BG
+Var_G
+exposure_time, ln_exposure
+```
 
-- 对数强度：`ln_R_sig`, `ln_G_sig`, `ln_B_sig`
-- 曝光归一化对数强度：`ln_R_sig_per_exp`, `ln_G_sig_per_exp`, `ln_B_sig_per_exp`
-- 比值特征：`Ratio_RG`, `Ratio_BG`, `Delta_RG`
-- 绿色通道方差：`Var_G`
-- 曝光特征：`exposure_time`, `ln_exposure`
+如果 CSV 包含 ROI 分布参数，`full` 特征还会追加：
 
-如果不使用背景扣除，对应特征名会从 `*_sig` 变为原始通道名，例如 `ln_R`。
+```text
+exp_roi_*_gauss_mu      = exp(roi_*_gauss_mu / 1000)
+log_roi_*_gamma_shape   = log(max(roi_*_gamma_shape, eps))
+sqrt_roi_*_gamma_scale  = sqrt(max(roi_*_gamma_scale, 0))
+```
+
+`compact` 只保留无曝光的 7 个物理特征：
+
+```text
+ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG, Delta_RG, Ratio_BG, Var_G
+```
+
+`compact_exposure` 保留 12 个基础物理特征。
 
 ## 处理流程
 
-1. 读取 ROI CSV，并从 `filename` 解析真实浓度 `conc_true`。
-2. 根据 `g_mode` 使用 G1 或 G1/G2 平均值。
-3. 根据 `use_bg` 决定使用原始 ROI 均值还是 `ROI - BG` 信号。
-4. 构造物理特征矩阵 `X`，再按 `feature_set` 选择方案B或方案B加曝光时间。
-5. 对目标浓度做变换，默认是：
+1. 读取 ROI CSV，并从文件名解析 `conc_true`。
+2. 根据 `g_mode` 选择 G1 或 G1/G2 平均值。
+3. 根据 `use_bg` 决定是否使用背景扣除信号。
+4. 构造特征矩阵 `X`，并按 `feature_set` 选择列。
+5. 目标浓度默认做 log 变换：
 
    ```text
-   y_target = log(concentration + eps)
+   y_target = log(C + eps)
    ```
 
-6. 设置样品权重：
+6. 构造样品权重：
 
    ```text
-   weight = 1 / (concentration + weight_eps)
+   weight = 1 / (C + weight_eps)
    ```
-
-   这样低浓度样品不会被高浓度样品完全淹没，但 `weight_eps` 较大时权重会更平滑。
 
 7. 训练模型：
 
    ```text
-   StandardScaler() -> RidgeCV(alphas=(10000, 100000))
+   StandardScaler -> RidgeCV(alphas=(10000, 100000))
    ```
 
-   `StandardScaler` 先标准化特征，`RidgeCV` 在候选正则强度里选内部 CV 分数更好的 alpha。
-
-8. 将预测值从 log 空间反变换回浓度：
+8. 将预测从 log 空间反变换回浓度：
 
    ```text
-   concentration_pred = exp(y_pred) - eps
+   C_pred = exp(y_pred) - eps
    ```
 
-9. 使用 isotonic regression 对训练集预测值做单调校准，并在 LOO 中对每一折用训练折单独拟合校准器。
-10. 执行 Leave-One-Out：每次留出一个样品，重新训练 Ridge 和校准器，再预测留出样品。
+9. 使用 isotonic regression 对训练预测做单调校准；LOO 中每折单独拟合校准器。
+10. 执行 Leave-One-Out，输出训练集和 LOO 指标。
 
 ## 算法输出
 
 算法层面的输出是：
 
-- Ridge 模型和 scaler。
+- Ridge pipeline 和校准器。
+- 使用的特征名、背景设置、目标变换。
 - 选中的正则强度 alpha。
-- 特征系数。
-- 训练集预测浓度、LOO 预测浓度和残差。
-- R2、RMSE、MAE。
+- 每个特征的 Ridge 系数。
+- 训练集和 LOO 预测浓度、残差、R2/RMSE/MAE。
 
-实际默认输出文件位于 `concentration_regression/rgb_fit_output/`：
+实际默认输出目录：
 
-- `concentration_model_v1.pkl`: `joblib` 保存的模型 bundle，包含 pipeline、特征设置、target transform、校准器等。
+- `concentration_regression/rgb_fit_output/`
+
+默认输出文件：
+
+- `concentration_model_v1.pkl`: `joblib` 模型 bundle。
 - `ridge_predictions.csv`: 训练集预测结果。
 - `ridge_predictions_loo.csv`: Leave-One-Out 预测结果。
-- `ridge_coefficients.csv`: 每个特征的 Ridge 系数。
-- `concentration_model_v1_evaluation.png`: 训练集和 LOO 预测散点图。
+- `ridge_coefficients.csv`: 特征系数。
+- `concentration_model_v1_evaluation.png`: 训练和 LOO 评估图。
 
-预测新 CSV 时默认输出：
+批处理训练时实际输出示例：
 
-- `<roi_csv_stem>_pred_concentration.csv`
-- `<roi_csv_stem>_pred_concentration.png`
+- `OUTPUT/mate20x/rgb_concentration_model.pkl`
+- `OUTPUT/mate20x/rgb_ridge_predictions.csv`
+- `OUTPUT/mate20x/rgb_ridge_predictions_loo.csv`
+- `OUTPUT/mate20x/rgb_ridge_coefficients.csv`
+- `OUTPUT/mate20x/rgb_ridge_evaluation.png`
 
 ## 使用方式
 
-训练默认 CSV：
-
 ```bash
 python concentration_regression/train.py
-```
-
-指定输入：
-
-```bash
-python concentration_regression/train.py \
-  --roi-csv pic_RGB/roi_results/roi_detailed_statistics.csv
-```
-
-使用带曝光时间的方案：
-
-```bash
-python concentration_regression/train.py \
-  --roi-csv pic_RGB/roi_results/roi_detailed_statistics.csv \
-  --feature-set compact_exposure
-```
-
-预测：
-
-```bash
-python concentration_regression/predict.py \
-  --model concentration_regression/rgb_fit_output/concentration_model_v1.pkl \
-  --roi-csv pic_RGB/roi_results/roi_detailed_statistics.csv
+python concentration_regression/predict.py --model concentration_regression/rgb_fit_output/concentration_model_v1.pkl --roi-csv dataset/food/roi_detailed_statistics.csv
 ```

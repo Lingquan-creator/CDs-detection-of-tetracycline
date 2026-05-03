@@ -131,7 +131,7 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
     parser.add_argument(
         "--use-bg",
         choices=["auto", "true", "false"],
-        default="auto",
+        default="true" if default_cfg.use_bg else "false",
         help="Background subtraction setting. 'auto' uses bg columns when available.",
     )
     parser.add_argument(

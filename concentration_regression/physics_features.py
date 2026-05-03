@@ -16,6 +16,7 @@ All three versions are kept synchronized.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -56,6 +57,10 @@ _EPS = 1e-6
 _CLIP_MIN = 0.1  # minimum signal after bg subtraction to avoid log of non-positive
 _EXPOSURE_MIN = 1e-6
 _DEFAULT_EXPOSURE_TIME = 1.0
+_NUMBER_RE = re.compile(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?")
+_ROI_DISTRIBUTION_CHANNELS: Tuple[str, ...] = ("R", "G1", "G2", "B")
+_GAUSS_MU_EXP_SCALE = 1000.0
+_EXP_CLIP = 50.0
 
 
 def extract_sample_metadata_from_name(name: str) -> Dict[str, Optional[float]]:
@@ -88,7 +93,11 @@ def extract_sample_metadata_from_name(name: str) -> Dict[str, Optional[float]]:
     try:
         return {"concentration": float(stem), "exposure_time": None}
     except ValueError:
-        return {"concentration": None, "exposure_time": None}
+        match = _NUMBER_RE.search(stem)
+        return {
+            "concentration": float(match.group(0)) if match else None,
+            "exposure_time": None,
+        }
 
 
 def extract_concentration_from_name(name: str) -> Optional[float]:
@@ -132,6 +141,36 @@ def _select_green_var(df: pd.DataFrame, g_mode: str) -> pd.Series:
 def _signal(roi: pd.Series, bg: pd.Series, clip_min: float) -> np.ndarray:
     sig = roi.to_numpy() - bg.to_numpy()
     return np.maximum(sig, clip_min)
+
+
+def _numeric_series(df: pd.DataFrame, column: str) -> pd.Series:
+    values = pd.to_numeric(df[column], errors="coerce").astype(float)
+    return values.replace([np.inf, -np.inf], np.nan)
+
+
+def _add_roi_distribution_transform_features(features: pd.DataFrame, df: pd.DataFrame) -> None:
+    """Append transformed ROI distribution parameters from roi_detailed_statistics.csv."""
+    for channel in _ROI_DISTRIBUTION_CHANNELS:
+        gauss_mu_col = f"roi_{channel}_gauss_mu"
+        if gauss_mu_col in df.columns:
+            gauss_mu = _numeric_series(df, gauss_mu_col)
+            features[f"exp_roi_{channel}_gauss_mu"] = np.exp(
+                np.clip(gauss_mu.to_numpy() / _GAUSS_MU_EXP_SCALE, -_EXP_CLIP, _EXP_CLIP)
+            )
+
+        shape_col = f"roi_{channel}_gauss_shape"
+        shape_feature_name = f"log_roi_{channel}_gauss_shape"
+        if shape_col not in df.columns:
+            shape_col = f"roi_{channel}_gamma_shape"
+            shape_feature_name = f"log_roi_{channel}_gamma_shape"
+        if shape_col in df.columns:
+            shape = _numeric_series(df, shape_col)
+            features[shape_feature_name] = np.log(np.maximum(shape.to_numpy(), _EPS))
+
+        gamma_scale_col = f"roi_{channel}_gamma_scale"
+        if gamma_scale_col in df.columns:
+            gamma_scale = _numeric_series(df, gamma_scale_col)
+            features[f"sqrt_roi_{channel}_gamma_scale"] = np.sqrt(np.maximum(gamma_scale.to_numpy(), 0.0))
 
 
 def resolve_exposure_time_series(df: pd.DataFrame) -> np.ndarray:
@@ -204,6 +243,7 @@ def build_feature_frame(df: pd.DataFrame, g_mode: str = DEFAULT_G_MODE, *, use_b
             "ln_exposure": ln_exposure,
         }
     )
+    _add_roi_distribution_transform_features(features, df)
     return features
 
 

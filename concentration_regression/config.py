@@ -17,8 +17,8 @@ from physics_features import DEFAULT_G_MODE
 # Training/inference defaults
 TARGET_TRANSFORM = "log"  # log-target regression (see improve2.md)
 TARGET_EPS = 1e-6         # small constant to avoid log(0) and for inverse transform
-DEFAULT_USE_BG = False    # background subtraction is optional; set True if bg_* columns are present
-DEFAULT_FEATURE_SET: Literal["full", "compact", "compact_exposure"] = "compact"
+DEFAULT_USE_BG = True     # detailed ROI statistics include bg_* columns; use them by default
+DEFAULT_FEATURE_SET: Literal["full", "compact", "compact_exposure"] = "full"
 # Expanded alpha grid to include large regularization for smoothing low-concentration noise
 # REMOVED small alphas to force smoother models and avoid overfitting noise.
 # FORCED high alphas (starting at 50.0) to combat multicollinearity-induced oscillation.
@@ -30,7 +30,7 @@ CLIP_MIN = 0.1            # minimum signal after background subtraction to avoid
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent
-ROI_STATS_PATH = BASE_DIR.parent / "pic_RGB" / "roi_results" / "roi_detailed_statistics.csv"
+ROI_STATS_PATH = BASE_DIR.parent / "dataset" / "food" / "roi_detailed_statistics.csv"
 OUTPUT_DIR = BASE_DIR / "rgb_fit_output"
 
 # Filenames

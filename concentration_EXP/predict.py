@@ -100,7 +100,6 @@ def parse_args(default_cfg: ExpConfig) -> argparse.Namespace:
     
     parser.add_argument(
         "--channel",
-        choices=["R_corr", "G1_corr", "G2_corr", "G_corr", "B_corr"],
         default=default_cfg.channel,
         help=f"Channel to use for prediction (default: {default_cfg.channel})",
     )

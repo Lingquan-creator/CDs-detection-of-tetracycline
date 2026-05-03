@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 
 from config import ExpConfig
-from physics_features import extract_concentration_from_name
+from physics_features import build_feature_frame, extract_concentration_from_name
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -230,6 +230,18 @@ def build_corrected_channels(df: pd.DataFrame) -> pd.DataFrame:
     corr["exposure_time"] = exposure
     for ch in ("R_corr", "G1_corr", "G2_corr", "G_corr", "B_corr"):
         corr[f"{ch}_per_exp"] = corr[ch].to_numpy(dtype=float) / np.maximum(exposure, _EXPOSURE_MIN)
+    try:
+        physics_features = build_feature_frame(df, use_bg=True)
+    except ValueError:
+        physics_features = pd.DataFrame(index=df.index)
+
+    for ch in [
+        col
+        for col in physics_features.columns
+        if col.startswith(("exp_roi_", "log_roi_", "sqrt_roi_"))
+    ]:
+        corr[ch] = physics_features[ch].to_numpy(dtype=float)
+        corr[f"{ch}_per_exp"] = corr[ch].to_numpy(dtype=float)
     return corr
 
 
@@ -248,7 +260,6 @@ def parse_args(default_cfg: ExpConfig) -> argparse.Namespace:
     
     parser.add_argument(
         "--channel",
-        choices=["R_corr", "G1_corr", "G2_corr", "G_corr", "B_corr"],
         default=default_cfg.channel,
         help=f"Which corrected channel to use for concentration inversion (fit uses exposure-normalized {default_cfg.channel})",
     )
@@ -317,8 +328,12 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     conc = df["conc_true"].to_numpy(dtype=float)
     corr = build_corrected_channels(df)
 
-    # Fit all channels
-    channels = ["R_corr", "G1_corr", "G2_corr", "G_corr", "B_corr"]
+    # Fit all corrected intensity channels plus optional transformed ROI distribution features.
+    channels = [
+        col
+        for col in corr.columns
+        if col != "exposure_time" and not col.endswith("_per_exp")
+    ]
     results: List[Dict[str, object]] = []
     params_by_channel: Dict[str, Tuple[float, float, float]] = {}
 
@@ -435,6 +450,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
         selected_channel=args.channel,
         conc_pred=conc_pred,
         out_path=plot_out,
+        channels=channels,
     )
 
 
@@ -446,11 +462,14 @@ def draw_fit_visualization(
     selected_channel: str,
     conc_pred: np.ndarray,
     out_path: Path,
+    channels: List[str],
 ) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    channels = ["R_corr", "G1_corr", "G2_corr", "G_corr", "B_corr"]
 
-    fig, axes = plt.subplots(2, 3, figsize=(16, 10), dpi=150)
+    total_axes = len(channels) + 1
+    ncols = 3
+    nrows = int(math.ceil(total_axes / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(16, 4.5 * nrows), dpi=150)
     axes = axes.ravel()
     x_curve = np.linspace(float(np.min(conc)), float(np.max(conc)), 200)
 
@@ -486,6 +505,9 @@ def draw_fit_visualization(
     else:
         ax_eval.text(0.5, 0.5, "No valid prediction", ha="center", va="center")
         ax_eval.set_title(f"Concentration inversion ({selected_channel})")
+
+    for ax in axes[total_axes:]:
+        ax.axis("off")
 
     format_figure_numbers(fig)
     plt.tight_layout()
