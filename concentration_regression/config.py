@@ -26,7 +26,7 @@ DEFAULT_FEATURE_SET: Literal["full", "compact", "compact_exposure", "ln_rgb"] = 
 ALPHAS: Tuple[float, ...] = (10000, 100000.0)
 # Increased epsilon to reduce sensitivity to noise in low concentrations (e.g. <10uM)
 # Higher eps (20 -> 50) means weights are flatter, preventing low-conc noise from dominating.
-WEIGHT_EPS = 50.0         # sample weight denominator: 1/(conc + WEIGHT_EPS)
+WEIGHT_EPS = 30.0         # sample weight denominator: 1/(conc + WEIGHT_EPS)
 CLIP_MIN = 0.1            # minimum signal after background subtraction to avoid log of negative/zero
 
 # Base paths
