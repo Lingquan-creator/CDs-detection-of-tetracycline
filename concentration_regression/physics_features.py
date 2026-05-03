@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Literal, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -116,7 +116,7 @@ def feature_names(use_bg: bool) -> Tuple[str, ...]:
 
 
 def has_background_columns(df: pd.DataFrame, g_mode: str = DEFAULT_G_MODE) -> bool:
-    required = {"roi_R_mean", "bg_R_mean", "roi_B_mean", "bg_B_mean", "roi_G1_mean", "bg_G1_mean", "roi_G1_var"}
+    required = {"roi_R_mean", "bg_R_mean", "roi_B_mean", "bg_B_mean", "roi_G1_mean", "bg_G1_mean"}
     if g_mode == "avg":
         required |= {"roi_G2_mean", "bg_G2_mean"}
     return required.issubset(set(df.columns))
@@ -131,6 +131,8 @@ def _select_green_mean(df: pd.DataFrame, g_mode: str) -> pd.Series:
 
 
 def _select_green_var(df: pd.DataFrame, g_mode: str) -> pd.Series:
+    if "roi_G1_var" not in df.columns:
+        return pd.Series(0.0, index=df.index, dtype=float)
     g1_var = df["roi_G1_var"]
     if g_mode == "avg" and "roi_G2_var" in df.columns:
         g2_var = df["roi_G2_var"]
@@ -138,8 +140,20 @@ def _select_green_var(df: pd.DataFrame, g_mode: str) -> pd.Series:
     return g1_var
 
 
-def _signal(roi: pd.Series, bg: pd.Series, clip_min: float) -> np.ndarray:
-    sig = roi.to_numpy() - bg.to_numpy()
+def _signal(
+    roi: pd.Series,
+    bg: pd.Series,
+    clip_min: float,
+    correction: Literal["subtract", "divide", "relative"] = "subtract",
+) -> np.ndarray:
+    if correction == "subtract":
+        sig = roi.to_numpy() - bg.to_numpy()
+    elif correction == "divide":
+        sig = roi.to_numpy() / (bg.to_numpy() + _EPS)
+    elif correction == "relative":
+        sig = (roi.to_numpy() - bg.to_numpy()) / (bg.to_numpy() + _EPS)
+    else:
+        raise ValueError(f"Unsupported background correction: {correction}")
     return np.maximum(sig, clip_min)
 
 
@@ -195,9 +209,16 @@ def resolve_exposure_time_series(df: pd.DataFrame) -> np.ndarray:
     return np.maximum(exposure_values, _EXPOSURE_MIN)
 
 
-def build_feature_frame(df: pd.DataFrame, g_mode: str = DEFAULT_G_MODE, *, use_bg: bool = False, clip_min: float = _CLIP_MIN) -> pd.DataFrame:
-    """Compute physics-informed features from a ROI dataframe (with optional background subtraction)."""
-    base_missing = [col for col in ["roi_R_mean", "roi_G1_mean", "roi_B_mean", "roi_G1_var"] if col not in df.columns]
+def build_feature_frame(
+    df: pd.DataFrame,
+    g_mode: str = DEFAULT_G_MODE,
+    *,
+    use_bg: bool = False,
+    clip_min: float = _CLIP_MIN,
+    bg_correction: Literal["subtract", "divide", "relative"] = "subtract",
+) -> pd.DataFrame:
+    """Compute physics-informed features from a ROI dataframe."""
+    base_missing = [col for col in ["roi_R_mean", "roi_G1_mean", "roi_B_mean"] if col not in df.columns]
     if base_missing:
         raise ValueError(f"Missing required columns for feature build: {base_missing}")
 
@@ -209,12 +230,15 @@ def build_feature_frame(df: pd.DataFrame, g_mode: str = DEFAULT_G_MODE, *, use_b
         if bg_missing:
             raise ValueError(f"Background mode requested but CSV missing columns: {bg_missing}")
 
-        r_sig = _signal(df["roi_R_mean"], df["bg_R_mean"], clip_min)
-        b_sig = _signal(df["roi_B_mean"], df["bg_B_mean"], clip_min)
+        r_sig = _signal(df["roi_R_mean"], df["bg_R_mean"], clip_min, bg_correction)
+        b_sig = _signal(df["roi_B_mean"], df["bg_B_mean"], clip_min, bg_correction)
         if g_mode == "avg" and "roi_G2_mean" in df.columns:
-            g_sig = ( _signal(df["roi_G1_mean"], df["bg_G1_mean"], clip_min) + _signal(df["roi_G2_mean"], df["bg_G2_mean"], clip_min) ) / 2.0
+            g_sig = (
+                _signal(df["roi_G1_mean"], df["bg_G1_mean"], clip_min, bg_correction)
+                + _signal(df["roi_G2_mean"], df["bg_G2_mean"], clip_min, bg_correction)
+            ) / 2.0
         else:
-            g_sig = _signal(df["roi_G1_mean"], df["bg_G1_mean"], clip_min)
+            g_sig = _signal(df["roi_G1_mean"], df["bg_G1_mean"], clip_min, bg_correction)
     else:
         r_sig = df["roi_R_mean"].to_numpy()
         b_sig = df["roi_B_mean"].to_numpy()
@@ -263,14 +287,35 @@ def build_feature_vector(
     g_mode: str = DEFAULT_G_MODE,
     use_bg: bool = False,
     clip_min: float = _CLIP_MIN,
+    bg_correction: Literal["subtract", "divide", "relative"] = "subtract",
 ) -> np.ndarray:
     """Create a single feature row for inference (supports optional background subtraction)."""
     if use_bg:
-        r_sig = max(r - bg_r, clip_min)
-        b_sig = max(b - bg_b, clip_min)
-        g1_sig = max(g1 - bg_g1, clip_min)
+        if bg_correction == "subtract":
+            r_sig = r - bg_r
+            b_sig = b - bg_b
+            g1_sig = g1 - bg_g1
+        elif bg_correction == "divide":
+            r_sig = r / (bg_r + _EPS)
+            b_sig = b / (bg_b + _EPS)
+            g1_sig = g1 / (bg_g1 + _EPS)
+        elif bg_correction == "relative":
+            r_sig = (r - bg_r) / (bg_r + _EPS)
+            b_sig = (b - bg_b) / (bg_b + _EPS)
+            g1_sig = (g1 - bg_g1) / (bg_g1 + _EPS)
+        else:
+            raise ValueError(f"Unsupported background correction: {bg_correction}")
+        r_sig = max(r_sig, clip_min)
+        b_sig = max(b_sig, clip_min)
+        g1_sig = max(g1_sig, clip_min)
         if g_mode == "avg" and g2 is not None:
-            g2_sig = max(g2 - bg_g2, clip_min)
+            if bg_correction == "subtract":
+                g2_sig = g2 - bg_g2
+            elif bg_correction == "divide":
+                g2_sig = g2 / (bg_g2 + _EPS)
+            else:
+                g2_sig = (g2 - bg_g2) / (bg_g2 + _EPS)
+            g2_sig = max(g2_sig, clip_min)
             g_mean = (g1_sig + g2_sig) / 2.0
             var_g = (var_g1 + (var_g2 or var_g1)) / 2.0
         else:

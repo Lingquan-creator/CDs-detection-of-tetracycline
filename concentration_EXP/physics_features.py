@@ -124,7 +124,6 @@ def has_background_columns(df: pd.DataFrame, g_mode: str = DEFAULT_G_MODE) -> bo
         "bg_B_mean",
         "roi_G1_mean",
         "bg_G1_mean",
-        "roi_G1_var",
     }
     if g_mode == "avg":
         required |= {"roi_G2_mean", "bg_G2_mean"}
@@ -142,6 +141,8 @@ def _select_green_mean(df: pd.DataFrame, g_mode: str) -> pd.Series:
 
 def _select_green_var(df: pd.DataFrame, g_mode: str) -> pd.Series:
     """Select green channel variance based on g_mode."""
+    if "roi_G1_var" not in df.columns:
+        return pd.Series(0.0, index=df.index, dtype=float)
     g1_var = df["roi_G1_var"]
     if g_mode == "avg" and "roi_G2_var" in df.columns:
         g2_var = df["roi_G2_var"]
@@ -221,7 +222,7 @@ def build_feature_frame(
     green variance, and explicit exposure-time terms.
     """
     base_missing = [
-        col for col in ["roi_R_mean", "roi_G1_mean", "roi_B_mean", "roi_G1_var"]
+        col for col in ["roi_R_mean", "roi_G1_mean", "roi_B_mean"]
         if col not in df.columns
     ]
     if base_missing:

@@ -132,9 +132,9 @@ def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: s
         raise ValueError(f"Unsupported feature set: {feature_set}")
 
     no_exposure_columns = (
-        ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Delta_RG", "Ratio_BG", "Var_G")
+        ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Delta_RG", "Ratio_BG")
         if use_bg
-        else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Delta_RG", "Ratio_BG", "Var_G")
+        else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Delta_RG", "Ratio_BG")
     )
     exposure_columns = (
         (

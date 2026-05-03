@@ -26,17 +26,19 @@
 
 - `use_bg=True`
 - `feature_set=compact`
+- `bg_correction=subtract`: 背景校正统一使用 `ROI - BG`
 - `target_transform=log`
 
 批处理脚本会用训练集下的 `roi_detailed_statistics.csv` 作为输入，`dataset/food` 保留为测试集。
 
 ## 特征构造
 
-背景扣除信号：
+背景校正信号：
 
 ```text
 R_sig = max(roi_R_mean - bg_R_mean, clip_min)
-G_sig = max(avg(roi_G1_mean, roi_G2_mean) - avg(bg_G1_mean, bg_G2_mean), clip_min)
+G_sig = max(avg(roi_G1_mean - bg_G1_mean,
+                roi_G2_mean - bg_G2_mean), clip_min)
 B_sig = max(roi_B_mean - bg_B_mean, clip_min)
 ```
 
@@ -58,13 +60,13 @@ log_roi_*_gamma_shape   = log(max(roi_*_gamma_shape, eps))
 sqrt_roi_*_gamma_scale  = sqrt(max(roi_*_gamma_scale, 0))
 ```
 
-`compact` 是当前默认，只保留跨数据集更稳的 7 个无曝光物理特征：
+`compact` 是当前默认，使用最近外部测试中最稳的 4 个无曝光物理特征，不包含 `Var_G`：
 
 ```text
-ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG, Delta_RG, Ratio_BG, Var_G
+ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG
 ```
 
-`compact_exposure` 保留 12 个基础物理特征。
+`compact_exposure` 保留 12 个基础物理特征，仍包含 `Var_G`。
 
 ## 处理流程
 

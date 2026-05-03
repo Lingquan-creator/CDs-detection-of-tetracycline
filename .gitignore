@@ -10,6 +10,7 @@ backup/
 *.tiff
 *.dng
 *.raw
+*.pdf
 test data/
 rep/
 CDs_cha_comp/

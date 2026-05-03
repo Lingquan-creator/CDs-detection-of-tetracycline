@@ -25,7 +25,7 @@ from sklearn.model_selection import LeaveOneOut
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from config import ALPHAS, CLIP_MIN, TARGET_EPS, TARGET_TRANSFORM, WEIGHT_EPS, TrainConfig
+from config import ALPHAS, CLIP_MIN, DEFAULT_BG_CORRECTION, TARGET_EPS, TARGET_TRANSFORM, WEIGHT_EPS, TrainConfig
 from physics_features import build_feature_frame, extract_concentration_from_name, has_background_columns
 
 matplotlib.use("Agg")
@@ -144,9 +144,15 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
     parser.add_argument("--alpha-grid", nargs="+", type=float, help="Alpha grid for RidgeCV.")
     parser.add_argument(
         "--feature-set",
-        choices=["full", "compact", "compact_exposure"],
+        choices=["full", "compact", "compact_exposure", "ln_rgb"],
         default=default_cfg.feature_set,
         help="Feature set: compact=ln RGB + ratios; compact_exposure adds exposure_time.",
+    )
+    parser.add_argument(
+        "--bg-correction",
+        choices=["subtract", "divide", "relative"],
+        default=getattr(default_cfg, "bg_correction", DEFAULT_BG_CORRECTION),
+        help="Background correction mode for --use-bg true: subtract=ROI-BG, divide=ROI/BG, relative=(ROI-BG)/BG.",
     )
     parser.add_argument("--weight-eps", type=float, default=WEIGHT_EPS, help="Sample weight: 1 / (conc + weight_eps).")
     parser.add_argument("--clip-min", type=float, default=CLIP_MIN, help="Min signal after bg subtraction.")
@@ -206,13 +212,18 @@ def resolve_use_bg(df: pd.DataFrame, g_mode: str, use_bg_arg: str) -> bool:
 def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: str) -> pd.DataFrame:
     if feature_set == "full":
         return feature_df
-    if feature_set not in {"compact", "compact_exposure"}:
+    if feature_set not in {"compact", "compact_exposure", "ln_rgb"}:
         raise ValueError(f"Unsupported feature set: {feature_set}")
 
-    no_exposure_columns = (
-        ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Delta_RG", "Ratio_BG", "Var_G")
+    ln_rgb_columns = (
+        ("ln_R_sig", "ln_G_sig", "ln_B_sig")
         if use_bg
-        else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Delta_RG", "Ratio_BG", "Var_G")
+        else ("ln_R", "ln_G", "ln_B")
+    )
+    no_exposure_columns = (
+        ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Delta_RG", "Ratio_BG")
+        if use_bg
+        else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Delta_RG", "Ratio_BG")
     )
     exposure_columns = (
         (
@@ -245,7 +256,10 @@ def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: s
             "ln_exposure",
         )
     )
-    selected_columns = exposure_columns if feature_set == "compact_exposure" else no_exposure_columns
+    if feature_set == "ln_rgb":
+        selected_columns = ln_rgb_columns
+    else:
+        selected_columns = exposure_columns if feature_set == "compact_exposure" else no_exposure_columns
     missing = [column for column in selected_columns if column not in feature_df.columns]
     if missing:
         raise ValueError(f"Cannot build {feature_set} feature set; missing columns: {missing}")
@@ -273,8 +287,9 @@ def train_candidate(
     weight_eps: float,
     clip_min: float,
     feature_set: str,
+    bg_correction: str,
 ) -> Dict[str, object]:
-    feature_df = build_feature_frame(df, g_mode=g_mode, use_bg=use_bg, clip_min=clip_min)
+    feature_df = build_feature_frame(df, g_mode=g_mode, use_bg=use_bg, clip_min=clip_min, bg_correction=bg_correction)
     feature_df = select_feature_set(feature_df, use_bg=use_bg, feature_set=feature_set)
     X = feature_df.to_numpy(dtype=float)
     y_target = transform_target(y_true, target_transform, target_eps)
@@ -292,6 +307,7 @@ def train_candidate(
         "g_mode": g_mode,
         "use_bg": use_bg,
         "feature_set": feature_set,
+        "bg_correction": bg_correction,
         "feature_names": tuple(feature_df.columns),
         "X": X,
         "sample_weight": sample_weight,
@@ -394,6 +410,7 @@ def save_outputs(
     alphas: Tuple[float, ...],
     weight_eps: float,
     feature_set: str,
+    bg_correction: str,
     selected_feature_names: Tuple[str, ...],
 ) -> None:
     for path in (model_out, pred_out, loo_out, coef_out):
@@ -412,6 +429,7 @@ def save_outputs(
         "target_eps": target_eps,
         "use_bg": use_bg,
         "feature_set": feature_set,
+        "bg_correction": bg_correction,
         "weight_eps": weight_eps,
         "isotonic": calibrator,
         "sklearn_version": sklearn_version,
@@ -452,7 +470,9 @@ def load_model_bundle(path: Path, g_mode_override: Optional[str] = None) -> Tupl
     """
     from predict import load_model_bundle as _load_bundle
 
-    _, model, g_mode, target_transform, target_eps, use_bg, calibrator = _load_bundle(path, g_mode_override)
+    loaded = _load_bundle(path, g_mode_override)
+    _, model, g_mode, target_transform, target_eps, use_bg, *rest = loaded
+    calibrator = rest[-1] if rest else None
     return model, g_mode, target_transform, target_eps, use_bg, calibrator
 
 
@@ -474,7 +494,12 @@ def main() -> None:
 
     print(f"Training data: {args.roi_csv} (n={len(df)})")
     print(f"Alpha candidates: {format_float_sequence(alphas)}")
-    print(f"Evaluating g_modes={g_modes}, use_bg={args.use_bg}, feature_set={args.feature_set}, target_transform={target_transform}")
+    bg_correction = str(args.bg_correction)
+
+    print(
+        f"Evaluating g_modes={g_modes}, use_bg={args.use_bg}, bg_correction={bg_correction}, "
+        f"feature_set={args.feature_set}, target_transform={target_transform}"
+    )
 
     for g_mode in g_modes:
         use_bg = resolve_use_bg(df, g_mode, args.use_bg)
@@ -489,9 +514,13 @@ def main() -> None:
             weight_eps=float(args.weight_eps),
             clip_min=float(args.clip_min),
             feature_set=str(args.feature_set),
+            bg_correction=bg_correction,
         )
         score = float(result["score"])
-        print(f"  candidate g_mode={g_mode}, use_bg={use_bg}, feature_set={args.feature_set}, cv_score={score:.6g}")
+        print(
+            f"  candidate g_mode={g_mode}, use_bg={use_bg}, bg_correction={bg_correction}, "
+            f"feature_set={args.feature_set}, cv_score={score:.6g}"
+        )
         if score > best_score:
             best_score = score
             best_result = result
@@ -503,6 +532,7 @@ def main() -> None:
     g_mode = str(best_result["g_mode"])
     use_bg = bool(best_result["use_bg"])
     feature_set = str(best_result["feature_set"])
+    bg_correction = str(best_result["bg_correction"])
     selected_feature_names = tuple(str(name) for name in best_result["feature_names"])
     X = np.asarray(best_result["X"], dtype=float)
     y_pred_raw = np.asarray(best_result["y_pred_raw"], dtype=float)
@@ -545,6 +575,7 @@ def main() -> None:
         alphas=alphas,
         weight_eps=float(args.weight_eps),
         feature_set=feature_set,
+        bg_correction=bg_correction,
         selected_feature_names=selected_feature_names,
     )
     draw_result_plot(
@@ -558,7 +589,10 @@ def main() -> None:
 
     reg = model.named_steps["regressor"]
     selected_alpha = float(getattr(reg, "alpha_", alphas[0]))
-    print(f"Selected model: g_mode={g_mode}, use_bg={use_bg}, feature_set={feature_set}, alpha={selected_alpha:.6g}")
+    print(
+        f"Selected model: g_mode={g_mode}, use_bg={use_bg}, bg_correction={bg_correction}, "
+        f"feature_set={feature_set}, alpha={selected_alpha:.6g}"
+    )
     print(f"Train   -> R2={train_metrics[0]:.6g}, RMSE={train_metrics[1]:.6g}, MAE={train_metrics[2]:.6g}")
     print(f"LOO-CV  -> R2={loo_metrics[0]:.6g}, RMSE={loo_metrics[1]:.6g}, MAE={loo_metrics[2]:.6g}")
     print(f"Saved model       -> {args.model_out}")

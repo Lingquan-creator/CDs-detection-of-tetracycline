@@ -15,7 +15,7 @@ ROI_STATS_PATH = BASE_DIR.parent / "dataset" / "food" / "roi_detailed_statistics
 OUTPUT_DIR = BASE_DIR / "exp_fit_output"
 
 # Exponential fitting defaults
-DEFAULT_CHANNEL = "G1_corr"  # Which corrected channel to use for final concentration inversion
+DEFAULT_CHANNEL = "feature_best"  # Fit the compact ROI-BG features, then invert the best fitted feature
 DEFAULT_WEIGHT_EPS = 5.0  # Weighting parameter: weights ~ 1/(conc + eps)
 
 # Output filenames

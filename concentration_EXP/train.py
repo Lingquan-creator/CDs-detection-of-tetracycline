@@ -30,6 +30,16 @@ from matplotlib.ticker import FuncFormatter
 
 _EXPOSURE_MIN = 1e-6
 CSV_FLOAT_FORMAT = "%.6g"
+EXP_INPUT_FEATURES = (
+    "ln_R_sig",
+    "ln_G_sig",
+    "ln_B_sig",
+    "Ratio_RG",
+    "Delta_RG",
+    "Ratio_BG",
+)
+AGGREGATE_CHANNELS = {"feature_median", "feature_mean"}
+AUTO_CHANNELS = AGGREGATE_CHANNELS | {"feature_best"}
 
 
 def format_plot_number(value: float, _pos: object = None) -> str:
@@ -107,12 +117,15 @@ def fit_exponential(
 
     y_min = float(np.min(y))
     y_max = float(np.max(y))
+    if math.isclose(y_min, y_max, rel_tol=0.0, abs_tol=1e-12):
+        raise ValueError("Feature is nearly constant; cannot fit exponential model.")
 
     # Re-parameterization: i0 (intensity at conc=0) must be >= max observed intensity
-    # This ensures the inverse function doesn't produce negative concentrations
+    # and c0 must be <= min observed intensity. This keeps the decreasing
+    # exponential invertible over the measured range.
     i0_min = y_max
-    p0 = (y_max * 1.05, -0.01, max(0.0, y_min))
-    bounds = ([i0_min, -np.inf, 0.0], [np.inf, 0.0, y_max])
+    p0 = (y_max, -0.01, y_min)
+    bounds = ([i0_min, -np.inf, -np.inf], [np.inf, 0.0, y_min])
 
     # Optional weighting to emphasize low-concentration fitting
     sigma: Optional[np.ndarray] = None
@@ -145,6 +158,20 @@ def fit_exponential(
     return (a, b, c0), float(r2), rmse
 
 
+def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Tuple[float, float]:
+    valid = np.isfinite(y_true) & np.isfinite(y_pred)
+    if not np.any(valid):
+        return float("nan"), float("nan")
+    y = y_true[valid]
+    pred = y_pred[valid]
+    residual = y - pred
+    ss_res = float(np.sum(residual**2))
+    ss_tot = float(np.sum((y - float(np.mean(y))) ** 2))
+    r2 = 1.0 - ss_res / ss_tot if ss_tot > 0.0 else 1.0
+    rmse = float(math.sqrt(ss_res / len(y)))
+    return r2, rmse
+
+
 def invert_exponential_intensity(
     intensity: np.ndarray,
     *,
@@ -170,79 +197,76 @@ def invert_exponential_intensity(
 
 def build_corrected_channels(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Build background-corrected mean intensities per channel.
-    
-    Computes:
-    - Signal = max(ROI - Background, 0)
-    - Signal_per_exposure = Signal / exposure_time
-    
-    Required columns:
-        - roi_R_mean, roi_G1_mean, roi_B_mean
-        - bg_R_mean, bg_G1_mean, bg_B_mean
-    
-    Optional:
-        - roi_G2_mean, bg_G2_mean (for dual-green sensors)
-    
-    Returns:
-        DataFrame with columns:
-        - corrected intensities: R_corr, G1_corr, G2_corr, G_corr, B_corr
-        - exposure metadata: exposure_time
-        - exposure-normalized intensities: <channel>_per_exp
+    Build the compact ROI-BG feature vector used by the exponential inversion.
+
+    The active inputs are:
+    ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG, Delta_RG, Ratio_BG.
+    ``*_per_exp`` aliases are kept for compatibility with the existing fitting
+    and plotting code; these features are already normalized/transformed inputs.
     """
     from physics_features import resolve_exposure_time_series
 
-    required = {
-        "roi_R_mean",
-        "roi_G1_mean",
-        "roi_B_mean",
-        "bg_R_mean",
-        "bg_G1_mean",
-        "bg_B_mean",
-    }
-    missing = sorted(required - set(df.columns))
+    corr = pd.DataFrame(index=df.index)
+    corr["exposure_time"] = resolve_exposure_time_series(df)
+    physics_features = build_feature_frame(df, use_bg=True)
+    missing = [feature for feature in EXP_INPUT_FEATURES if feature not in physics_features.columns]
     if missing:
-        raise ValueError(
-            f"ROI CSV missing required columns for exponential fit: {missing}"
+        raise ValueError(f"Cannot build exponential input vector; missing features: {missing}")
+
+    for feature in EXP_INPUT_FEATURES:
+        values = physics_features[feature].to_numpy(dtype=float)
+        corr[feature] = values
+        corr[f"{feature}_per_exp"] = values
+    return corr
+
+
+def predict_from_fitted_features(
+    corrected_channels: pd.DataFrame,
+    params_by_channel: Dict[str, Tuple[float, float, float]],
+    channels: List[str],
+    selected_channel: str,
+) -> Tuple[np.ndarray, pd.DataFrame]:
+    """Invert one feature or aggregate all fitted feature inversions."""
+    pred_by_feature: Dict[str, np.ndarray] = {}
+    for ch in channels:
+        if ch not in params_by_channel:
+            continue
+        a, b, c0 = params_by_channel[ch]
+        pred_by_feature[ch] = invert_exponential_intensity(
+            corrected_channels[f"{ch}_per_exp"].to_numpy(dtype=float),
+            a=a,
+            b=b,
+            c0=c0,
         )
 
-    r = (df["roi_R_mean"] - df["bg_R_mean"]).clip(lower=0.0)
-    g1 = (df["roi_G1_mean"] - df["bg_G1_mean"]).clip(lower=0.0)
-    b = (df["roi_B_mean"] - df["bg_B_mean"]).clip(lower=0.0)
-
-    has_g2 = "roi_G2_mean" in df.columns and "bg_G2_mean" in df.columns
-    if has_g2:
-        g2 = (df["roi_G2_mean"] - df["bg_G2_mean"]).clip(lower=0.0)
-        g = ((g1 + g2) / 2.0).clip(lower=0.0)
+    if selected_channel in params_by_channel:
+        conc_pred = pred_by_feature[selected_channel]
+    elif selected_channel in AGGREGATE_CHANNELS:
+        if not pred_by_feature:
+            raise RuntimeError("No fitted feature channels are available for aggregate prediction.")
+        stacked = np.vstack([pred_by_feature[ch] for ch in channels if ch in pred_by_feature])
+        if selected_channel == "feature_mean":
+            conc_pred = np.nanmean(stacked, axis=0)
+        else:
+            conc_pred = np.nanmedian(stacked, axis=0)
     else:
-        g2 = pd.Series([np.nan] * len(df), index=df.index, dtype=float)
-        g = g1
+        available = sorted(params_by_channel) + sorted(AUTO_CHANNELS)
+        raise ValueError(f"Selected channel '{selected_channel}' is unavailable. Available: {available}")
 
-    corr = pd.DataFrame(
-        {
-            "R_corr": r.astype(float),
-            "G1_corr": g1.astype(float),
-            "G2_corr": g2.astype(float),
-            "G_corr": g.astype(float),
-            "B_corr": b.astype(float),
-        }
-    )
-    exposure = resolve_exposure_time_series(df)
-    corr["exposure_time"] = exposure
-    for ch in ("R_corr", "G1_corr", "G2_corr", "G_corr", "B_corr"):
-        corr[f"{ch}_per_exp"] = corr[ch].to_numpy(dtype=float) / np.maximum(exposure, _EXPOSURE_MIN)
-    try:
-        physics_features = build_feature_frame(df, use_bg=True)
-    except ValueError:
-        physics_features = pd.DataFrame(index=df.index)
+    return np.maximum(np.asarray(conc_pred, dtype=float), 0.0), pd.DataFrame(pred_by_feature)
 
-    for ch in [
-        col
-        for col in physics_features.columns
-        if col.startswith(("exp_roi_", "log_roi_", "sqrt_roi_"))
-    ]:
-        corr[ch] = physics_features[ch].to_numpy(dtype=float)
-        corr[f"{ch}_per_exp"] = corr[ch].to_numpy(dtype=float)
-    return corr
+
+def resolve_selected_feature(
+    selected_channel: str,
+    fit_results: List[Dict[str, object]],
+    params_by_channel: Dict[str, Tuple[float, float, float]],
+) -> str:
+    if selected_channel != "feature_best":
+        return selected_channel
+    valid_results = [row for row in fit_results if str(row["channel"]) in params_by_channel and np.isfinite(float(row["inv_r2"]))]
+    if not valid_results:
+        raise RuntimeError("Cannot select feature_best because no fitted feature has finite inverse R2.")
+    return str(max(valid_results, key=lambda row: float(row["inv_r2"]))["channel"])
 
 
 def parse_args(default_cfg: ExpConfig) -> argparse.Namespace:
@@ -261,7 +285,10 @@ def parse_args(default_cfg: ExpConfig) -> argparse.Namespace:
     parser.add_argument(
         "--channel",
         default=default_cfg.channel,
-        help=f"Which corrected channel to use for concentration inversion (fit uses exposure-normalized {default_cfg.channel})",
+        help=(
+            "Which feature to use for concentration inversion, feature_best, or feature_median/feature_mean "
+            f"to aggregate all fitted features (default: {default_cfg.channel})"
+        ),
     )
     
     parser.add_argument(
@@ -328,7 +355,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     conc = df["conc_true"].to_numpy(dtype=float)
     corr = build_corrected_channels(df)
 
-    # Fit all corrected intensity channels plus optional transformed ROI distribution features.
+    # Fit the compact ROI-BG feature vector.
     channels = [
         col
         for col in corr.columns
@@ -351,6 +378,8 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
             (a, b, c0), r2, rmse = fit_exponential(
                 conc, y, weight_eps=float(args.weight_eps)
             )
+            conc_fit_pred = np.maximum(invert_exponential_intensity(y, a=a, b=b, c0=c0), 0.0)
+            inv_r2, inv_rmse = regression_metrics(conc, conc_fit_pred)
             params_by_channel[ch] = (a, b, c0)
             results.append({
                 "channel": ch,
@@ -360,10 +389,12 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
                 "c": c0,
                 "r2": r2,
                 "rmse": rmse,
+                "inv_r2": inv_r2,
+                "inv_rmse": inv_rmse,
             })
             print(
                 f"[FIT] {ch:8s} (per_exp): a={a:9.6g}, b={b:9.6g}, c={c0:9.6g}  "
-                f"R2={r2:.6g}  RMSE={rmse:.6g}"
+                f"R2={r2:.6g}  RMSE={rmse:.6g}  inv_R2={inv_r2:.6g}  inv_RMSE={inv_rmse:.6g}"
             )
         except Exception as e:
             print(f"[FAIL] {ch}: {e}")
@@ -399,20 +430,11 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     pred_df.to_csv(pred_out, index=False, float_format=CSV_FLOAT_FORMAT)
     print(f"Saved intensity predictions -> {pred_out}")
 
-    # Invert selected channel to get concentration predictions
-    if args.channel not in params_by_channel:
-        raise ValueError(
-            f"Selected channel '{args.channel}' was not fitted (missing or invalid data)."
-        )
-
-    a, b, c0 = params_by_channel[args.channel]
-    conc_pred = invert_exponential_intensity(
-        corr[f"{args.channel}_per_exp"].to_numpy(dtype=float),
-        a=a,
-        b=b,
-        c0=c0,
-    )
-    conc_pred = np.maximum(np.asarray(conc_pred, dtype=float), 0.0)
+    # Invert selected feature, or aggregate all fitted feature inversions.
+    selected_channel = resolve_selected_feature(args.channel, results, params_by_channel)
+    if selected_channel != args.channel:
+        print(f"\nResolved channel '{args.channel}' -> '{selected_channel}'")
+    conc_pred, feature_conc_pred = predict_from_fitted_features(corr, params_by_channel, channels, selected_channel)
 
     # Save concentration predictions
     conc_out = resolve_output_path(args.conc_out, cfg.concentration_path_for(args.roi_csv), cfg.output_dir)
@@ -423,10 +445,13 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
         "exposure_time": corr["exposure_time"],
         "conc_pred": conc_pred,
         "conc_true": conc,
-        f"{args.channel}_intensity": corr[args.channel],
-        f"{args.channel}_per_exp": corr[f"{args.channel}_per_exp"],
+        "selected_channel": selected_channel,
         "residual": conc_pred - conc,
     })
+    if selected_channel in corr.columns:
+        out_df[f"{selected_channel}_value"] = corr[selected_channel]
+    for ch in feature_conc_pred.columns:
+        out_df[f"{ch}_conc_pred"] = feature_conc_pred[ch].to_numpy(dtype=float)
     out_df.to_csv(conc_out, index=False, float_format=CSV_FLOAT_FORMAT)
 
     # Calculate and display final metrics
@@ -435,7 +460,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
         r2_final = 1 - np.sum((conc[valid_mask] - conc_pred[valid_mask])**2) / np.sum((conc[valid_mask] - conc[valid_mask].mean())**2)
         rmse_final = np.sqrt(np.mean((conc[valid_mask] - conc_pred[valid_mask])**2))
         print(f"\nSaved concentration predictions -> {conc_out}")
-        print(f"\nFinal Evaluation (channel={args.channel}, signal={args.channel}_per_exp):")
+        print(f"\nFinal Evaluation (channel={selected_channel}, requested={args.channel}):")
         print(f"  R2 = {r2_final:.6g}")
         print(f"  RMSE = {rmse_final:.6g} uM")
     else:
@@ -447,7 +472,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
         conc=conc,
         corrected_channels=corr,
         params_by_channel=params_by_channel,
-        selected_channel=args.channel,
+        selected_channel=selected_channel,
         conc_pred=conc_pred,
         out_path=plot_out,
         channels=channels,

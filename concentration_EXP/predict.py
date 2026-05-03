@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 from config import ExpConfig
-from train import build_corrected_channels, invert_exponential_intensity
+from train import AUTO_CHANNELS, build_corrected_channels, predict_from_fitted_features
 from physics_features import extract_concentration_from_name
 
 matplotlib.use("Agg")
@@ -78,6 +78,43 @@ def load_fit_parameters(params_csv: Path, channel: str) -> Tuple[float, float, f
     return float(row["a"]), float(row["b"]), float(row["c"])
 
 
+def load_all_fit_parameters(params_csv: Path) -> dict[str, Tuple[float, float, float]]:
+    """Load all fitted feature parameters from exp_fit_params.csv."""
+    if not params_csv.exists():
+        raise FileNotFoundError(f"Parameters file not found: {params_csv}")
+
+    df = pd.read_csv(params_csv)
+    required = {"channel", "a", "b", "c"}
+    missing = sorted(required - set(df.columns))
+    if missing:
+        raise ValueError(f"Parameters CSV missing required columns: {missing}")
+
+    params: dict[str, Tuple[float, float, float]] = {}
+    for row in df.itertuples(index=False):
+        channel = str(getattr(row, "channel"))
+        params[channel] = (
+            float(getattr(row, "a")),
+            float(getattr(row, "b")),
+            float(getattr(row, "c")),
+        )
+    return params
+
+
+def resolve_selected_feature_from_params(params_csv: Path, selected_channel: str) -> str:
+    if selected_channel != "feature_best":
+        return selected_channel
+
+    df = pd.read_csv(params_csv)
+    score_col = "inv_r2" if "inv_r2" in df.columns else "r2"
+    if score_col not in df.columns:
+        raise ValueError("Cannot use feature_best because parameter CSV has no r2/inv_r2 column.")
+    ranked = df[np.isfinite(pd.to_numeric(df[score_col], errors="coerce"))].copy()
+    if ranked.empty:
+        raise ValueError(f"Cannot use feature_best because no fitted feature has finite {score_col}.")
+    ranked[score_col] = pd.to_numeric(ranked[score_col], errors="coerce")
+    return str(ranked.sort_values(score_col, ascending=False).iloc[0]["channel"])
+
+
 def parse_args(default_cfg: ExpConfig) -> argparse.Namespace:
     """Parse command-line arguments for prediction."""
     parser = argparse.ArgumentParser(
@@ -135,9 +172,17 @@ def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
     params_path = params_path.resolve()
 
     print(f"Loading parameters from {params_path}...")
-    a, b, c = load_fit_parameters(params_path, args.channel)
-    print(f"Using channel: {args.channel} (exposure-normalized for inversion)")
-    print(f"Parameters: a={a:.6g}, b={b:.6g}, c={c:.6g}\n")
+    params_by_channel = load_all_fit_parameters(params_path)
+    selected_channel = resolve_selected_feature_from_params(params_path, args.channel)
+    if selected_channel in params_by_channel:
+        a, b, c = params_by_channel[selected_channel]
+        print(f"Using feature: {selected_channel} (requested: {args.channel})")
+        print(f"Parameters: a={a:.6g}, b={b:.6g}, c={c:.6g}\n")
+    elif selected_channel in AUTO_CHANNELS:
+        print(f"Using aggregate feature mode: {args.channel}\n")
+    else:
+        available = sorted(params_by_channel) + sorted(AUTO_CHANNELS)
+        raise ValueError(f"Selected channel '{args.channel}' is unavailable. Available: {available}")
     
     # Load ROI data
     df_raw = pd.read_csv(args.roi_csv)
@@ -147,22 +192,20 @@ def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
     # Build corrected channels
     corr = build_corrected_channels(df_raw)
     
-    # Get intensity for selected channel
-    intensity = corr[args.channel].to_numpy(dtype=float)
-    intensity_per_exp = corr[f"{args.channel}_per_exp"].to_numpy(dtype=float)
-    
-    # Predict concentration
-    conc_pred = invert_exponential_intensity(intensity_per_exp, a=a, b=b, c0=c)
-    conc_pred = np.maximum(np.asarray(conc_pred, dtype=float), 0.0)
+    channels = [col for col in corr.columns if col != "exposure_time" and not col.endswith("_per_exp")]
+    conc_pred, feature_conc_pred = predict_from_fitted_features(corr, params_by_channel, channels, selected_channel)
     
     # Prepare output
     output_df = pd.DataFrame({
         "filename": df_raw["filename"],
         "exposure_time": corr["exposure_time"],
         "conc_pred": conc_pred,
-        f"{args.channel}_intensity": intensity,
-        f"{args.channel}_per_exp": intensity_per_exp,
+        "selected_channel": selected_channel,
     })
+    if selected_channel in corr.columns:
+        output_df[f"{selected_channel}_value"] = corr[selected_channel]
+    for ch in feature_conc_pred.columns:
+        output_df[f"{ch}_conc_pred"] = feature_conc_pred[ch].to_numpy(dtype=float)
     conc_true = df_raw["filename"].apply(extract_concentration_from_name)
     if conc_true.notna().any():
         output_df["conc_true"] = conc_true
@@ -174,7 +217,7 @@ def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
     output_df.to_csv(output_path, index=False, float_format=CSV_FLOAT_FORMAT)
 
     plot_path = resolve_output_path(args.plot_out, cfg.concentration_plot_path_for(args.roi_csv), cfg.output_dir)
-    _draw_prediction_plot(output_df, plot_path, args.channel)
+    _draw_prediction_plot(output_df, plot_path, selected_channel)
     
     # Display statistics
     valid_mask = np.isfinite(conc_pred)

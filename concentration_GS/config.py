@@ -31,7 +31,7 @@ PREDICT_PLOT_SUFFIX = "_pred_concentration_gs.png"
 
 DEFAULT_G_MODE: Literal["g1", "avg"] = "avg"
 DEFAULT_USE_BG = "true"
-DEFAULT_FEATURE_SET: Literal["full", "compact", "compact_exposure"] = "full"
+DEFAULT_FEATURE_SET: Literal["full", "compact", "compact_exposure"] = "compact"
 TARGET_EPS = 1e-6
 DEFAULT_CONFIDENCE = 0.90
 

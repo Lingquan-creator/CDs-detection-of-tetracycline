@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import csv
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -25,13 +26,7 @@ from roi_config import (
 )
 from roi_gui import BackgroundSelection, ROISelection, select_roi_with_gui
 from roi_manual import ManualROITools
-from roi_distribution_features import (
-    RAW_DIST_CHANNELS,
-    RGB_DIST_CHANNELS,
-    compute_channel_distribution_features,
-    compute_rgb_distribution_features,
-    DIST_FEATURE_KEYS,
-)
+RAW_CHANNELS = ("R", "G1", "G2", "B")
 
 # 字体设置：尽量兼容中英文
 matplotlib.rcParams["font.sans-serif"] = [
@@ -84,9 +79,6 @@ class ROIResult:
     B_display: float
     exposure_time: Optional[float] = None
     iso: Optional[int] = None
-    # 各通道强度分布统计参数（高斯拟合、泊松、矩、熵、FFT、MGF）
-    roi_dist_stats: Optional[Dict[str, float]] = None
-    rgb_dist_stats: Optional[Dict[str, float]] = None
     source_path: Optional[str] = None
 
     def to_dict(self) -> Dict:
@@ -113,51 +105,6 @@ class ROIResult:
                 self.G2_corrected,
                 self.B_corrected,
             ]
-        )
-
-    def get_distribution_feature_vector(self) -> np.ndarray:
-        """返回 RAW 四通道 ROI 强度分布参数向量。"""
-        if not self.roi_dist_stats:
-            return np.zeros(len(RAW_DIST_CHANNELS) * len(DIST_FEATURE_KEYS))
-        features = []
-        for ch in RAW_DIST_CHANNELS:
-            for key in DIST_FEATURE_KEYS:
-                features.append(self.roi_dist_stats.get(f"{ch}_{key}", 0.0))
-        return np.array(features)
-
-    def get_rgb_distribution_feature_vector(self) -> np.ndarray:
-        """返回 RGB 三通道 ROI 强度分布参数向量。"""
-        if not self.rgb_dist_stats:
-            return np.zeros(len(RGB_DIST_CHANNELS) * len(DIST_FEATURE_KEYS))
-        features = []
-        for ch in RGB_DIST_CHANNELS:
-            for key in DIST_FEATURE_KEYS:
-                features.append(self.rgb_dist_stats.get(f"{ch}_{key}", 0.0))
-        return np.array(features)
-
-    def get_full_feature_vector(self) -> np.ndarray:
-        """返回增强输入向量：RAW 均值 + RAW 分布 + RGB 分布。"""
-        return np.concatenate(
-            [
-                self.get_feature_vector(),
-                self.get_distribution_feature_vector(),
-                self.get_rgb_distribution_feature_vector(),
-            ]
-        )
-
-    def get_rgb_vector(self) -> np.ndarray:
-        return np.array(
-            [
-                self.R_display,
-                self.G_display,
-                self.B_display,
-            ]
-        )
-
-    def get_rgb_full_feature_vector(self) -> np.ndarray:
-        """返回 RGB 输入向量：RGB 均值 + RGB 分布参数。"""
-        return np.concatenate(
-            [self.get_rgb_vector(), self.get_rgb_distribution_feature_vector()]
         )
 
 
@@ -476,60 +423,15 @@ class ROIProcessor:
             return raw_channels, metadata
 
     def compute_roi_statistics(self, raw_channels: np.ndarray, roi_mask: np.ndarray, metadata: Optional[Dict] = None) -> Dict[str, float]:
-        """计算 ROI 内的通道统计值，包括均值、方差、分位数、饱和比例等。"""
+        """计算当前输入向量所需的四通道均值。"""
         stats: Dict[str, float] = {}
-        channel_names = list(RAW_DIST_CHANNELS)
-        
-        # 获取白电平（用于计算饱和比例）
-        white_level = 16383.0  # 14-bit RAW 默认值
-        if metadata and metadata.get("white_level"):
-            wl = metadata.get("white_level")
-            if isinstance(wl, (list, tuple, np.ndarray)):
-                white_level = float(np.max(wl))
-            else:
-                white_level = float(wl)
-        
-        for i, name in enumerate(channel_names):
+        for i, name in enumerate(RAW_CHANNELS):
             channel_data = raw_channels[:, :, i]
             roi_values = channel_data[roi_mask > 0]
             if len(roi_values) > 0:
-                # 基础统计量
                 stats[f"{name}_mean"] = float(np.mean(roi_values))
-                stats[f"{name}_var"] = float(np.var(roi_values))  # 方差
-                stats[f"{name}_std"] = float(np.std(roi_values))
-                stats[f"{name}_median"] = float(np.median(roi_values))
-                stats[f"{name}_p10"] = float(np.percentile(roi_values, 10))
-                stats[f"{name}_p50"] = float(np.percentile(roi_values, 50))  # 中位数
-                stats[f"{name}_p90"] = float(np.percentile(roi_values, 90))
-                
-                # 饱和比例（接近白电平的像素占比）
-                saturation_threshold = white_level * 0.95  # 95%白电平视为饱和
-                saturated_pixels = np.sum(roi_values >= saturation_threshold)
-                stats[f"{name}_saturation_ratio"] = float(saturated_pixels / len(roi_values))
             else:
                 stats[f"{name}_mean"] = 0.0
-                stats[f"{name}_var"] = 0.0
-                stats[f"{name}_std"] = 0.0
-                stats[f"{name}_median"] = 0.0
-                stats[f"{name}_p10"] = 0.0
-                stats[f"{name}_p50"] = 0.0
-                stats[f"{name}_p90"] = 0.0
-                stats[f"{name}_saturation_ratio"] = 0.0
-        
-        # 计算通道比值（抗整体亮度漂移）
-        epsilon = 1e-6  # 防止除零
-        G_mean = (stats["G1_mean"] + stats["G2_mean"]) / 2.0
-        stats["R_G_ratio"] = stats["R_mean"] / (G_mean + epsilon)
-        stats["B_G_ratio"] = stats["B_mean"] / (G_mean + epsilon)
-        stats["R_B_ratio"] = stats["R_mean"] / (stats["B_mean"] + epsilon)
-        stats["G1_G2_ratio"] = stats["G1_mean"] / (stats["G2_mean"] + epsilon)
-
-        # ---- 各通道强度分布统计建模 ----
-        # 包含：高斯拟合、泊松统计、高阶矩、Shannon熵、FFT频谱、MGF（Laplace域）
-        dist_feats = compute_channel_distribution_features(
-            raw_channels, roi_mask, channel_names
-        )
-        stats.update(dist_feats)
 
         return stats
 
@@ -722,15 +624,6 @@ class ROIProcessor:
             int(np.clip(np.max(roi_box[:, 1]), 0, H - 1)),
         )
 
-        # 提取 ROI 分布统计特征
-        roi_dist: Dict[str, float] = {}
-        for ch in RAW_DIST_CHANNELS:
-            for key in DIST_FEATURE_KEYS:
-                full_key = f"{ch}_{key}"
-                if full_key in roi_stats:
-                    roi_dist[full_key] = roi_stats[full_key]
-        roi_rgb_dist = compute_rgb_distribution_features(raw_channels, roi_mask)
-
         result = ROIResult(
             filename=filepath.name,
             concentration=metadata.get("concentration"),
@@ -769,8 +662,6 @@ class ROIProcessor:
             B_display=max(0, B_display),
             exposure_time=metadata.get("exposure_time"),
             iso=metadata.get("iso"),
-            roi_dist_stats=roi_dist if roi_dist else None,
-            rgb_dist_stats=roi_rgb_dist if roi_rgb_dist else None,
             source_path=str(filepath),
         )
 
@@ -934,195 +825,115 @@ class ROIProcessor:
 
         if results:
             self._save_results(results, output_dir)
-            self._save_detailed_statistics(results, output_dir)
 
         return results
 
     def _save_results(self, results: List[ROIResult], output_dir: Path):
-        """保存 JSON/CSV/NPY 结果。"""
+        """只保存 ROI/BG 选择记录和当前输入向量需要的参数。"""
         output_dir.mkdir(parents=True, exist_ok=True)
+
+        records = [self._build_output_record(r) for r in results]
 
         json_path = output_dir / "roi_results.json"
         with open(json_path, "w", encoding="utf-8") as f:
-            json.dump([r.to_dict() for r in results], f, indent=2, ensure_ascii=False)
-        print(f"\nJSON 结果已保存: {json_path}")
+            json.dump(records, f, indent=2, ensure_ascii=False)
+        print(f"\nROI/BG 记录已保存: {json_path}")
 
-        csv_path = output_dir / "roi_features.csv"
-        with open(csv_path, "w", encoding="utf-8") as f:
-            f.write(
-                "filename,concentration,center_x,center_y,width,height,angle_deg,bg_center_x,bg_center_y,"
-                "bg_inner_center_x,bg_inner_center_y,bg_outer_center_x,bg_outer_center_y,"
-                "bg_inner_x,bg_inner_y,bg_outer_x,bg_outer_y,bg_angle_deg,area,"
-            )
-            f.write("R_mean,G1_mean,G2_mean,B_mean,")
-            f.write("R_bg,G1_bg,G2_bg,B_bg,")
-            f.write("R_corrected,G1_corrected,G2_corrected,B_corrected,")
-            f.write("R_display,G_display,B_display,")
-            f.write("exposure_time,iso\n")
-            for r in results:
-                concentration_text = "" if r.concentration is None else f"{r.concentration:.8g}"
-                f.write(
-                    f"{r.filename},{concentration_text},{r.center_x:.2f},{r.center_y:.2f},{r.width:.2f},{r.height:.2f},{r.angle_deg:.2f},"
-                    f"{r.bg_center_x:.2f},{r.bg_center_y:.2f},"
-                    f"{r.bg_inner_center_x:.2f},{r.bg_inner_center_y:.2f},{r.bg_outer_center_x:.2f},{r.bg_outer_center_y:.2f},"
-                    f"{r.bg_inner_x:.2f},{r.bg_inner_y:.2f},{r.bg_outer_x:.2f},{r.bg_outer_y:.2f},{r.bg_angle_deg:.2f},{r.area},"
-                )
-                f.write(
-                    f"{r.R_mean:.2f},{r.G1_mean:.2f},{r.G2_mean:.2f},{r.B_mean:.2f},"
-                )
-                f.write(
-                    f"{r.R_bg:.2f},{r.G1_bg:.2f},{r.G2_bg:.2f},{r.B_bg:.2f},"
-                )
-                f.write(
-                    f"{r.R_corrected:.2f},{r.G1_corrected:.2f},{r.G2_corrected:.2f},{r.B_corrected:.2f},"
-                )
-                f.write(f"{r.R_display:.2f},{r.G_display:.2f},{r.B_display:.2f},")
-                f.write(f"{r.exposure_time},{r.iso}\n")
-        print(f"CSV 特征已保存: {csv_path}")
-
-        features_path = output_dir / "feature_matrix.npy"
-        feature_matrix = np.array([r.get_feature_vector() for r in results])
-        np.save(features_path, feature_matrix)
-        print(f"特征矩阵已保存: {features_path} (shape: {feature_matrix.shape})")
-
-        # 保存完整特征矩阵（含分布统计参数）
-        full_features_path = output_dir / "feature_matrix_full.npy"
-        full_feature_matrix = np.array([r.get_full_feature_vector() for r in results])
-        np.save(full_features_path, full_feature_matrix)
-        rgb_full_features_path = output_dir / "feature_matrix_rgb_full.npy"
-        rgb_full_feature_matrix = np.array([r.get_rgb_full_feature_vector() for r in results])
-        np.save(rgb_full_features_path, rgb_full_feature_matrix)
-        print(
-            f"RGB 增强特征矩阵已保存: {rgb_full_features_path} (shape: {rgb_full_feature_matrix.shape})"
-        )
-        print(f"完整特征矩阵已保存: {full_features_path} (shape: {full_feature_matrix.shape})")
-
-        # 保存分布特征 CSV
-        dist_csv_path = output_dir / "roi_distribution_features.csv"
-        dist_col_names = [f"{ch}_{k}" for ch in RAW_DIST_CHANNELS for k in DIST_FEATURE_KEYS]
-        with open(dist_csv_path, "w", encoding="utf-8") as f:
-            f.write("filename," + ",".join(dist_col_names) + "\n")
-            for r in results:
-                vals = [r.filename]
-                dist = r.roi_dist_stats or {}
-                for col in dist_col_names:
-                    vals.append(f"{dist.get(col, 0.0):.8g}")
-                f.write(",".join(vals) + "\n")
-        print(f"分布特征CSV已保存: {dist_csv_path}")
-        print(f"  特征说明: 4通道 × {len(DIST_FEATURE_KEYS)}特征 = {len(dist_col_names)} 列")
-        print("  模型候选: Gaussian / Poisson / Gamma，best_model_code: 1/2/3")
-        print("  关键参数: gauss_mu/sigma/r2, poisson_lambda, gamma_shape/scale,")
-        print("            fano_factor, skewness, kurtosis, entropy, fft_*, mgf_t1~t4")
-
-        rgb_dist_csv_path = output_dir / "roi_rgb_distribution_features.csv"
-        rgb_dist_col_names = [
-            f"{ch}_{k}" for ch in RGB_DIST_CHANNELS for k in DIST_FEATURE_KEYS
-        ]
-        with open(rgb_dist_csv_path, "w", encoding="utf-8") as f:
-            f.write("filename," + ",".join(rgb_dist_col_names) + "\n")
-            for r in results:
-                vals = [r.filename]
-                dist = r.rgb_dist_stats or {}
-                for col in rgb_dist_col_names:
-                    vals.append(f"{dist.get(col, 0.0):.8g}")
-                f.write(",".join(vals) + "\n")
-        print(f"RGB 分布特征CSV已保存: {rgb_dist_csv_path}")
-        print(f"  特征说明: 3 通道 × {len(DIST_FEATURE_KEYS)} 特征 = {len(rgb_dist_col_names)} 列")
-        print("  模型候选: Gaussian / Poisson / Gamma，best_model_code: 1/2/3")
-
-    def _save_detailed_statistics(self, results: List[ROIResult], output_dir: Path):
-        """保存详细的统计信息到单独的CSV文件，包括均值、方差、分位数、饱和比例和通道比值。"""
-        output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # 重新处理图像以获取详细统计信息
-        detailed_stats_list = []
-        
-        for result in results:
-            # 构建完整路径
-            filepath = Path(result.source_path) if result.source_path else (DATA_DIR / result.filename)
-            if not filepath.exists():
-                print(f"  警告: 找不到文件 {filepath}，跳过详细统计")
-                continue
-            
-            try:
-                # 重新加载图像并计算详细统计
-                raw_channels, metadata = self.load_raw_image(filepath)
-                H, W = raw_channels.shape[:2]
-                roi_sel = ROISelection(
-                    center=(result.center_x, result.center_y),
-                    width=result.width,
-                    height=result.height,
-                    angle_deg=result.angle_deg,
-                )
-                bg_sel = BackgroundSelection(
-                    center=(result.bg_outer_center_x, result.bg_outer_center_y),
-                    inner_center=(result.bg_inner_center_x, result.bg_inner_center_y),
-                    outer_center=(result.bg_outer_center_x, result.bg_outer_center_y),
-                    inner_x=result.bg_inner_x,
-                    inner_y=result.bg_inner_y,
-                    outer_x=result.bg_outer_x,
-                    outer_y=result.bg_outer_y,
-                    angle_deg=result.bg_angle_deg,
-                )
-                roi_mask = self.manual.create_fixed_roi(
-                    roi_sel.center, (H, W), roi_sel.width, roi_sel.height, roi_sel.angle_deg
-                )
-                bg_mask = self.manual.create_background_roi(
-                    bg_sel.outer_center,
-                    (H, W),
-                    roi_angle=bg_sel.angle_deg,
-                    inner_center=bg_sel.inner_center,
-                    outer_center=bg_sel.outer_center,
-                    inner_width=bg_sel.inner_x,
-                    inner_height=bg_sel.inner_y,
-                    outer_width=bg_sel.outer_x,
-                    outer_height=bg_sel.outer_y,
-                    exclude_mask=roi_mask,
-                )
-                
-                # 计算详细统计
-                roi_stats = self.compute_roi_statistics(raw_channels, roi_mask, metadata)
-                bg_stats = self.compute_roi_statistics(raw_channels, bg_mask, metadata)
-                
-                # 合并信息
-                detailed_info = {
-                    'filename': result.filename,
-                    'concentration': result.concentration,
-                    'exposure_time': result.exposure_time,
-                    'iso': result.iso,
-                    **{f'roi_{k}': v for k, v in roi_stats.items()},
-                    **{f'bg_{k}': v for k, v in bg_stats.items()}
-                }
-                detailed_stats_list.append(detailed_info)
-                
-            except Exception as exc:
-                print(f"  警告: 处理 {result.filename} 详细统计时出错: {exc}")
-                continue
-        
-        if not detailed_stats_list:
-            print("  警告: 没有成功生成详细统计信息")
-            return
-        
-        # 保存到CSV
         csv_path = output_dir / "roi_detailed_statistics.csv"
-        with open(csv_path, "w", encoding="utf-8") as f:
-            # 写表头
-            keys = detailed_stats_list[0].keys()
-            f.write(','.join(keys) + '\n')
-            
-            # 写数据
-            for stats in detailed_stats_list:
-                values = []
-                for key in keys:
-                    val = stats[key]
-                    if isinstance(val, float):
-                        values.append(f"{val:.6f}")
-                    else:
-                        values.append(str(val))
-                f.write(','.join(values) + '\n')
-        
-        print(f"详细统计已保存: {csv_path}")
-        print(f"  包含列: 均值、方差、分位数(p10/p50/p90)、饱和比例、通道比值(R/G, B/G, R/B, G1/G2)")
+        fieldnames = [
+            "filename",
+            "concentration",
+            "exposure_time",
+            "iso",
+            "center_x",
+            "center_y",
+            "width",
+            "height",
+            "angle_deg",
+            "bg_inner_center_x",
+            "bg_inner_center_y",
+            "bg_outer_center_x",
+            "bg_outer_center_y",
+            "bg_inner_x",
+            "bg_inner_y",
+            "bg_outer_x",
+            "bg_outer_y",
+            "bg_angle_deg",
+            "roi_R_mean",
+            "roi_G1_mean",
+            "roi_G2_mean",
+            "roi_B_mean",
+            "bg_R_mean",
+            "bg_G1_mean",
+            "bg_G2_mean",
+            "bg_B_mean",
+            "R_sig",
+            "G_sig",
+            "B_sig",
+            "ln_R_sig",
+            "ln_G_sig",
+            "ln_B_sig",
+            "Ratio_RG",
+            "Delta_RG",
+            "Ratio_BG",
+        ]
+        with open(csv_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(records)
+
+        print(f"输入向量参数已保存: {csv_path}")
+        print("  输出列只包含 ROI/BG 选择记录、ROI/BG 均值和当前 4 维输入向量。")
+
+    @staticmethod
+    def _format_optional(value: Optional[float | int]) -> str:
+        return "" if value is None else str(value)
+
+    def _build_output_record(self, r: ROIResult) -> Dict[str, str]:
+        g_sig = (r.G1_corrected + r.G2_corrected) / 2.0
+        r_sig = max(r.R_corrected, 0.1)
+        g_sig_clipped = max(g_sig, 0.1)
+        b_sig = max(r.B_corrected, 0.1)
+        ratio_rg = r_sig / (g_sig_clipped + 1e-6)
+        delta_rg = (g_sig_clipped - r_sig) / (g_sig_clipped + r_sig + 1e-6)
+        ratio_bg = b_sig / (g_sig_clipped + 1e-6)
+        return {
+            "filename": r.filename,
+            "concentration": self._format_optional(r.concentration),
+            "exposure_time": self._format_optional(r.exposure_time),
+            "iso": self._format_optional(r.iso),
+            "center_x": f"{r.center_x:.6f}",
+            "center_y": f"{r.center_y:.6f}",
+            "width": f"{r.width:.6f}",
+            "height": f"{r.height:.6f}",
+            "angle_deg": f"{r.angle_deg:.6f}",
+            "bg_inner_center_x": f"{r.bg_inner_center_x:.6f}",
+            "bg_inner_center_y": f"{r.bg_inner_center_y:.6f}",
+            "bg_outer_center_x": f"{r.bg_outer_center_x:.6f}",
+            "bg_outer_center_y": f"{r.bg_outer_center_y:.6f}",
+            "bg_inner_x": f"{r.bg_inner_x:.6f}",
+            "bg_inner_y": f"{r.bg_inner_y:.6f}",
+            "bg_outer_x": f"{r.bg_outer_x:.6f}",
+            "bg_outer_y": f"{r.bg_outer_y:.6f}",
+            "bg_angle_deg": f"{r.bg_angle_deg:.6f}",
+            "roi_R_mean": f"{r.R_mean:.6f}",
+            "roi_G1_mean": f"{r.G1_mean:.6f}",
+            "roi_G2_mean": f"{r.G2_mean:.6f}",
+            "roi_B_mean": f"{r.B_mean:.6f}",
+            "bg_R_mean": f"{r.R_bg:.6f}",
+            "bg_G1_mean": f"{r.G1_bg:.6f}",
+            "bg_G2_mean": f"{r.G2_bg:.6f}",
+            "bg_B_mean": f"{r.B_bg:.6f}",
+            "R_sig": f"{r_sig:.6f}",
+            "G_sig": f"{g_sig_clipped:.6f}",
+            "B_sig": f"{b_sig:.6f}",
+            "ln_R_sig": f"{np.log(r_sig + 1e-6):.6f}",
+            "ln_G_sig": f"{np.log(g_sig_clipped + 1e-6):.6f}",
+            "ln_B_sig": f"{np.log(b_sig + 1e-6):.6f}",
+            "Ratio_RG": f"{ratio_rg:.6f}",
+            "Delta_RG": f"{delta_rg:.6f}",
+            "Ratio_BG": f"{ratio_bg:.6f}",
+        }
 
 
 def main():

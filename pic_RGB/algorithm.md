@@ -1,13 +1,13 @@
 # pic_RGB 算法说明
 
-本目录负责从 DNG/RAW 图像中选取样品 ROI 和背景区域，提取 R/G1/G2/B 四通道统计量，并生成浓度反演使用的 CSV/NPY/JSON 文件。
+本目录负责从 DNG/RAW 图像中选取样品 ROI 和背景区域，只提取当前浓度反演输入向量需要的 R/G1/G2/B 均值参数，并保存 ROI/BG 选择记录。
 
 ## 主要代码
 
 - `roi_processor.py`: 主流程，批量读取 DNG，复用缓存或调用 GUI 选择 ROI/BG，计算统计量并保存结果。
 - `roi_gui.py`: 交互式 ROI、背景内框、背景外框选择界面。
 - `roi_manual.py`: 根据中心、宽高、角度生成旋转矩形 ROI mask 和背景环 mask。
-- `roi_distribution_features.py`: 计算高斯/泊松/Gamma、矩、熵、FFT、MGF 等分布特征。
+- `roi_distribution_features.py`: 历史分布特征工具；当前精简流程不再调用。
 - `roi_config.py`: 输入输出路径、默认 ROI 参数、缓存复用和可视化配置。
 - `analyze_statistics.py`: 查看和分析统计 CSV 的辅助脚本。
 
@@ -58,11 +58,8 @@ PIC_RGB_OUTPUT_DIR=/path/to/output
    - 若缓存存在并启用 `REUSE_LAST_SELECTION`，直接复用缓存。
    - 否则打开 GUI，由用户拖动选择当前激活框：ROI、BG inner 或 BG outer。
 5. 用 `roi_manual.py` 生成 ROI mask 和背景环 mask。背景环会排除 ROI 区域。
-6. 对 ROI 和 BG 分别计算四通道统计：
-   - mean, var, std
-   - median, p10, p50, p90
-   - saturation_ratio
-   - R/G, B/G, R/B, G1/G2 比值
+6. 对 ROI 和 BG 分别只计算四通道均值：
+   - `R_mean`, `G1_mean`, `G2_mean`, `B_mean`
 7. 计算背景扣除值：
 
    ```text
@@ -72,18 +69,23 @@ PIC_RGB_OUTPUT_DIR=/path/to/output
    B_corrected  = roi_B_mean  - bg_B_mean
    ```
 
-8. 计算 RAW 四通道和显示 RGB 的分布特征。
-9. 保存 JSON、CSV、NPY 和每张图的 ROI 可视化 PNG。
+8. 构造当前使用的输入向量：
+
+   ```text
+   ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG
+   ```
+
+9. 保存 ROI/BG 选择记录和输入向量所需参数。默认不再输出 NPY、分布统计 CSV 和每张图的 PNG。
 
 ## 算法输出
 
 算法层面的输出是：
 
 - 每张图的 ROI/BG 几何位置。
-- ROI 和 BG 的四通道统计量。
-- 背景扣除后的 R/G1/G2/B 特征。
-- RAW/RGB 分布统计特征。
-- 用于建模的特征矩阵。
+- ROI/BG 几何位置。
+- ROI 和 BG 的四通道均值。
+- 背景扣除后的 `R_sig/G_sig/B_sig`。
+- 当前 4 维输入向量。
 
 实际输出目录是 `OUTPUT_DIR`。当前默认是：
 
@@ -93,14 +95,7 @@ PIC_RGB_OUTPUT_DIR=/path/to/output
 
 - `roi_results.json`: ROI/BG 几何、通道均值、背景扣除值和元数据。
 - `roi_selection_cache.json`: 可复用的 ROI/BG 选择缓存。
-- `roi_features.csv`: 简化特征表。
-- `feature_matrix.npy`: 4 维背景扣除特征矩阵 `[R, G1, G2, B]`。
-- `feature_matrix_full.npy`: RAW 均值 + RAW 分布 + RGB 分布的完整特征矩阵。
-- `feature_matrix_rgb_full.npy`: 显示 RGB + RGB 分布特征矩阵。
-- `roi_distribution_features.csv`: RAW 四通道分布特征。
-- `roi_rgb_distribution_features.csv`: RGB 三通道分布特征。
-- `roi_detailed_statistics.csv`: 详细统计表，后续浓度反演主要使用。
-- `<filename>_roi.png`: 每张图的 ROI/BG 可视化。
+- `roi_detailed_statistics.csv`: 当前训练/预测需要的 ROI/BG 均值、`R_sig/G_sig/B_sig` 和 `ln_R_sig/ln_G_sig/ln_B_sig/Ratio_RG`。
 
 ## 使用方式
 

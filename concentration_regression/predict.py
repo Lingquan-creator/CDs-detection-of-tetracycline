@@ -135,7 +135,7 @@ def load_model_bundle(
     *,
     strict_sklearn_version: bool = False,
     suppress_sklearn_version_warning: bool = False,
-) -> Tuple[object, object, str, str, float, bool, Optional[object]]:
+) -> Tuple[object, object, str, str, float, bool, str, Optional[object]]:
     obj = _joblib_load_with_sklearn_version_handling(
         path,
         strict_sklearn_version=strict_sklearn_version,
@@ -145,6 +145,7 @@ def load_model_bundle(
     target_transform = "identity"
     target_eps = TARGET_EPS
     use_bg = False
+    bg_correction = "subtract"
     calibrator: Optional[object] = None
 
     if isinstance(obj, dict) and "model" in obj:
@@ -153,6 +154,7 @@ def load_model_bundle(
         target_transform = obj.get("target_transform", target_transform)
         target_eps = obj.get("target_eps", TARGET_EPS)
         use_bg = bool(obj.get("use_bg", use_bg))
+        bg_correction = str(obj.get("bg_correction", bg_correction))
         calibrator = obj.get("isotonic", None)
     else:
         model = obj
@@ -162,8 +164,10 @@ def load_model_bundle(
         g_mode = g_mode_override
     if g_mode not in ("g1", "avg"):
         g_mode = DEFAULT_G_MODE
+    if bg_correction not in ("subtract", "divide", "relative"):
+        bg_correction = "subtract"
 
-    return obj, model, g_mode, str(target_transform), float(target_eps), use_bg, calibrator
+    return obj, model, g_mode, str(target_transform), float(target_eps), use_bg, bg_correction, calibrator
 
 
 def inverse_target(pred: np.ndarray, transform: Optional[str], target_eps: float) -> np.ndarray:
@@ -198,6 +202,7 @@ def predict_batch(
     target_transform: Optional[str],
     target_eps: float,
     use_bg: bool,
+    bg_correction: str,
     calibrator: Optional[object],
     expected_feature_names: Optional[Sequence[str]],
 ) -> pd.DataFrame:
@@ -213,7 +218,13 @@ def predict_batch(
         print("WARNING: model expects bg_* columns, input CSV has none, fallback to non-bg features.")
         dataset_use_bg = False
 
-    feature_df = build_feature_frame(df, g_mode=g_mode, use_bg=dataset_use_bg, clip_min=CLIP_MIN)
+    feature_df = build_feature_frame(
+        df,
+        g_mode=g_mode,
+        use_bg=dataset_use_bg,
+        clip_min=CLIP_MIN,
+        bg_correction=bg_correction,
+    )
     model_features = _select_model_features(feature_df, expected_feature_names)
     pred_target = model.predict(model_features.to_numpy(dtype=float))
     pred_raw = inverse_target(np.asarray(pred_target, dtype=float), target_transform, target_eps)
@@ -325,7 +336,7 @@ def main() -> None:
     if not model_path.exists():
         raise FileNotFoundError(f"Model file not found: {model_path}")
 
-    bundle, model, g_mode, target_transform, target_eps, use_bg, calibrator = load_model_bundle(
+    bundle, model, g_mode, target_transform, target_eps, use_bg, bg_correction, calibrator = load_model_bundle(
         model_path,
         args.g_mode,
         strict_sklearn_version=bool(args.strict_sklearn_version),
@@ -341,7 +352,8 @@ def main() -> None:
 
     print(
         f"Loaded model: {model_path} "
-        f"(g_mode={g_mode}, target={target_transform}, use_bg={use_bg}, calibrator={'yes' if calibrator else 'no'})"
+        f"(g_mode={g_mode}, target={target_transform}, use_bg={use_bg}, "
+        f"bg_correction={bg_correction}, calibrator={'yes' if calibrator else 'no'})"
     )
 
     expected_feature_names: Optional[Sequence[str]] = None
@@ -359,6 +371,7 @@ def main() -> None:
         target_transform=target_transform,
         target_eps=target_eps,
         use_bg=use_bg,
+        bg_correction=bg_correction,
         calibrator=calibrator,
         expected_feature_names=expected_feature_names,
     )
