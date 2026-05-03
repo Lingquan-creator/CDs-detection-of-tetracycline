@@ -72,7 +72,7 @@ PIC_RGB_OUTPUT_DIR=/path/to/output
 8. 构造当前使用的输入向量：
 
    ```text
-   ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG
+   ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG, Delta_RG, Delta_GB
    ```
 
 9. 保存 ROI/BG 选择记录和输入向量所需参数。默认不再输出 NPY、分布统计 CSV 和每张图的 PNG。
@@ -85,7 +85,7 @@ PIC_RGB_OUTPUT_DIR=/path/to/output
 - ROI/BG 几何位置。
 - ROI 和 BG 的四通道均值。
 - 背景扣除后的 `R_sig/G_sig/B_sig`。
-- 当前 4 维输入向量。
+- 当前 6 维输入向量。
 
 实际输出目录是 `OUTPUT_DIR`。当前默认是：
 
@@ -95,7 +95,7 @@ PIC_RGB_OUTPUT_DIR=/path/to/output
 
 - `roi_results.json`: ROI/BG 几何、通道均值、背景扣除值和元数据。
 - `roi_selection_cache.json`: 可复用的 ROI/BG 选择缓存。
-- `roi_detailed_statistics.csv`: 当前训练/预测需要的 ROI/BG 均值、`R_sig/G_sig/B_sig` 和 `ln_R_sig/ln_G_sig/ln_B_sig/Ratio_RG`。
+- `roi_detailed_statistics.csv`: 当前训练/预测需要的 ROI/BG 均值、`R_sig/G_sig/B_sig` 和 `ln_R_sig/ln_G_sig/ln_B_sig/Ratio_RG/Delta_RG/Delta_GB`。
 
 ## 使用方式
 

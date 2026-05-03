@@ -221,9 +221,9 @@ def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: s
         else ("ln_R", "ln_G", "ln_B")
     )
     no_exposure_columns = (
-        ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Delta_RG", "Ratio_BG")
+        ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Delta_RG", "Delta_GB")
         if use_bg
-        else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Delta_RG", "Ratio_BG")
+        else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Delta_RG", "Delta_GB")
     )
     exposure_columns = (
         (

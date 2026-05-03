@@ -5,8 +5,8 @@ This module provides unified feature engineering tools for all concentration
 prediction methods (Ridge, Exponential, Gaussian amortized posterior).
 
 Supported feature sets:
-- Raw features (no background): ln_R/ln_G/ln_B, Ratio_RG/Delta_RG/Ratio_BG, Var_G
-- Background-subtracted features: ln_R_sig/ln_G_sig/ln_B_sig using signal=ROI-BG, plus ratios/Var_G
+- Raw features (no background): ln_R/ln_G/ln_B, Ratio_RG/Delta_RG/Ratio_BG/Delta_GB, Var_G
+- Background-subtracted features: ln_R_sig/ln_G_sig/ln_B_sig using signal=ROI-BG, plus ratios/deltas/Var_G
 
 Based on Beer-Lambert law: I is proportional to exp(-epsilon*l*C), so ln(I) should be linear with concentration.
 
@@ -33,6 +33,7 @@ FEATURE_NAMES_RAW: Tuple[str, ...] = (
     "Ratio_RG",
     "Delta_RG",
     "Ratio_BG",
+    "Delta_GB",
     "Var_G",
     "exposure_time",
     "ln_exposure",
@@ -47,6 +48,7 @@ FEATURE_NAMES_BG: Tuple[str, ...] = (
     "Ratio_RG",
     "Delta_RG",
     "Ratio_BG",
+    "Delta_GB",
     "Var_G",
     "exposure_time",
     "ln_exposure",
@@ -262,6 +264,7 @@ def build_feature_frame(
             "Ratio_RG": r_sig / (g_sig + _EPS),
             "Delta_RG": (g_sig - r_sig) / (g_sig + r_sig + _EPS),
             "Ratio_BG": b_sig / (g_sig + _EPS),
+            "Delta_GB": (b_sig - g_sig) / (b_sig + g_sig + _EPS),
             "Var_G": g_var,
             "exposure_time": exposure,
             "ln_exposure": ln_exposure,
@@ -341,8 +344,9 @@ def build_feature_vector(
     ratio_rg = r_sig / (g_mean + _EPS)
     delta_rg = (g_mean - r_sig) / (g_mean + r_sig + _EPS)
     ratio_bg = b_sig / (g_mean + _EPS)
+    delta_gb = (b_sig - g_mean) / (b_sig + g_mean + _EPS)
 
     return np.array(
-        [[ln_r, ln_g, ln_b, ln_r_per_exp, ln_g_per_exp, ln_b_per_exp, ratio_rg, delta_rg, ratio_bg, var_g, exposure, np.log(exposure + _EPS)]],
+        [[ln_r, ln_g, ln_b, ln_r_per_exp, ln_g_per_exp, ln_b_per_exp, ratio_rg, delta_rg, ratio_bg, delta_gb, var_g, exposure, np.log(exposure + _EPS)]],
         dtype=float,
     )

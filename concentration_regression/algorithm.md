@@ -1,6 +1,6 @@
 # concentration_regression 算法说明
 
-本目录实现基于物理特征和 Ridge 回归的浓度反演。模型把 ROI/BG 统计转换成 Beer-Lambert 风格的对数强度、通道比值和分布变换特征，再用带强正则的线性模型预测浓度。
+本目录实现基于物理特征和 Ridge 回归的浓度反演。模型把 ROI/BG 统计转换成 Beer-Lambert 风格的对数强度和通道差分特征，再用带强正则的线性模型预测浓度。
 
 ## 主要代码
 
@@ -47,7 +47,7 @@ B_sig = max(roi_B_mean - bg_B_mean, clip_min)
 ```text
 ln_R_sig, ln_G_sig, ln_B_sig
 ln_R_sig_per_exp, ln_G_sig_per_exp, ln_B_sig_per_exp
-Ratio_RG, Delta_RG, Ratio_BG
+Ratio_RG, Delta_RG, Delta_GB
 Var_G
 exposure_time, ln_exposure
 ```
@@ -60,10 +60,10 @@ log_roi_*_gamma_shape   = log(max(roi_*_gamma_shape, eps))
 sqrt_roi_*_gamma_scale  = sqrt(max(roi_*_gamma_scale, 0))
 ```
 
-`compact` 是当前默认，使用最近外部测试中最稳的 4 个无曝光物理特征，不包含 `Var_G`：
+`compact` 是当前默认，使用最近外部测试中最稳的 6 个无曝光物理特征，不包含 `Var_G`：
 
 ```text
-ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG
+ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG, Delta_RG, Delta_GB
 ```
 
 `compact_exposure` 保留 12 个基础物理特征，仍包含 `Var_G`。

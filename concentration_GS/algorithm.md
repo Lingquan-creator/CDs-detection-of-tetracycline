@@ -31,7 +31,7 @@ q(log(C + eps) | x) = Normal(mu_phi(x), sigma_phi(x)^2)
 当前默认配置：
 
 - `use_bg=true`: 默认要求并使用背景扣除。
-- `feature_set=compact`: 输入向量参考 `concentration_regression`，使用跨数据集更稳的 4 个 ROI-BG 特征。
+- `feature_set=compact`: 输入向量参考 `concentration_regression`，使用跨数据集更稳的 6 个 ROI-BG 特征。
 - `hidden_dim=8`
 - `max_std_log=2.0`: 保留后验 log 标准差上限。
 
@@ -50,7 +50,7 @@ B_sig = max(roi_B_mean - bg_B_mean, clip_min)
 ```text
 ln_R_sig, ln_G_sig, ln_B_sig
 ln_R_sig_per_exp, ln_G_sig_per_exp, ln_B_sig_per_exp
-Ratio_RG, Delta_RG, Ratio_BG
+Ratio_RG, Delta_RG, Delta_GB
 Var_G
 exposure_time, ln_exposure
 ```
@@ -63,10 +63,10 @@ log_roi_*_gamma_shape   = log(max(roi_*_gamma_shape, eps))
 sqrt_roi_*_gamma_scale  = sqrt(max(roi_*_gamma_scale, 0))
 ```
 
-当前默认 `compact` 实际训练列是 4 维，不包含 `Var_G`：
+当前默认 `compact` 实际训练列是 6 维，不包含 `Var_G`：
 
 ```text
-ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG
+ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG, Delta_RG, Delta_GB
 ```
 
 如果使用 `full`，会使用所有基础物理特征和可用的 ROI 分布变换特征；如果使用 `compact_exposure`，则只使用 12 维基础物理特征。若 `use_bg=false`，对应特征名会从 `*_sig` 变为原始 ROI 通道，例如 `ln_R`。
@@ -90,7 +90,7 @@ ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG
    y_std = (y_log - mean(y_log)) / std(y_log)
    ```
 
-7. 训练 MLP。输入维度由 `feature_set` 和 CSV 中可用列决定；当前默认 compact 是 4 维。网络结构为：
+7. 训练 MLP。输入维度由 `feature_set` 和 CSV 中可用列决定；当前默认 compact 是 6 维。网络结构为：
 
    ```text
    input_dim -> hidden_dim -> hidden_dim -> mu/std heads

@@ -6,7 +6,7 @@ Fits intensity = a * exp(b * conc) + c for each RGB channel, then inverts to pre
 Usage:
     python train.py                    # Use default ROI CSV
     python train.py --roi-csv <path>   # Custom ROI CSV
-    python train.py --channel G_corr   # Use averaged green channel
+    python train.py --channel G_sig    # Use averaged green ROI-BG light channel
     python train.py --weight-eps 10.0  # Adjust low-concentration emphasis
 """
 
@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 
 from config import ExpConfig
-from physics_features import build_feature_frame, extract_concentration_from_name
+from physics_features import extract_concentration_from_name, resolve_exposure_time_series
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -30,16 +30,10 @@ from matplotlib.ticker import FuncFormatter
 
 _EXPOSURE_MIN = 1e-6
 CSV_FLOAT_FORMAT = "%.6g"
-EXP_INPUT_FEATURES = (
-    "ln_R_sig",
-    "ln_G_sig",
-    "ln_B_sig",
-    "Ratio_RG",
-    "Delta_RG",
-    "Ratio_BG",
-)
-AGGREGATE_CHANNELS = {"feature_median", "feature_mean"}
-AUTO_CHANNELS = AGGREGATE_CHANNELS | {"feature_best"}
+EXP_LIGHT_CHANNELS = ("R_sig", "G1_sig", "G2_sig", "G_sig", "B_sig")
+AGGREGATE_CHANNELS = {"light_median", "light_mean", "feature_median", "feature_mean"}
+BEST_CHANNEL_ALIASES = {"light_best", "feature_best"}
+AUTO_CHANNELS = AGGREGATE_CHANNELS | BEST_CHANNEL_ALIASES
 
 
 def format_plot_number(value: float, _pos: object = None) -> str:
@@ -197,26 +191,38 @@ def invert_exponential_intensity(
 
 def build_corrected_channels(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Build the compact ROI-BG feature vector used by the exponential inversion.
+    Build ROI-BG light intensity channels used by the exponential inversion.
 
-    The active inputs are:
-    ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG, Delta_RG, Ratio_BG.
-    ``*_per_exp`` aliases are kept for compatibility with the existing fitting
-    and plotting code; these features are already normalized/transformed inputs.
+    The model fits intensity directly as I(C)=a*exp(b*C)+c for R/G/B signals.
+    ``*_per_exp`` columns are retained as diagnostics but are not fitted by default.
     """
-    from physics_features import resolve_exposure_time_series
+    required = {
+        "roi_R_mean",
+        "roi_G1_mean",
+        "roi_B_mean",
+        "bg_R_mean",
+        "bg_G1_mean",
+        "bg_B_mean",
+    }
+    missing = sorted(required - set(df.columns))
+    if missing:
+        raise ValueError(f"ROI CSV missing required columns for exponential fit: {missing}")
 
     corr = pd.DataFrame(index=df.index)
     corr["exposure_time"] = resolve_exposure_time_series(df)
-    physics_features = build_feature_frame(df, use_bg=True)
-    missing = [feature for feature in EXP_INPUT_FEATURES if feature not in physics_features.columns]
-    if missing:
-        raise ValueError(f"Cannot build exponential input vector; missing features: {missing}")
+    corr["R_sig"] = np.maximum(df["roi_R_mean"].to_numpy(dtype=float) - df["bg_R_mean"].to_numpy(dtype=float), 0.1)
+    corr["G1_sig"] = np.maximum(df["roi_G1_mean"].to_numpy(dtype=float) - df["bg_G1_mean"].to_numpy(dtype=float), 0.1)
+    corr["B_sig"] = np.maximum(df["roi_B_mean"].to_numpy(dtype=float) - df["bg_B_mean"].to_numpy(dtype=float), 0.1)
+    if "roi_G2_mean" in df.columns and "bg_G2_mean" in df.columns:
+        corr["G2_sig"] = np.maximum(df["roi_G2_mean"].to_numpy(dtype=float) - df["bg_G2_mean"].to_numpy(dtype=float), 0.1)
+        corr["G_sig"] = (corr["G1_sig"].to_numpy(dtype=float) + corr["G2_sig"].to_numpy(dtype=float)) / 2.0
+    else:
+        corr["G2_sig"] = np.nan
+        corr["G_sig"] = corr["G1_sig"].to_numpy(dtype=float)
 
-    for feature in EXP_INPUT_FEATURES:
-        values = physics_features[feature].to_numpy(dtype=float)
-        corr[feature] = values
-        corr[f"{feature}_per_exp"] = values
+    exposure = np.maximum(corr["exposure_time"].to_numpy(dtype=float), _EXPOSURE_MIN)
+    for channel in EXP_LIGHT_CHANNELS:
+        corr[f"{channel}_per_exp"] = corr[channel].to_numpy(dtype=float) / exposure
     return corr
 
 
@@ -233,7 +239,7 @@ def predict_from_fitted_features(
             continue
         a, b, c0 = params_by_channel[ch]
         pred_by_feature[ch] = invert_exponential_intensity(
-            corrected_channels[f"{ch}_per_exp"].to_numpy(dtype=float),
+            corrected_channels[ch].to_numpy(dtype=float),
             a=a,
             b=b,
             c0=c0,
@@ -245,7 +251,7 @@ def predict_from_fitted_features(
         if not pred_by_feature:
             raise RuntimeError("No fitted feature channels are available for aggregate prediction.")
         stacked = np.vstack([pred_by_feature[ch] for ch in channels if ch in pred_by_feature])
-        if selected_channel == "feature_mean":
+        if selected_channel in {"feature_mean", "light_mean"}:
             conc_pred = np.nanmean(stacked, axis=0)
         else:
             conc_pred = np.nanmedian(stacked, axis=0)
@@ -261,11 +267,11 @@ def resolve_selected_feature(
     fit_results: List[Dict[str, object]],
     params_by_channel: Dict[str, Tuple[float, float, float]],
 ) -> str:
-    if selected_channel != "feature_best":
+    if selected_channel not in BEST_CHANNEL_ALIASES:
         return selected_channel
     valid_results = [row for row in fit_results if str(row["channel"]) in params_by_channel and np.isfinite(float(row["inv_r2"]))]
     if not valid_results:
-        raise RuntimeError("Cannot select feature_best because no fitted feature has finite inverse R2.")
+        raise RuntimeError("Cannot select best light channel because no fitted channel has finite inverse R2.")
     return str(max(valid_results, key=lambda row: float(row["inv_r2"]))["channel"])
 
 
@@ -286,8 +292,8 @@ def parse_args(default_cfg: ExpConfig) -> argparse.Namespace:
         "--channel",
         default=default_cfg.channel,
         help=(
-            "Which feature to use for concentration inversion, feature_best, or feature_median/feature_mean "
-            f"to aggregate all fitted features (default: {default_cfg.channel})"
+            "Which light channel to use for concentration inversion, light_best, or light_median/light_mean "
+            f"to aggregate all fitted channels (default: {default_cfg.channel})"
         ),
     )
     
@@ -355,7 +361,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     conc = df["conc_true"].to_numpy(dtype=float)
     corr = build_corrected_channels(df)
 
-    # Fit the compact ROI-BG feature vector.
+    # Fit ROI-BG light intensity channels directly.
     channels = [
         col
         for col in corr.columns
@@ -369,7 +375,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     print(f"Weight epsilon: {float(args.weight_eps):.6g}\n")
 
     for ch in channels:
-        y = corr[f"{ch}_per_exp"].to_numpy(dtype=float)
+        y = corr[ch].to_numpy(dtype=float)
         if np.all(np.isnan(y)):
             print(f"[SKIP] {ch}: all NaN values")
             continue
@@ -383,7 +389,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
             params_by_channel[ch] = (a, b, c0)
             results.append({
                 "channel": ch,
-                "fit_signal": f"{ch}_per_exp",
+                "fit_signal": ch,
                 "a": a,
                 "b": b,
                 "c": c0,
@@ -393,7 +399,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
                 "inv_rmse": inv_rmse,
             })
             print(
-                f"[FIT] {ch:8s} (per_exp): a={a:9.6g}, b={b:9.6g}, c={c0:9.6g}  "
+                f"[FIT] {ch:8s}: a={a:9.6g}, b={b:9.6g}, c={c0:9.6g}  "
                 f"R2={r2:.6g}  RMSE={rmse:.6g}  inv_R2={inv_r2:.6g}  inv_RMSE={inv_rmse:.6g}"
             )
         except Exception as e:
@@ -423,9 +429,9 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
         pred_df[f"{ch}_per_exp"] = corr[f"{ch}_per_exp"]
         if ch in params_by_channel:
             a, b, c0 = params_by_channel[ch]
-            pred_df[f"{ch}_per_exp_pred"] = model_exponential(conc, a, b, c0)
+            pred_df[f"{ch}_pred"] = model_exponential(conc, a, b, c0)
         else:
-            pred_df[f"{ch}_per_exp_pred"] = np.nan
+            pred_df[f"{ch}_pred"] = np.nan
 
     pred_df.to_csv(pred_out, index=False, float_format=CSV_FLOAT_FORMAT)
     print(f"Saved intensity predictions -> {pred_out}")
@@ -500,17 +506,17 @@ def draw_fit_visualization(
 
     for idx, ch in enumerate(channels):
         ax = axes[idx]
-        y = corrected_channels[f"{ch}_per_exp"].to_numpy(dtype=float)
+        y = corrected_channels[ch].to_numpy(dtype=float)
         ax.scatter(conc, y, s=20, alpha=0.7, label="Measured")
         if ch in params_by_channel:
             a, b, c0 = params_by_channel[ch]
             y_curve = model_exponential(x_curve, a, b, c0)
             ax.plot(x_curve, y_curve, "r-", linewidth=1.5, label="Fit")
-            ax.set_title(f"{ch}: fit (per_exp)")
+            ax.set_title(f"{ch}: fit")
         else:
             ax.set_title(f"{ch}: skipped")
         ax.set_xlabel("Concentration (uM)")
-        ax.set_ylabel("Corrected intensity / exposure")
+        ax.set_ylabel("Corrected intensity")
         ax.grid(alpha=0.25)
         ax.legend(loc="best", fontsize=8)
 

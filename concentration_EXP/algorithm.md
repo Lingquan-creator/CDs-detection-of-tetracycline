@@ -6,7 +6,7 @@
 I(C) = a * exp(b * C) + c
 ```
 
-其中 `C` 是浓度，`I` 是从 ROI-BG 信号构造的特征。当前默认使用 4 个 compact 输入特征分别拟合，并选择训练集反演浓度 R2 最高的特征做最终反演。
+其中 `C` 是浓度，`I` 是 ROI-BG 后的光强信号。当前默认直接使用 `R_sig/G1_sig/G2_sig/G_sig/B_sig` 光强分别拟合，并选择训练集反演浓度 R2 最高的光强通道做最终反演。
 
 ## 主要代码
 
@@ -42,30 +42,30 @@ G_sig = max(avg(roi_G1_mean - bg_G1_mean,
 B_sig = max(roi_B_mean - bg_B_mean, clip_min)
 ```
 
-4. 从 ROI-BG 信号构造 4 个输入特征：
+4. 直接使用 ROI-BG 光强通道作为指数拟合的 `I`：
 
 ```text
-ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG
+R_sig, G1_sig, G2_sig, G_sig, B_sig
 ```
 
-5. 对 4 个输入特征分别拟合 `I(C) = a * exp(b*C) + c`。拟合使用 `scipy.optimize.curve_fit`，并用 `weight_eps` 提高低浓度样品权重。
-6. 对每个拟合成功的特征分别反演浓度：
+5. 对各个光强通道分别拟合 `I(C) = a * exp(b*C) + c`。拟合使用 `scipy.optimize.curve_fit`，并用 `weight_eps` 提高低浓度样品权重。
+6. 对每个拟合成功的光强通道分别反演浓度：
 
    ```text
    C_pred = log((I - c) / a) / b
    ```
 
    反演前会裁剪 `(I - c) / a`，避免负数或 `log(0)`。
-7. 默认 `--channel feature_best`，即选择训练集反演浓度 R2 最高的特征做最终反演；也可以指定某一个特征名，或使用 `feature_median` / `feature_mean` 聚合各特征反演结果。
-8. 输出每个样品的预测浓度、各特征反演浓度、残差、R2/RMSE，并绘制拟合图。
+7. 默认 `--channel light_best`，即选择训练集反演浓度 R2 最高的光强通道做最终反演；也可以指定某一个通道名，或使用 `light_median` / `light_mean` 聚合各通道反演结果。`feature_best/feature_median/feature_mean` 作为旧脚本兼容别名保留。
+8. 输出每个样品的预测浓度、各光强通道反演浓度、残差、R2/RMSE，并绘制拟合图。
 
 ## 算法输出
 
 算法层面的输出是：
 
-- 每个输入特征的指数参数 `a`, `b`, `c`。
-- 每个输入特征的拟合质量 `r2`, `rmse`。
-- 默认最优特征反演浓度 `conc_pred`、各特征反演浓度和残差。
+- 每个光强通道的指数参数 `a`, `b`, `c`。
+- 每个光强通道的拟合质量 `r2`, `rmse`。
+- 默认最优光强通道反演浓度 `conc_pred`、各通道反演浓度和残差。
 
 实际默认输出目录：
 

@@ -875,7 +875,7 @@ class ROIProcessor:
             "ln_B_sig",
             "Ratio_RG",
             "Delta_RG",
-            "Ratio_BG",
+            "Delta_GB",
         ]
         with open(csv_path, "w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -883,7 +883,7 @@ class ROIProcessor:
             writer.writerows(records)
 
         print(f"输入向量参数已保存: {csv_path}")
-        print("  输出列只包含 ROI/BG 选择记录、ROI/BG 均值和当前 4 维输入向量。")
+        print("  输出列只包含 ROI/BG 选择记录、ROI/BG 均值和当前 6 维输入向量。")
 
     @staticmethod
     def _format_optional(value: Optional[float | int]) -> str:
@@ -896,7 +896,7 @@ class ROIProcessor:
         b_sig = max(r.B_corrected, 0.1)
         ratio_rg = r_sig / (g_sig_clipped + 1e-6)
         delta_rg = (g_sig_clipped - r_sig) / (g_sig_clipped + r_sig + 1e-6)
-        ratio_bg = b_sig / (g_sig_clipped + 1e-6)
+        delta_gb = (b_sig - g_sig_clipped) / (b_sig + g_sig_clipped + 1e-6)
         return {
             "filename": r.filename,
             "concentration": self._format_optional(r.concentration),
@@ -932,7 +932,7 @@ class ROIProcessor:
             "ln_B_sig": f"{np.log(b_sig + 1e-6):.6f}",
             "Ratio_RG": f"{ratio_rg:.6f}",
             "Delta_RG": f"{delta_rg:.6f}",
-            "Ratio_BG": f"{ratio_bg:.6f}",
+            "Delta_GB": f"{delta_gb:.6f}",
         }
 
 

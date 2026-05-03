@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 from config import ExpConfig
-from train import AUTO_CHANNELS, build_corrected_channels, predict_from_fitted_features
+from train import AUTO_CHANNELS, BEST_CHANNEL_ALIASES, build_corrected_channels, predict_from_fitted_features
 from physics_features import extract_concentration_from_name
 
 matplotlib.use("Agg")
@@ -101,16 +101,16 @@ def load_all_fit_parameters(params_csv: Path) -> dict[str, Tuple[float, float, f
 
 
 def resolve_selected_feature_from_params(params_csv: Path, selected_channel: str) -> str:
-    if selected_channel != "feature_best":
+    if selected_channel not in BEST_CHANNEL_ALIASES:
         return selected_channel
 
     df = pd.read_csv(params_csv)
     score_col = "inv_r2" if "inv_r2" in df.columns else "r2"
     if score_col not in df.columns:
-        raise ValueError("Cannot use feature_best because parameter CSV has no r2/inv_r2 column.")
+        raise ValueError("Cannot use light_best because parameter CSV has no r2/inv_r2 column.")
     ranked = df[np.isfinite(pd.to_numeric(df[score_col], errors="coerce"))].copy()
     if ranked.empty:
-        raise ValueError(f"Cannot use feature_best because no fitted feature has finite {score_col}.")
+        raise ValueError(f"Cannot use light_best because no fitted light channel has finite {score_col}.")
     ranked[score_col] = pd.to_numeric(ranked[score_col], errors="coerce")
     return str(ranked.sort_values(score_col, ascending=False).iloc[0]["channel"])
 
@@ -176,10 +176,10 @@ def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
     selected_channel = resolve_selected_feature_from_params(params_path, args.channel)
     if selected_channel in params_by_channel:
         a, b, c = params_by_channel[selected_channel]
-        print(f"Using feature: {selected_channel} (requested: {args.channel})")
+        print(f"Using light channel: {selected_channel} (requested: {args.channel})")
         print(f"Parameters: a={a:.6g}, b={b:.6g}, c={c:.6g}\n")
     elif selected_channel in AUTO_CHANNELS:
-        print(f"Using aggregate feature mode: {args.channel}\n")
+        print(f"Using aggregate light-channel mode: {args.channel}\n")
     else:
         available = sorted(params_by_channel) + sorted(AUTO_CHANNELS)
         raise ValueError(f"Selected channel '{args.channel}' is unavailable. Available: {available}")
