@@ -419,10 +419,10 @@ class ControlsWidget(QWidget):
         self.roi_group = QGroupBox("ROI Settings")
         roi_layout = QGridLayout()
         
-        self.spin_roi_cx = self._create_spinbox(0, 10000, "Center X")
-        self.spin_roi_cy = self._create_spinbox(0, 10000, "Center Y")
-        self.spin_roi_w = self._create_spinbox(1, 5000, "Width")
-        self.spin_roi_h = self._create_spinbox(1, 5000, "Height")
+        self.spin_roi_cx = self._create_spinbox(0, 10000, "Center X", settings.move_step)
+        self.spin_roi_cy = self._create_spinbox(0, 10000, "Center Y", settings.move_step)
+        self.spin_roi_w = self._create_spinbox(1, 5000, "Width", settings.size_step)
+        self.spin_roi_h = self._create_spinbox(1, 5000, "Height", settings.size_step)
         self.spin_roi_a = self._create_double_spinbox(0, 360, "Angle")
 
         roi_layout.addWidget(QLabel("Center X:"), 0, 0)
@@ -443,14 +443,14 @@ class ControlsWidget(QWidget):
         self.bg_group = QGroupBox("Background Settings")
         bg_layout = QGridLayout()
         
-        self.spin_bg_inner_cx = self._create_spinbox(0, 10000, "BG inner center X")
-        self.spin_bg_inner_cy = self._create_spinbox(0, 10000, "BG inner center Y")
-        self.spin_bg_in_x = self._create_spinbox(1, 5000, "BG inner width")
-        self.spin_bg_in_y = self._create_spinbox(1, 5000, "BG inner height")
-        self.spin_bg_outer_cx = self._create_spinbox(0, 10000, "BG outer center X")
-        self.spin_bg_outer_cy = self._create_spinbox(0, 10000, "BG outer center Y")
-        self.spin_bg_out_x = self._create_spinbox(1, 5000, "BG outer width")
-        self.spin_bg_out_y = self._create_spinbox(1, 5000, "BG outer height")
+        self.spin_bg_inner_cx = self._create_spinbox(0, 10000, "BG inner center X", settings.move_step)
+        self.spin_bg_inner_cy = self._create_spinbox(0, 10000, "BG inner center Y", settings.move_step)
+        self.spin_bg_in_x = self._create_spinbox(1, 5000, "BG inner width", settings.size_step)
+        self.spin_bg_in_y = self._create_spinbox(1, 5000, "BG inner height", settings.size_step)
+        self.spin_bg_outer_cx = self._create_spinbox(0, 10000, "BG outer center X", settings.move_step)
+        self.spin_bg_outer_cy = self._create_spinbox(0, 10000, "BG outer center Y", settings.move_step)
+        self.spin_bg_out_x = self._create_spinbox(1, 5000, "BG outer width", settings.size_step)
+        self.spin_bg_out_y = self._create_spinbox(1, 5000, "BG outer height", settings.size_step)
 
         bg_layout.addWidget(QLabel("Inner Cx:"), 0, 0)
         bg_layout.addWidget(self.spin_bg_inner_cx, 0, 1)
@@ -503,9 +503,10 @@ class ControlsWidget(QWidget):
         self.radio_bg_inner.toggled.connect(self._on_mode_changed)
         self.radio_bg_outer.toggled.connect(self._on_mode_changed)
 
-    def _create_spinbox(self, min_val, max_val, tooltip):
+    def _create_spinbox(self, min_val, max_val, tooltip, single_step=1):
         sb = QSpinBox()
         sb.setRange(min_val, max_val)
+        sb.setSingleStep(max(1, int(single_step)))
         sb.setToolTip(tooltip)
         return sb
 

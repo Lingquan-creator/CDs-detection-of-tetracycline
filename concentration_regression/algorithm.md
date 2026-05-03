@@ -25,7 +25,7 @@
 当前默认：
 
 - `use_bg=True`
-- `feature_set=full`
+- `feature_set=compact`
 - `target_transform=log`
 
 批处理脚本会用训练集下的 `roi_detailed_statistics.csv` 作为输入，`dataset/food` 保留为测试集。
@@ -58,7 +58,7 @@ log_roi_*_gamma_shape   = log(max(roi_*_gamma_shape, eps))
 sqrt_roi_*_gamma_scale  = sqrt(max(roi_*_gamma_scale, 0))
 ```
 
-`compact` 只保留无曝光的 7 个物理特征：
+`compact` 是当前默认，只保留跨数据集更稳的 7 个无曝光物理特征：
 
 ```text
 ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG, Delta_RG, Ratio_BG, Var_G

@@ -18,7 +18,7 @@ from physics_features import DEFAULT_G_MODE
 TARGET_TRANSFORM = "log"  # log-target regression (see improve2.md)
 TARGET_EPS = 1e-6         # small constant to avoid log(0) and for inverse transform
 DEFAULT_USE_BG = True     # detailed ROI statistics include bg_* columns; use them by default
-DEFAULT_FEATURE_SET: Literal["full", "compact", "compact_exposure"] = "full"
+DEFAULT_FEATURE_SET: Literal["full", "compact", "compact_exposure"] = "compact"
 # Expanded alpha grid to include large regularization for smoothing low-concentration noise
 # REMOVED small alphas to force smoother models and avoid overfitting noise.
 # FORCED high alphas (starting at 50.0) to combat multicollinearity-induced oscillation.

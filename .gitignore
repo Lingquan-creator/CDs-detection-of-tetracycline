@@ -21,3 +21,4 @@ concentration_GS/amortized_output
 oncentration_EXP/exp_fit_output
 *.zip
 OUTPUT/
+temp/
