@@ -23,4 +23,5 @@ concentration_EXP/exp_fit_output
 *.zip
 OUTPUT/
 temp/
+article/
 .backup/
