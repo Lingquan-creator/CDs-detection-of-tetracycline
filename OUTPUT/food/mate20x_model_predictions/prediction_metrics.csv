@@ -1,0 +1,13 @@
+model,sample_group,prediction_column,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
+exp,all,conc_pred,18,-0.535139,95.9731,79.1324,-76.2092,77.395,167.161
+rgb_ridge,all,conc_pred,18,0.983258,10.0226,8.31055,0.826136,7.2222,18.215
+gs_posterior_median,all,posterior_median,18,0.109933,73.0781,62.8306,-62.6658,68.9294,116.43
+gs_posterior_mean,all,posterior_mean,18,0.191146,69.6644,60.2888,-59.4008,66.3871,110.29
+exp,chicken,conc_pred,9,-0.528306,95.7593,79.4722,-76.9345,75.9474,165.707
+rgb_ridge,chicken,conc_pred,9,0.990118,7.7002,6.41954,-0.543064,6.40262,16.0773
+gs_posterior_median,chicken,posterior_median,9,0.103187,73.3545,63.3879,-63.1624,66.7192,116.43
+gs_posterior_mean,chicken,posterior_mean,9,0.184557,69.9476,61.2026,-59.5361,64.0677,110.29
+exp,egg,conc_pred,9,-0.541972,96.1864,78.7926,-75.4838,78.8427,167.161
+rgb_ridge,egg,conc_pred,9,0.976398,11.9001,10.2016,2.19534,7.765,18.215
+gs_posterior_median,egg,posterior_median,9,0.116679,72.8006,62.2732,-62.1693,71.1396,111.595
+gs_posterior_mean,egg,posterior_mean,9,0.197736,69.38,59.375,-59.2656,68.7065,105.215

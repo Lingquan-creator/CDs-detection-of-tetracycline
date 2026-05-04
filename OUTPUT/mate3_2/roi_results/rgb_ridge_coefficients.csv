@@ -1,0 +1,13 @@
+feature,coefficient
+ln_R_sig,-0.000406447
+ln_G_sig,0.000137253
+ln_B_sig,0.000258654
+ln_R_sig_per_exp,-0.000406447
+ln_G_sig_per_exp,0.000137253
+ln_B_sig_per_exp,0.000258654
+Ratio_RG,-0.00348937
+Delta_RG,0.00342635
+Ratio_BG,0.00282013
+Var_G,0.00229622
+exposure_time,0
+ln_exposure,0

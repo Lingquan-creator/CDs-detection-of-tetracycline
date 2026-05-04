@@ -1,0 +1,50 @@
+Train CSV: /home/jzh/CDs/dataset/mate20x/roi_detailed_statistics.csv
+Test CSV:  /home/jzh/CDs/dataset/food/roi_detailed_statistics.csv
+weight formula: w_i = 1 / (beta * C_i + weight_eps), weight_eps=50
+alpha scan beta fixed at 1; beta scan alpha fixed at best alpha from alpha scan: 1000
+weight_eps scan alpha fixed at 1000, beta fixed at 1
+
+[best alpha scan rows: food all]
+       variant_id       alpha  beta       r2      rmse       mae  mean_error
+alpha_1e03_beta_1      1000.0   1.0 0.983056 10.082801  7.806819   -0.886585
+alpha_1e04_beta_1     10000.0   1.0 0.983028 10.091052  7.739944   -1.375398
+alpha_1e05_beta_1    100000.0   1.0 0.983005 10.098033  7.746414   -1.415348
+alpha_1e06_beta_1   1000000.0   1.0 0.983003 10.098743  7.747061   -1.419335
+alpha_1e07_beta_1  10000000.0   1.0 0.983002 10.098814  7.747126   -1.419734
+alpha_1e08_beta_1 100000000.0   1.0 0.983002 10.098821  7.747132   -1.419773
+alpha_1e02_beta_1       100.0   1.0 0.982070 10.372057  8.967030    3.403250
+alpha_1e01_beta_1        10.0   1.0 0.762292 37.765677 30.400405   29.790700
+alpha_0e00_beta_1         0.0   1.0 0.444052 57.755398 44.503902  -24.430336
+alpha_1e00_beta_1         1.0   1.0 0.310385 64.324900 54.893466   54.893466
+
+[best beta scan rows: food all]
+           variant_id  alpha      beta  effective_weight_eps        r2      rmse       mae  mean_error
+ beta_1e00_alpha_1e03 1000.0    1.0000                 50.00  0.983056 10.082801  7.806819   -0.886585
+beta_1e-01_alpha_1e03 1000.0    0.1000                500.00  0.970947 13.202841  9.917406   -8.024285
+beta_1e-02_alpha_1e03 1000.0    0.0100               5000.00  0.964029 14.691018 11.460951   -9.841470
+beta_1e-03_alpha_1e03 1000.0    0.0010              50000.00  0.963050 14.889582 11.660128  -10.067934
+beta_1e-04_alpha_1e03 1000.0    0.0001             500000.00  0.962948 14.910104 11.680564  -10.091175
+ beta_0e00_alpha_1e03 1000.0    0.0000                   inf  0.962937 14.912391 11.682840  -10.093764
+ beta_1e01_alpha_1e03 1000.0   10.0000                  5.00  0.942463 18.580229 15.112722   13.483996
+ beta_1e03_alpha_1e03 1000.0 1000.0000                  0.05 -0.001809 77.529696 67.032723    3.294504
+ beta_1e02_alpha_1e03 1000.0  100.0000                  0.50 -0.103707 81.377162 66.236332   66.236332
+
+[best weight_eps scan rows: food all]
+                      variant_id  alpha  beta  weight_eps  effective_weight_eps       r2      rmse       mae  mean_error
+ weight_eps_30_alpha_1e03_beta_1 1000.0   1.0        30.0                  30.0 0.983302 10.009283  8.412249    1.169013
+ weight_eps_50_alpha_1e03_beta_1 1000.0   1.0        50.0                  50.0 0.983056 10.082801  7.806819   -0.886585
+ weight_eps_80_alpha_1e03_beta_1 1000.0   1.0        80.0                  80.0 0.982214 10.330298  7.927174   -2.715950
+weight_eps_120_alpha_1e03_beta_1 1000.0   1.0       120.0                 120.0 0.980318 10.866926  8.239210   -4.191587
+ weight_eps_10_alpha_1e03_beta_1 1000.0   1.0        10.0                  10.0 0.974248 12.430278 10.265112    6.790455
+  weight_eps_1_alpha_1e03_beta_1 1000.0   1.0         1.0                   1.0 0.491553 55.232979 43.876321   43.876321
+
+[best overall: food all]
+scan                                         weight_eps
+variant_id              weight_eps_30_alpha_1e03_beta_1
+alpha                                            1000.0
+beta                                                1.0
+effective_weight_eps                               30.0
+r2                                             0.983302
+rmse                                          10.009283
+mae                                            8.412249
+mean_error                                     1.169013

@@ -1,0 +1,70 @@
+Base features: ln_R_sig, ln_G_sig, ln_B_sig
+Optional features: Ratio_RG, Ratio_BG, Ratio_RB, Delta_RG, Delta_RB, Delta_GB
+Correction: ROI-BG; model: RidgeCV + log target + isotonic calibration
+
+[train]
+  ratio_bg_ratio_rb_delta_gb: n_features=6, R2=0.99998, RMSE=0.317585, MAE=0.124394, mean_error=-0.00196745, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_GB
+  ratio_bg_ratio_rb_delta_rb: n_features=6, R2=0.99998, RMSE=0.317585, MAE=0.124394, mean_error=-0.00196745, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RB
+  ratio_bg_delta_rb_delta_gb: n_features=6, R2=0.99998, RMSE=0.317585, MAE=0.124394, mean_error=-0.00196745, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Delta_RB;Delta_GB
+  ratio_bg_ratio_rb_delta_rb_delta_gb: n_features=7, R2=0.999979, RMSE=0.324582, MAE=0.11959, mean_error=-0.00204895, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RB;Delta_GB
+  ratio_rb_delta_rb_delta_gb: n_features=6, R2=0.99993, RMSE=0.600988, MAE=0.258333, mean_error=-0.00695492, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RB;Delta_RB;Delta_GB
+  ratio_bg_delta_gb: n_features=5, R2=0.999899, RMSE=0.719573, MAE=0.374394, mean_error=-0.00786856, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Delta_GB
+  ratio_bg_delta_rg_delta_gb: n_features=6, R2=0.999864, RMSE=0.833574, MAE=0.425, mean_error=-0.0121632, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Delta_RG;Delta_GB
+  ratio_rg_ratio_bg_delta_gb: n_features=6, R2=0.999864, RMSE=0.833574, MAE=0.425, mean_error=-0.0121632, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_GB
+  ratio_bg_delta_rg_delta_rb: n_features=6, R2=0.999853, RMSE=0.86883, MAE=0.425, mean_error=-0.0132461, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Delta_RG;Delta_RB
+  ratio_bg_delta_rg_delta_rb_delta_gb: n_features=7, R2=0.999853, RMSE=0.86883, MAE=0.425, mean_error=-0.0132461, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Delta_RG;Delta_RB;Delta_GB
+  ratio_rb_delta_rg_delta_rb_delta_gb: n_features=7, R2=0.999853, RMSE=0.86883, MAE=0.425, mean_error=-0.0132461, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RB;Delta_RG;Delta_RB;Delta_GB
+  ratio_bg_ratio_rb_delta_rg_delta_rb: n_features=7, R2=0.999853, RMSE=0.86883, MAE=0.425, mean_error=-0.0132461, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RG;Delta_RB
+  ratio_bg_ratio_rb_delta_rg_delta_gb: n_features=7, R2=0.999853, RMSE=0.86883, MAE=0.425, mean_error=-0.0132461, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RG;Delta_GB
+  ratio_bg_ratio_rb_delta_rg: n_features=6, R2=0.999853, RMSE=0.86883, MAE=0.425, mean_error=-0.0132461, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RG
+  ratio_rg_delta_rb_delta_gb: n_features=6, R2=0.999853, RMSE=0.86883, MAE=0.425, mean_error=-0.0132461, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RB;Delta_GB
+  delta_rg_delta_rb_delta_gb: n_features=6, R2=0.999853, RMSE=0.86883, MAE=0.425, mean_error=-0.0132461, features=ln_R_sig;ln_G_sig;ln_B_sig;Delta_RG;Delta_RB;Delta_GB
+  ratio_rg_ratio_bg_ratio_rb_delta_gb: n_features=7, R2=0.999853, RMSE=0.86883, MAE=0.425, mean_error=-0.0132461, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_GB
+  ratio_rg_ratio_bg_delta_rb: n_features=6, R2=0.999853, RMSE=0.86883, MAE=0.425, mean_error=-0.0132461, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_RB
+  ratio_rg_ratio_bg_delta_rb_delta_gb: n_features=7, R2=0.999853, RMSE=0.86883, MAE=0.425, mean_error=-0.0132461, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_RB;Delta_GB
+  ratio_rg_ratio_bg_delta_rg_delta_gb: n_features=7, R2=0.999853, RMSE=0.86883, MAE=0.425, mean_error=-0.0132461, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_RG;Delta_GB
+
+[loo]
+  ratio_rg_ratio_bg_ratio_rb_delta_rb: n_features=7, R2=0.985068, RMSE=8.74704, MAE=4.11941, mean_error=-1.48685, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RB
+  ratio_rg_ratio_bg_ratio_rb_delta_gb: n_features=7, R2=0.985066, RMSE=8.7475, MAE=4.17303, mean_error=-1.56447, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_GB
+  ratio_rg_ratio_rb_delta_rb_delta_gb: n_features=7, R2=0.98506, RMSE=8.74929, MAE=4.11509, mean_error=-1.49439, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RB;Delta_GB
+  ratio_rg_ratio_bg_delta_rb_delta_gb: n_features=7, R2=0.985055, RMSE=8.75086, MAE=4.19605, mean_error=-1.56186, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_RB;Delta_GB
+  ratio_bg_ratio_rb_delta_rg_delta_rb: n_features=7, R2=0.985052, RMSE=8.75148, MAE=4.13288, mean_error=-1.48948, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RG;Delta_RB
+  ratio_rb_delta_rg_delta_rb_delta_gb: n_features=7, R2=0.985045, RMSE=8.75372, MAE=4.12844, mean_error=-1.49685, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RB;Delta_RG;Delta_RB;Delta_GB
+  ratio_bg_ratio_rb_delta_rg_delta_gb: n_features=7, R2=0.985045, RMSE=8.75373, MAE=4.18882, mean_error=-1.56714, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RG;Delta_GB
+  ratio_bg_delta_rg_delta_rb_delta_gb: n_features=7, R2=0.985033, RMSE=8.75727, MAE=4.21199, mean_error=-1.56468, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Delta_RG;Delta_RB;Delta_GB
+  ratio_bg_ratio_rb_delta_rb: n_features=6, R2=0.984744, RMSE=8.84144, MAE=4.05882, mean_error=-1.83853, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RB
+  ratio_bg_ratio_rb_delta_rg_delta_rb_delta_gb: n_features=8, R2=0.984717, RMSE=8.849, MAE=4.30746, mean_error=-1.48015, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB
+  ratio_rg_ratio_bg_ratio_rb_delta_rb_delta_gb: n_features=8, R2=0.984707, RMSE=8.85189, MAE=4.31509, mean_error=-1.46751, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RB;Delta_GB
+  ratio_rb_delta_rb_delta_gb: n_features=6, R2=0.984683, RMSE=8.8589, MAE=4.12746, mean_error=-1.91908, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RB;Delta_RB;Delta_GB
+  ratio_rg_ratio_bg_delta_gb: n_features=6, R2=0.984599, RMSE=8.88333, MAE=4.51744, mean_error=-1.70521, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_GB
+  ratio_rg_ratio_bg_delta_rb: n_features=6, R2=0.984589, RMSE=8.88622, MAE=4.5071, mean_error=-1.56376, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_RB
+  ratio_bg_delta_rg_delta_gb: n_features=6, R2=0.984568, RMSE=8.89204, MAE=4.53177, mean_error=-1.70631, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Delta_RG;Delta_GB
+  ratio_bg_delta_rg_delta_rb: n_features=6, R2=0.984564, RMSE=8.89327, MAE=4.52092, mean_error=-1.56438, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Delta_RG;Delta_RB
+  ratio_rg_delta_rb_delta_gb: n_features=6, R2=0.984545, RMSE=8.89874, MAE=4.53812, mean_error=-1.56751, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RB;Delta_GB
+  delta_rg_delta_rb_delta_gb: n_features=6, R2=0.984521, RMSE=8.90579, MAE=4.55178, mean_error=-1.56854, features=ln_R_sig;ln_G_sig;ln_B_sig;Delta_RG;Delta_RB;Delta_GB
+  ratio_rg_ratio_rb_delta_gb: n_features=6, R2=0.984511, RMSE=8.90845, MAE=4.52793, mean_error=-1.68333, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_GB
+  ratio_rg_ratio_bg_ratio_rb: n_features=6, R2=0.984504, RMSE=8.91064, MAE=4.57828, mean_error=-1.59398, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB
+
+[food]
+  ratio_rg_delta_rg_delta_gb: n_features=6, R2=0.983028, RMSE=10.0911, MAE=7.73994, mean_error=-1.3754, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG;Delta_GB
+  ratio_rg_ratio_bg_delta_rg: n_features=6, R2=0.981385, RMSE=10.5682, MAE=7.95617, mean_error=-2.9591, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_RG
+  ratio_rg_ratio_rb_delta_rg_delta_rb: n_features=7, R2=0.967168, RMSE=14.0354, MAE=11.1969, mean_error=-9.49849, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_RB
+  ratio_rg_delta_rg_delta_rb: n_features=6, R2=0.965568, RMSE=14.3732, MAE=11.2545, mean_error=10.0194, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG;Delta_RB
+  ratio_rg_ratio_rb_delta_rg: n_features=6, R2=0.962516, RMSE=14.9969, MAE=11.9125, mean_error=10.8692, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG
+  delta_rg: n_features=4, R2=0.947676, RMSE=17.7184, MAE=13.7928, mean_error=10.4113, features=ln_R_sig;ln_G_sig;ln_B_sig;Delta_RG
+  ratio_rg: n_features=4, R2=0.943905, RMSE=18.3458, MAE=14.1654, mean_error=11.3789, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG
+  ratio_rg_ratio_rb: n_features=5, R2=0.935015, RMSE=19.7461, MAE=15.6202, mean_error=-13.6911, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB
+  ratio_rg_delta_rb: n_features=5, R2=0.9313, RMSE=20.3026, MAE=16.1256, mean_error=-14.5927, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RB
+  ratio_rb_delta_rg: n_features=5, R2=0.929803, RMSE=20.5227, MAE=16.2891, mean_error=-14.3609, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RB;Delta_RG
+  delta_rg_delta_rb: n_features=5, R2=0.92572, RMSE=21.1112, MAE=16.8125, mean_error=-15.2836, features=ln_R_sig;ln_G_sig;ln_B_sig;Delta_RG;Delta_RB
+  ratio_rg_ratio_rb_delta_rg_delta_gb: n_features=7, R2=0.894761, RMSE=25.1284, MAE=20.584, mean_error=-20.0386, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_GB
+  ratio_rg_delta_rg_delta_rb_delta_gb: n_features=7, R2=0.890478, RMSE=25.6346, MAE=21.0737, mean_error=-20.7207, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG;Delta_RB;Delta_GB
+  ratio_rg_ratio_bg_ratio_rb_delta_rg: n_features=7, R2=0.883144, RMSE=26.479, MAE=21.763, mean_error=-21.3782, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RG
+  ratio_rg_ratio_bg_delta_rg_delta_rb: n_features=7, R2=0.878473, RMSE=27.003, MAE=22.2913, mean_error=-22.0307, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_RG;Delta_RB
+  ratio_rg_delta_gb: n_features=5, R2=0.772766, RMSE=36.9243, MAE=30.9193, mean_error=-30.2568, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_GB
+  ln_rgb_only: n_features=3, R2=0.768691, RMSE=37.2539, MAE=29.4468, mean_error=-27.2394, features=ln_R_sig;ln_G_sig;ln_B_sig
+  delta_rg_delta_gb: n_features=5, R2=0.756286, RMSE=38.2398, MAE=31.9557, mean_error=-31.2932, features=ln_R_sig;ln_G_sig;ln_B_sig;Delta_RG;Delta_GB
+  ratio_rg_delta_rg: n_features=5, R2=0.75505, RMSE=38.3367, MAE=30.6038, mean_error=30.6038, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG
+  ratio_rg_ratio_bg_delta_rg_delta_gb: n_features=7, R2=0.748868, RMSE=38.8174, MAE=32.9136, mean_error=-32.6874, features=ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_RG;Delta_GB
+
