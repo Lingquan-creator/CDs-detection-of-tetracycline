@@ -21,6 +21,7 @@ Bundled phone model folders:
 - `mate20x`
 - `mate3_2`
 - `xiaomi`
+- `vivo100x`
 
 Available model types:
 

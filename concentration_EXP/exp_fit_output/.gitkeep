@@ -1,6 +1,0 @@
-# Output directory for exponential fitting results
-#
-# This directory will contain:
-# - exp_fit_params.csv: Fitted parameters per channel
-# - exp_fit_predictions.csv: Fitted intensity predictions
-# - *_pred_concentration_exp.csv: Concentration predictions

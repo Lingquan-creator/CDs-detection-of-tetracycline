@@ -1,92 +1,107 @@
-# concentration_EXP 算法说明
+# concentration_EXP 代码说明
 
-本目录实现基于指数衰减模型的浓度反演。核心思想是把 ROI 的背景扣除信号视为随浓度单调变化的响应，并对每个候选通道分别拟合：
+本目录实现基于指数衰减模型的浓度反演。代码直接使用 ROI-BG 后的 RAW 通道光强拟合浓度响应，并通过指数函数反解浓度：
 
 ```text
 I(C) = a * exp(b * C) + c
+C_pred = log((I - c) / a) / b
 ```
 
-其中 `C` 是浓度，`I` 是 ROI-BG 后的光强信号。当前默认直接使用 `R_sig/G1_sig/G2_sig/G_sig/B_sig` 光强分别拟合，并选择训练集反演浓度 R2 最高的光强通道做最终反演。
+其中 `C` 为浓度，`I` 为背景扣除后的通道光强。当前实现将每个光强通道单独拟合，并默认选择训练集反演浓度 `inv_r2` 最高的通道作为最终预测通道。
 
-## 主要代码
+## 代码文件
 
-- `train.py`: 读取 ROI 统计 CSV，拟合指数模型，输出训练集反演结果和图。
-- `predict.py`: 读取已保存的指数参数，对新 ROI CSV 做浓度反演。
-- `config.py`: 默认输入输出路径、默认反演通道和拟合权重参数。
-- `physics_features.py`: 解析文件名中的浓度/曝光时间，并提供通用物理特征工具。
+- `config.py`: 定义默认输入、输出目录和文件名。默认输入是 `dataset/food/roi_detailed_statistics.csv`，默认输出目录是 `concentration_EXP/exp_fit_output/`，默认通道策略是 `light_best`。
+- `physics_features.py`: 解析文件名中的浓度和曝光时间，并提供通用物理特征工具。指数模型主要使用其中的浓度解析和曝光时间解析函数。
+- `train.py`: 训练入口。读取 ROI 统计 CSV，构造背景扣除光强，拟合各通道指数模型，保存参数、训练集拟合值、浓度反演结果和评估图。
+- `predict.py`: 预测入口。读取训练阶段保存的 `exp_fit_params.csv`，对新的 ROI CSV 构造同样的背景扣除光强并反演浓度。
+- `example.py`: 示例调用脚本，用于演示训练或预测流程。
 
-## 算法输入
+## 输入数据
 
-算法层面的输入是：
+训练和预测都依赖 `roi_detailed_statistics.csv`。核心列包括：
 
-- 样品真实浓度 `C`，从 `filename` 中解析，例如 `120.dng` 或 `chicken120.dng`。
-- ROI 与背景 RAW 通道均值：`roi_R_mean`, `roi_G1_mean`, `roi_G2_mean`, `roi_B_mean` 和对应 `bg_*_mean`。
-- 可选曝光时间 `exposure_time`，缺失时使用默认曝光。
+- `filename`: 用于解析真实浓度。支持纯数字文件名，也支持从文件名中提取第一个数字。
+- `roi_R_mean`, `roi_G1_mean`, `roi_G2_mean`, `roi_B_mean`: ROI 区域四个 Bayer 通道均值。
+- `bg_R_mean`, `bg_G1_mean`, `bg_G2_mean`, `bg_B_mean`: 背景区域四个 Bayer 通道均值。
+- `exposure_time`: 可选。缺失时会尝试从文件名解析，仍缺失则使用同表中第一个有效曝光时间，最终兜底为 `1.0`。
 
-实际默认输入文件：
+## 光强构造
 
-- `dataset/food/roi_detailed_statistics.csv`
-
-批处理脚本 `OUTPUT/run_dataset_concentration_training.sh` 会递归查找 `dataset/**/roi_detailed_statistics.csv`，跳过 `dataset/food` 作为测试集，并把每个训练集的输出写到对应 `OUTPUT/<dataset>/...` 目录。
-
-## 处理流程
-
-1. 读取 ROI CSV，要求至少包含 `filename` 和 ROI/BG 均值列。
-2. 从 `filename` 提取真实浓度 `conc_true`，丢弃无法解析浓度的样品。
-3. 构造 ROI-BG 背景扣除信号：
+`train.py` 和 `predict.py` 通过 `build_corrected_channels()` 生成拟合用光强：
 
 ```text
-R_sig = max(roi_R_mean - bg_R_mean, clip_min)
-G_sig = max(avg(roi_G1_mean - bg_G1_mean,
-                roi_G2_mean - bg_G2_mean), clip_min)
-B_sig = max(roi_B_mean - bg_B_mean, clip_min)
+R_sig  = max(roi_R_mean  - bg_R_mean,  0.1)
+G1_sig = max(roi_G1_mean - bg_G1_mean, 0.1)
+G2_sig = max(roi_G2_mean - bg_G2_mean, 0.1)
+B_sig  = max(roi_B_mean  - bg_B_mean,  0.1)
+G_sig  = (G1_sig + G2_sig) / 2
 ```
 
-4. 直接使用 ROI-BG 光强通道作为指数拟合的 `I`：
+实际参与指数拟合的通道为：
 
 ```text
 R_sig, G1_sig, G2_sig, G_sig, B_sig
 ```
 
-5. 对各个光强通道分别拟合 `I(C) = a * exp(b*C) + c`。拟合使用 `scipy.optimize.curve_fit`，并用 `weight_eps` 提高低浓度样品权重。
-6. 对每个拟合成功的光强通道分别反演浓度：
+代码也会生成 `*_per_exp` 作为诊断输出，但默认不参与指数拟合和通道选择。
+
+## 训练流程
+
+1. 读取 ROI CSV，检查空表和必要列。
+2. 从 `filename` 解析 `conc_true`，丢弃无法解析浓度的样品，并按浓度排序。
+3. 计算 `R_sig/G1_sig/G2_sig/G_sig/B_sig`。
+4. 对每个通道拟合指数模型。实际拟合使用重参数形式：
 
    ```text
-   C_pred = log((I - c) / a) / b
+   I(C) = (i0 - c) * exp(b * C) + c
+   a = i0 - c
    ```
 
-   反演前会裁剪 `(I - c) / a`，避免负数或 `log(0)`。
-7. 默认 `--channel light_best`，即选择训练集反演浓度 R2 最高的光强通道做最终反演；也可以指定某一个通道名，或使用 `light_median` / `light_mean` 聚合各通道反演结果。`feature_best/feature_median/feature_mean` 作为旧脚本兼容别名保留。
-8. 输出每个样品的预测浓度、各光强通道反演浓度、残差、R2/RMSE，并绘制拟合图。
+   约束为 `i0 >= max(I)`、`b <= 0`、`c <= min(I)`，使曲线保持递减且便于反演。
+5. 样品权重通过 `sigma = sqrt(C + weight_eps)` 传入 `curve_fit`。默认 `weight_eps=5.0`，低浓度样品获得相对更高权重。
+6. 对每个通道计算光强拟合指标 `r2/rmse`，再用反演浓度计算 `inv_r2/inv_rmse`。
+7. 根据 `--channel` 决定最终浓度：
+   - `light_best`: 选择 `inv_r2` 最高的通道。
+   - 指定通道名，如 `G_sig`。
+   - `light_mean` 或 `light_median`: 聚合所有拟合成功通道的反演值。
+   - `feature_*` 名称保留为兼容别名。
+8. 保存参数、训练集光强拟合结果、浓度反演结果和图像。
 
-## 算法输出
+## 预测流程
 
-算法层面的输出是：
+`predict.py` 的流程与训练阶段保持一致：
 
-- 每个光强通道的指数参数 `a`, `b`, `c`。
-- 每个光强通道的拟合质量 `r2`, `rmse`。
-- 默认最优光强通道反演浓度 `conc_pred`、各通道反演浓度和残差。
+1. 读取 `exp_fit_params.csv` 中各通道的 `a/b/c`。
+2. 若请求 `light_best`，根据参数文件中的 `inv_r2` 选择通道。
+3. 读取新的 ROI CSV 并重新计算背景扣除光强。
+4. 用保存的指数参数反演浓度。
+5. 如果文件名能解析出真实浓度，则额外输出 `conc_true` 和 `residual`。
 
-实际默认输出目录：
+## 输出文件
 
-- `concentration_EXP/exp_fit_output/`
+默认输出目录：
 
-默认输出文件：
+```text
+concentration_EXP/exp_fit_output/
+```
 
-- `exp_fit_params.csv`: 每个通道的指数参数和拟合指标。
-- `exp_fit_predictions.csv`: 各通道实测信号和拟合信号。
-- `<roi_csv_stem>_pred_concentration_exp.csv`: 选定通道反演浓度。
-- `exp_fit_evaluation.png`: 通道拟合曲线和浓度反演图。
+训练输出：
 
-批处理训练时实际输出文件名由脚本指定，例如：
+- `exp_fit_params.csv`: 每个通道的 `a`, `b`, `c`, `r2`, `rmse`, `inv_r2`, `inv_rmse`。
+- `exp_fit_predictions.csv`: 训练样品的实测光强、曝光归一化光强和拟合光强。
+- `<roi_csv_stem>_pred_concentration_exp.csv`: 最终反演浓度和各通道反演浓度。
+- `exp_fit_evaluation.png`: 各通道指数曲线和最终浓度反演散点图。
 
-- `OUTPUT/mate20x/exp_fit_params.csv`
-- `OUTPUT/mate20x/exp_concentration_predictions.csv`
-- `OUTPUT/mate20x/exp_fit_evaluation.png`
+预测输出：
+
+- `<roi_csv_stem>_pred_concentration_exp.csv`
+- `<roi_csv_stem>_pred_concentration_exp.png`
 
 ## 使用方式
 
 ```bash
 python concentration_EXP/train.py
+python concentration_EXP/train.py --roi-csv dataset/food/roi_detailed_statistics.csv --channel G_sig
 python concentration_EXP/predict.py --params concentration_EXP/exp_fit_output/exp_fit_params.csv --roi-csv dataset/food/roi_detailed_statistics.csv
 ```

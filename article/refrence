@@ -1,0 +1,41 @@
+\begin{thebibliography}{99}
+
+\bibitem{ruiz2023}
+Ruiz, A. J., Allen, R., Giallorenzi, M. K., Samkoe, K. S., Chapman, M. S., \& Pogue, B. W. (2023). 
+Smartphone-based dual radiometric fluorescence and white-light imager for quantification of protoporphyrin IX in skin. 
+Journal of Biomedical Optics, 28(08), 086003. 
+
+\bibitem{hasinoff2016}
+Hasinoff, S. W., Sharlet, D., Geiss, R., Adams, A., Barron, J. T., Kainz, F., Chen, J., \& Levoy, M. (2016). 
+Burst photography for high dynamic range and low-light imaging on mobile cameras. 
+ACM Transactions on Graphics, 35(6), 1–12.
+
+\bibitem{chen2005}
+Chen, T., Lin, B., Brunner, E., \& Schild, D. (2005). 
+In situ background estimation in quantitative fluorescence imaging. 
+Biophysical Journal, 90(7), 2534–2547. 
+
+\bibitem{liu2021}
+Liu, Y., Rollins, A. M., Levenson, R. M., Fereidouni, F., \& Jenkins, M. W. (2021). 
+Pocket MUSE: an affordable, versatile and high-performance fluorescence microscope using a smartphone. 
+Communications Biology, 4(1), 334.
+
+\bibitem{rasooly2016}
+Rasooly, R., Bruck, H., Balsam, J., Prickril, B., Ossandon, M., \& Rasooly, A. (2016). 
+Improving the sensitivity and functionality of mobile Webcam-Based fluorescence detectors for Point-of-Care diagnostics in global health. 
+Diagnostics, 6(2), 19. 
+
+\bibitem{branning2024}
+Branning, J. M., Faughnan, K. A., Tomson, A. A., Bell, G. J., Isbell, S. M., DeGroot, A., Jameson, L., Kilroy, K., Smith, M., Smith, R., Mottel, L., Branning, E. G., Worrall, Z., Anderson, F., Panditaradyula, A., Yang, W., Abdelmalek, J., Brake, J., \& Cash, K. J. (2024). 
+Multifunction fluorescence open source in vivo/in vitro imaging system (openIVIS). 
+PLoS ONE, 19(3), e0299875.
+
+\end{thebibliography}
+
+[1] Brooks, T., Mildenhall, B., Xue, T., Chen, J., Sharlet, D., & Barron, J. T. (2019). *Unprocessing images for learned raw denoising*. https://openaccess.thecvf.com/content_CVPR_2019/html/Brooks_Unprocessing_Images_for_Learned_Raw_Denoising_CVPR_2019_paper.html
+
+[2]Hüpfel, M., Kobitski, A. Y., Zhang, W., & Nienhaus, G. U. (2021). Wavelet-based background and noise subtraction for fluorescence microscopy images. *Biomedical Optics Express*, *12*(2), 969. https://doi.org/10.1364/boe.413181
+
+[3]Kennard, R. W., & Hoerl, A. E. (2012). Ridge regression: Biased estimation for nonorthogonal problems. *Taylor & Francis*. https://www.tandfonline.com/doi/abs/10.1080/00401706.1970.10488634?utm_source=chatgpt.com
+
+[4]Stone, M. (1974). Cross‐validatory choice and assessment of statistical predictions. Journal of the royal statistical society: Series B (Methodological), 36(2), 111-133.

@@ -1,106 +1,161 @@
-# 浓度反演流程使用说明
+# concentration_regression
 
-基于物理先验 + 岭回归，将 ROI RGB 统计量映射为浓度。本版本（v4）增强了低浓度精度与单调性约束，并提供了防过拟合的评估机制。
+本目录使用物理特征加 Ridge 回归做浓度反演。代码将 ROI/BG RAW 通道统计转换为对数光强、通道比值和差分特征，再用标准化后的 RidgeCV 预测浓度，并用 isotonic regression 做单调校准。
 
-## 核心改进 (v4)
-1. **真实评估 (LOO-CV)**：输出留一法交叉验证结果 (`_LOO_CV.csv`)，杜绝因极高拟合精度产生的“过拟合错觉”，真实反映模型对未知样品的预测能力。
-2. **低浓度优化**：通过 `WEIGHT_EPS` (默认50.0) 平滑样本权重，并使用大数值 Alpha 正则化，有效抑制低浓度段因噪声导致的剧烈震荡。
-3. **背景扣除 (强制)**：始终采用背景扣除模式 (`Signal = ROI - BG`)，直接建立信号与浓度的映射，不再支持无背景模式。
-4. **单调性约束**：集成 `IsotonicRegression`，强制输出非负且单调递增。
+## 主要文件
 
----
+- `config.py`: 默认路径、目标变换、背景校正、特征集合和正则网格。
+- `physics_features.py`: ROI/BG 物理特征构造。
+- `train.py`: 训练 RidgeCV，执行 Leave-One-Out，保存模型、预测、系数和评估图。
+- `predict.py`: 加载模型 bundle，对新的 ROI CSV 输出浓度预测。
+- `algorithm.md`: 更完整的代码和算法说明。
 
-## 输入与配置详解 (Input & Configuration)
+## 默认配置
 
-### 1. 数据输入 (CSV)
-默认路径：`pic_RGB/roi_results/roi_detailed_statistics.csv`
-必需列（由 `pic_RGB` 流程生成）：
-- **基础列**：`filename` (必须包含浓度数值，如 `12.0.dng`)
-- **ROI 统计**：`roi_R_mean`, `roi_G1_mean`, `roi_B_mean`, `roi_G1_var`
-- **背景统计 (必需)**：`bg_R_mean`, `bg_G1_mean`, `bg_B_mean`
-  - *注：必须存在背景列，模型会自动进行信号扣除 (Signal = ROI - BG)。*
-
-### 2. 参数配置 (`config.py`)
-主要超参数均在 `concentration/config.py` 中定义，修改此处即可影响训练行为：
-
-| 参数 | 默认值 | 说明 |
-| :--- | :--- | :--- |
-| `ALPHAS` | `(10000, 100000.0)` | 正则化网格。强制使用高正则化项以应对共线性并平滑模型。 |
-| `WEIGHT_EPS` | `50.0` | 权重平滑项。权重 $w = 1/(y + \epsilon)$。值越大，低浓度样本被“特殊对待”的程度越低，曲线越平滑。 |
-| `TARGET_TRANSFORM` | `"identity"` | 目标变换。默认直接预测浓度，配合背景扣除物理模型。 |
-| `CLIP_MIN` | `0.1` | 信号阈值。防止 `log(Signal)` 出现负无穷。 |
-
----
-
-## 输出产物 (Outputs)
-
-所有输出文件均位于 `concentration/rgb_fit_output/` 目录：
-
-### 1. 模型文件
-- **`concentration_model_v1.pkl`**
-  - **内容**：Python `dict` 对象，包含：
-    - `model`: 训练好的 Pipeline (Scaler + Ridge)。
-    - `isotonic`: 训练好的保序回归校准器 (IsotonicRegression)。
-    - `g_mode`, `use_bg`, `feature_names`: 训练时选定的最佳策略元数据。
-    - `sklearn_version`, `python_version`, `bundle_created_utc`: 训练环境信息（用于排查版本一致性问题）。
-  - **用途**：推理脚本 `predict.py` 的主要输入。
-  - **版本兼容提示**：模型文件使用 joblib/pickle 序列化，建议训练与推理使用相同的 scikit-learn 版本。
-    - 出现版本不一致警告时：优先重新训练（`python concentration/rgb_exponential_fit.py --method ridge`）。
-    - 若仅需减少/消除重复警告（并理解风险）：优先重新训练并重新保存模型 bundle。
-
-### 1.1 指数拟合输出（无需模型文件）
-- **`rgb_fit_params.csv`**：指数拟合参数（按通道）。
-- **`rgb_fit_predictions.csv`**：指数拟合曲线在各浓度点的强度预测（用于检查拟合质量）。
-- **`pic_RGB/roi_results/roi_detailed_statistics_pred_concentration_exp.csv`**：指数拟合反推的浓度预测结果（默认使用 `G1_corr`）。
-
-### 2. 评估报告 (重要)
-- **`ridge_predictions_LOO_CV.csv` (真实精度)**
-  - **含义**：留一法交叉验证结果。每个样本的预测值是在“该样本未参与训练”的模型上跑出来的。
-  - **用途**：**请看这个文件的 RMSE 和 R2 来评估模型好坏**。
-- **`ridge_predictions.csv` (拟合精度)**
-  - **含义**：全量数据训练后的回测结果。
-  - **用途**：仅用于检查标准曲线是否“做”得足够光滑，不代表预测能力。
-
-### 3. 分析辅助
-- **`ridge_coefficients.csv`**：特征权重表，用于分析哪些颜色通道对浓度的贡献最大。
-
----
-
-## 快速使用 (Quick Start)
-
-### 训练
-```bash
-# 指数拟合（默认）：拟合 I = a*exp(b*C)+c 并反推浓度
-python concentration/rgb_exponential_fit.py
-
-# 岭回归训练：生成 concentration_model_v1.pkl 等
-python concentration/rgb_exponential_fit.py --method ridge
+```text
+输入: dataset/food/roi_detailed_statistics.csv
+输出: concentration_regression/rgb_fit_output/
+target_transform: log
+use_bg: true
+bg_correction: subtract
+feature_set: compact
+alphas: (10000, 100000)
+weight_eps: 30.0
+clip_min: 0.1
+g_mode: avg
 ```
 
-### 推理
-**批量预测 (Batch Mode)**：
-```bash
-# 读取 ROI 统计 CSV，生成预测结果
-python concentration_regression/train.py --roi-csv pic_RGB/roi_results/roi_detailed_statistics.csv
-```
-*注：输入 CSV 必须包含背景统计列 (bg_*)，否则脚本会报错。*
+## 输入
 
-**单点预测 (Single Mode, 调试用)**：
+训练 CSV 需要包含：
+
+```text
+filename
+roi_R_mean, roi_G1_mean, roi_B_mean
+bg_R_mean, bg_G1_mean, bg_B_mean
+```
+
+默认 `g_mode=avg` 且 `use_bg=true`，通常还需要：
+
+```text
+roi_G2_mean, bg_G2_mean
+```
+
+可选列：
+
+- `roi_G1_var`, `roi_G2_var`: 用于 `Var_G`。
+- `exposure_time`: 用于曝光相关特征。
+- ROI 分布参数列: `feature_set=full` 时使用。
+
+`filename` 会用于解析真实浓度；训练时无法解析浓度的样品会被丢弃。
+
+## 特征集合
+
+默认 `feature_set=compact`，使用：
+
+```text
+ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG, Delta_RG, Delta_GB
+```
+
+其他选项：
+
+- `compact_exposure`: 使用曝光归一化、`Ratio_BG`、`Var_G`、曝光时间等基础特征。
+- `ln_rgb`: 只使用 `ln_R_sig/ln_G_sig/ln_B_sig`。
+- `full`: 使用全部可构造特征，包括可用 ROI 分布参数。
+
+背景校正支持：
+
+```text
+subtract: ROI - BG
+divide: ROI / (BG + eps)
+relative: (ROI - BG) / (BG + eps)
+```
+
+所有背景校正信号都会裁剪到不小于 `clip_min=0.1`。
+
+## 训练流程
+
+1. 读取 ROI CSV，从 `filename` 解析 `conc_true`。
+2. 构造特征并按 `feature_set` 选择训练列。
+3. 默认对目标做 log 变换：
+
+   ```text
+   y_target = log(C + 1e-6)
+   ```
+
+4. 样品权重：
+
+   ```text
+   weight = 1 / (C + weight_eps)
+   ```
+
+5. 训练：
+
+   ```text
+   StandardScaler -> RidgeCV(alphas=(10000, 100000))
+   ```
+
+6. 将预测反变换回浓度，并用 `IsotonicRegression(out_of_bounds="clip")` 校准。
+7. 执行 Leave-One-Out，输出训练集和 LOO 的 R2、RMSE、MAE。
+
+## 常用命令
+
+训练：
+
+```bash
+python concentration_regression/train.py
+```
+
+指定输入和特征：
+
 ```bash
 python concentration_regression/train.py \
-  --model concentration/rgb_fit_output/concentration_model_v1.pkl \
-  --r 25.5 --g1 40.2 --b 10.1 --var-g 205.0
+  --roi-csv dataset/food/roi_detailed_statistics.csv \
+  --feature-set compact \
+  --use-bg true \
+  --bg-correction subtract
 ```
 
----
+预测：
 
-## 目录结构
+```bash
+python concentration_regression/predict.py \
+  --model concentration_regression/rgb_fit_output/concentration_model_v1.pkl \
+  --roi-csv dataset/food/roi_detailed_statistics.csv
+```
+
+处理 scikit-learn 版本警告：
+
+```bash
+python concentration_regression/predict.py \
+  --model concentration_regression/rgb_fit_output/concentration_model_v1.pkl \
+  --roi-csv dataset/food/roi_detailed_statistics.csv \
+  --suppress-sklearn-version-warning
+```
+
+## 输出
+
+默认输出目录：
+
 ```text
-concentration/
-├── config.py               # [配置] 路径、超参数 (Alpha, Eps)
-├── physics_features.py     # [核心] 物理特征计算逻辑
-├── rgb_exponential_fit.py  # [拟合] 指数拟合(默认) / 岭回归训练(--method ridge)
-├── train.py              # [训练] 训练 Ridge 模型并做 LOO 验证
-├── METHODOLOGY.md          # [文档] 算法原理白皮书
-└── rgb_fit_output/         # [输出] 产物目录
+concentration_regression/rgb_fit_output/
+```
+
+训练输出：
+
+- `concentration_model_v1.pkl`: `joblib` 模型 bundle。
+- `ridge_predictions.csv`: 训练集原始预测、校准预测和残差。
+- `ridge_predictions_loo.csv`: Leave-One-Out 预测和残差。
+- `ridge_coefficients.csv`: Ridge 特征系数。
+- `concentration_model_v1_evaluation.png`: 训练和 LOO 评估图。
+
+预测输出：
+
+- `<roi_csv_stem>_pred_concentration.csv`
+- `<roi_csv_stem>_pred_concentration.png`
+
+## 依赖
+
+```bash
+pip install numpy pandas matplotlib scikit-learn joblib
 ```

@@ -16,5 +16,11 @@
     "exp_params": "models/xiaomi/exp_fit_params.csv",
     "regression_model": "models/xiaomi/rgb_concentration_model.pkl",
     "gs_model": "models/xiaomi/gs_amortized_posterior_model.pt"
+  },
+  "vivo100x": {
+    "display_name": "Vivo100X",
+    "exp_params": "models/vivo100x/exp_fit_params.csv",
+    "regression_model": "models/vivo100x/rgb_concentration_model.pkl",
+    "gs_model": "models/vivo100x/gs_amortized_posterior_model.pt"
   }
 }

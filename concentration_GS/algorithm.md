@@ -1,167 +1,150 @@
-# concentration_GS 算法说明
+# concentration_GS 代码说明
 
-本目录实现基于神经网络的摊销后验浓度反演。它输出的不是单个点估计，而是条件后验分布：
+本目录实现基于小型神经网络的摊销后验浓度反演。模型不只输出单个浓度值，而是学习条件后验分布：
 
 ```text
 q(log(C + eps) | x) = Normal(mu_phi(x), sigma_phi(x)^2)
 ```
 
-其中 `x` 是从 ROI 统计构造的物理特征，`mu_phi` 和 `sigma_phi` 由小型 MLP 输出。浓度空间中的预测分布是移位对数正态分布。默认点预测使用 `posterior_median`，避免 `posterior_mean` 被大方差放大。
+其中 `x` 是从 ROI/BG 统计构造的物理特征，`mu_phi` 和 `sigma_phi` 由 MLP 输出。转换回浓度空间后，预测分布是移位对数正态分布。默认点估计使用 `posterior_median`。
 
-## 主要代码
+## 代码文件
 
-- `train.py`: 训练摊销后验模型，输出训练集评估和 Leave-One-Out 评估。
-- `predict.py`: 加载模型，对新的 ROI 统计 CSV 输出后验分布。
-- `visualize_results.py`: 读取训练输出 CSV，生成额外可视化。
-- `physics_features.py`: 从 ROI 统计构造物理特征。
-- `config.py`: 默认路径、网络超参数和输出文件名。
+- `config.py`: 定义默认路径、输出文件名和训练超参数。默认输入为 `dataset/food/roi_detailed_statistics.csv`，输出目录为 `concentration_GS/amortized_output/`。
+- `physics_features.py`: 构造物理特征，解析浓度和曝光时间，检查背景列。
+- `train.py`: 训练入口。训练摊销后验模型，输出训练集和 Leave-One-Out 后验摘要、离散概率表和评估图。
+- `predict.py`: 预测入口。加载 `.pt` 模型 bundle，对新的 ROI CSV 输出后验摘要、离散概率和预测图。
+- `visualize_results.py`: 读取训练输出，生成散点图、残差图、不确定性图和后验分布图。
 
-## 算法输入
+## 输入数据
 
-算法层面的输入是：
+训练和预测使用 `roi_detailed_statistics.csv`。核心列包括：
 
-- 样品真实浓度 `C`，从 `filename` 解析。
-- ROI 和背景通道统计。
-- 可选曝光时间。
-
-实际默认输入文件：
-
-- `dataset/food/roi_detailed_statistics.csv`
-
-当前默认配置：
-
-- `use_bg=true`: 默认要求并使用背景扣除。
-- `feature_set=compact`: 输入向量参考 `concentration_regression`，使用跨数据集更稳的 6 个 ROI-BG 特征。
-- `hidden_dim=8`
-- `max_std_log=2.0`: 保留后验 log 标准差上限。
+- `filename`: 用于解析浓度标签，训练时必须能解析出有效浓度。
+- `roi_R_mean`, `roi_G1_mean`, `roi_G2_mean`, `roi_B_mean`: ROI 四通道均值。
+- `bg_R_mean`, `bg_G1_mean`, `bg_G2_mean`, `bg_B_mean`: 背景四通道均值。默认 `--use-bg true`，因此训练输入默认必须包含这些列。
+- `roi_G1_var`, `roi_G2_var`: 可选，构造 `Var_G` 时使用；缺失则置为 0。
+- `exposure_time`: 可选，缺失时从文件名或表内有效值兜底。
+- ROI 分布参数列可选。使用 `feature_set=full` 时会追加变换后的分布特征。
 
 ## 特征构造
 
-背景扣除信号：
+默认 `g_mode=avg`，绿色通道使用 G1/G2 平均。背景扣除模式下：
 
 ```text
-R_sig = max(roi_R_mean - bg_R_mean, clip_min)
-G_sig = max(avg(roi_G1_mean, roi_G2_mean) - avg(bg_G1_mean, bg_G2_mean), clip_min)
-B_sig = max(roi_B_mean - bg_B_mean, clip_min)
+R_sig = max(roi_R_mean - bg_R_mean, 0.1)
+G_sig = (max(roi_G1_mean - bg_G1_mean, 0.1)
+       + max(roi_G2_mean - bg_G2_mean, 0.1)) / 2
+B_sig = max(roi_B_mean - bg_B_mean, 0.1)
 ```
 
-完整基础物理特征包含 12 维：
+基础物理特征为：
 
 ```text
 ln_R_sig, ln_G_sig, ln_B_sig
 ln_R_sig_per_exp, ln_G_sig_per_exp, ln_B_sig_per_exp
-Ratio_RG, Delta_RG, Delta_GB
+Ratio_RG, Delta_RG, Ratio_BG, Delta_GB
 Var_G
 exposure_time, ln_exposure
 ```
 
-如果 CSV 中存在 ROI 分布参数，`full` 特征还会追加：
+如果 `use_bg=false`，对应的 `ln_*_sig` 会变为原始 ROI 光强的 `ln_R/ln_G/ln_B`。
+
+`feature_set` 控制实际输入列：
+
+- `compact`: 默认 6 维，使用 `ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG, Delta_RG, Delta_GB`。
+- `compact_exposure`: 使用 12 维基础特征中的曝光相关列和 `Ratio_BG/Var_G`，但不含 `Delta_GB`。
+- `full`: 使用 `build_feature_frame()` 生成的全部列，包括可用的 ROI 分布特征。
+
+可选分布特征包括：
 
 ```text
-exp_roi_*_gauss_mu      = exp(roi_*_gauss_mu / 1000)
-log_roi_*_gamma_shape   = log(max(roi_*_gamma_shape, eps))
-sqrt_roi_*_gamma_scale  = sqrt(max(roi_*_gamma_scale, 0))
+exp_roi_*_gauss_mu
+log_roi_*_gauss_shape 或 log_roi_*_gamma_shape
+sqrt_roi_*_gamma_scale
 ```
 
-当前默认 `compact` 实际训练列是 6 维，不包含 `Var_G`：
+## 模型结构和训练
+
+神经网络定义在 `AmortizedPosteriorNet`：
 
 ```text
-ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG, Delta_RG, Delta_GB
+input_dim -> Linear(hidden_dim) -> SiLU -> Dropout
+          -> Linear(hidden_dim) -> SiLU
+          -> mu_head, std_head
 ```
 
-如果使用 `full`，会使用所有基础物理特征和可用的 ROI 分布变换特征；如果使用 `compact_exposure`，则只使用 12 维基础物理特征。若 `use_bg=false`，对应特征名会从 `*_sig` 变为原始 ROI 通道，例如 `ln_R`。
+默认超参数：
 
-## 处理流程
+- `hidden_dim=8`
+- `dropout=0.05`
+- `learning_rate=1e-2`
+- `weight_decay=1e-3`
+- `epochs=2500`
+- `patience=250`
+- `min_std=0.08`
+- `std_reg_lambda=0.01`
+- `max_std_log=2.0`
+- `weight_eps=25.0`
 
-1. 读取 ROI CSV，并从 `filename` 解析 `conc_true`。
-2. 根据 `g_mode` 选择 G1 或 G1/G2 平均值。
-3. 根据 `use_bg` 决定是否使用背景扣除。
-4. 构造特征矩阵 `X`，再按 `feature_set` 选择列。
-5. 标准化特征：
+训练流程：
+
+1. 读取 ROI CSV 并解析 `conc_true`。
+2. 选择 `use_bg`、`g_mode` 和 `feature_set`，构造特征矩阵 `X`。
+3. 标准化特征：
 
    ```text
    X_std = (X - mean(X)) / std(X)
    ```
 
-6. 对目标做对数变换和标准化：
+4. 将目标变换到 log 空间并标准化：
 
    ```text
    y_log = log(C + eps)
    y_std = (y_log - mean(y_log)) / std(y_log)
    ```
 
-7. 训练 MLP。输入维度由 `feature_set` 和 CSV 中可用列决定；当前默认 compact 是 6 维。网络结构为：
-
-   ```text
-   input_dim -> hidden_dim -> hidden_dim -> mu/std heads
-   ```
-
-   网络输出：
-
-   ```text
-   mu = mu_head(backbone(X_std))
-   std = min_std + softplus(std_head(backbone(X_std)))
-   ```
-
-8. 损失函数是加权高斯负对数似然，并额外惩罚过大的预测标准差：
+5. 用加权高斯负对数似然训练：
 
    ```text
    loss = weighted_NLL + std_reg_lambda * mean(std^2)
-   ```
-
-   样品权重约为：
-
-   ```text
    weight = 1 / (C + weight_eps)
    ```
 
-9. 将标准化空间的 `mu/std` 转回 `log(C + eps)` 空间。转换后对 `std_log` 使用上限：
+6. 使用 early stopping 保存训练损失最低的参数。
+7. 将输出从标准化 log 空间还原为 `posterior_log_mean` 和 `posterior_log_std`，并用 `max_std_log` 限制过大的 log 标准差。
+8. 计算后验均值、中位数、众数、标准差、置信区间和 NLL。
+9. 以训练集中出现过的浓度作为参考 bin，计算每个样品落入各浓度 bin 的概率质量。
+10. 执行 Leave-One-Out。每折用剩余样品重新训练一个模型，再预测留出样品。
 
-   ```text
-   std_log = min(std_log, max_std_log)
-   ```
+## 输出文件
 
-10. 计算移位对数正态分布摘要：
-    - `posterior_mean`
-    - `posterior_median`
-    - `posterior_mode`
-    - `posterior_std`
-    - 置信区间
-    - 离散参考浓度 bin 的概率质量
-11. 训练时执行 Leave-One-Out：每次留出一个样品，用剩余样品重新训练并预测留出样品。
-12. 评估和默认图使用 `posterior_median`。
+默认输出目录：
 
-## 算法输出
+```text
+concentration_GS/amortized_output/
+```
 
-算法层面的输出是：
+训练输出：
 
-- 模型参数和标准化参数。
-- 每个样品的后验分布参数 `posterior_log_mean`, `posterior_log_std`。
-- 后验点估计、区间估计和概率表。
-- 训练集和 LOO 指标：R2、RMSE、MAE、平均 NLL。
-
-实际默认输出目录：
-
-- `concentration_GS/amortized_output/`
-
-默认输出文件：
-
-- `amortized_posterior_model.pt`: PyTorch 模型 bundle。
+- `amortized_posterior_model.pt`: PyTorch bundle，包含网络参数、标准化参数、特征名、参考浓度、训练配置和评估指标。
 - `train_posterior_summary.csv`: 训练集后验摘要。
-- `loo_posterior_summary.csv`: LOO 后验摘要。
-- `train_posterior_probabilities.csv`: 训练集离散浓度概率。
-- `loo_posterior_probabilities.csv`: LOO 离散浓度概率。
-- `posterior_evaluation.png`: 训练/LOO 散点图和概率热图。
+- `loo_posterior_summary.csv`: Leave-One-Out 后验摘要。
+- `train_posterior_probabilities.csv`: 训练集离散浓度 bin 概率。
+- `loo_posterior_probabilities.csv`: LOO 离散浓度 bin 概率。
+- `posterior_evaluation.png`: 训练/LOO 后验散点图和 LOO 概率热图。
 
-预测新 CSV 时默认输出：
+预测输出：
 
-- `<roi_csv_stem>_pred_concentration_gs.csv`
-- `<roi_csv_stem>_pred_concentration_gs_prob.csv`
-- `<roi_csv_stem>_pred_concentration_gs.png`
+- `<roi_csv_stem>_pred_concentration_gs.csv`: 后验摘要。
+- `<roi_csv_stem>_pred_concentration_gs_prob.csv`: 参考浓度 bin 概率。
+- `<roi_csv_stem>_pred_concentration_gs.png`: 预测散点或不确定性图。
 
 ## 使用方式
 
 ```bash
 python concentration_GS/train.py
+python concentration_GS/train.py --feature-set compact_exposure --use-bg true
 python concentration_GS/predict.py --model concentration_GS/amortized_output/amortized_posterior_model.pt --roi-csv dataset/food/roi_detailed_statistics.csv
+python concentration_GS/visualize_results.py
 ```
