@@ -1,0 +1,20 @@
+{
+  "mate20x": {
+    "display_name": "Mate20X",
+    "exp_params": "models/mate20x/exp_fit_params.csv",
+    "regression_model": "models/mate20x/rgb_concentration_model.pkl",
+    "gs_model": "models/mate20x/gs_amortized_posterior_model.pt"
+  },
+  "mate3_2": {
+    "display_name": "Mate3_2",
+    "exp_params": "models/mate3_2/exp_fit_params.csv",
+    "regression_model": "models/mate3_2/rgb_concentration_model.pkl",
+    "gs_model": "models/mate3_2/gs_amortized_posterior_model.pt"
+  },
+  "xiaomi": {
+    "display_name": "Xiaomi",
+    "exp_params": "models/xiaomi/exp_fit_params.csv",
+    "regression_model": "models/xiaomi/rgb_concentration_model.pkl",
+    "gs_model": "models/xiaomi/gs_amortized_posterior_model.pt"
+  }
+}

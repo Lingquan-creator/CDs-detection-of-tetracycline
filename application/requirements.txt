@@ -1,0 +1,10 @@
+PySide6
+rawpy
+numpy
+pandas
+opencv-python
+scikit-learn
+joblib
+torch
+scipy
+pyinstaller
