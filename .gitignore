@@ -24,3 +24,5 @@ concentration_EXP/exp_fit_output
 temp/
 article/
 .backup/
+application_linux/
+application_win/

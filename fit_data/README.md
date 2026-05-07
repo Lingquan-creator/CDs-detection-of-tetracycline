@@ -84,7 +84,7 @@ python fit_data/integrate_and_fit.py
 1. 读取 `data.csv`。
 2. 绘制所有浓度的光谱。
 3. 在默认 `400-700 nm` 内积分。
-4. 去掉 0 浓度点。
+4. 如需排除特定浓度，可在 `integrate_and_fit.py` 里设置 `EXCLUDE_CONCENTRATIONS`。
 5. 拟合指数模型：
 
    ```text
@@ -108,7 +108,7 @@ python fit_data/integrate_and_fit.py
 python fit_data/fit_parameters.py
 ```
 
-该脚本读取 `results_spec.csv`，对每个峰的参数随浓度变化作图并拟合趋势。默认忽略浓度 `0` 和 `0.2`。
+该脚本读取 `results_spec.csv`，对每个峰的参数随浓度变化作图并拟合趋势。默认不忽略任何浓度点。
 
 输出：
 

@@ -1,0 +1,202 @@
+======================================================================
+光谱拟合批量结果汇总 / Batch Spectrum Fitting Results Summary
+======================================================================
+
+样品 / Sample: egg-1-0
+  R² = 0.807449
+  RMSE = 3.7288e+04 (相对RMSE = 18.38%)
+  背景 / Background B = 7.7803e+04
+  峰 1 / Peak 1:
+    λ = 407.20 nm, σ_E = 0.2644 eV, 积分强度 / Integral = 1.4376e+07
+  峰 2 / Peak 2:
+    λ = 534.14 nm, σ_E = 0.1026 eV, 积分强度 / Integral = 3.5856e+06
+  峰 3 / Peak 3:
+    λ = 575.11 nm, σ_E = 0.1757 eV, 积分强度 / Integral = 3.3160e+07
+
+样品 / Sample: egg-1-2
+  R² = 0.822015
+  RMSE = 3.6601e+04 (相对RMSE = 18.29%)
+  背景 / Background B = 8.0139e+04
+  峰 1 / Peak 1:
+    λ = 405.00 nm, σ_E = 0.2485 eV, 积分强度 / Integral = 1.2874e+07
+  峰 2 / Peak 2:
+    λ = 531.25 nm, σ_E = 0.0676 eV, 积分强度 / Integral = 1.3533e+06
+  峰 3 / Peak 3:
+    λ = 571.31 nm, σ_E = 0.1782 eV, 积分强度 / Integral = 3.5056e+07
+
+样品 / Sample: egg-1-10
+  R² = 0.750507
+  RMSE = 3.1009e+04 (相对RMSE = 21.21%)
+  背景 / Background B = 6.0834e+04
+  峰 1 / Peak 1:
+    λ = 405.86 nm, σ_E = 0.2417 eV, 积分强度 / Integral = 9.4244e+06
+  峰 2 / Peak 2:
+    λ = 533.31 nm, σ_E = 0.0768 eV, 积分强度 / Integral = 1.1128e+06
+  峰 3 / Peak 3:
+    λ = 573.12 nm, σ_E = 0.1837 eV, 积分强度 / Integral = 2.6065e+07
+
+样品 / Sample: egg-1-20
+  R² = 0.554229
+  RMSE = 3.5214e+04 (相对RMSE = 28.03%)
+  背景 / Background B = 5.3094e+04
+  峰 1 / Peak 1:
+    λ = 406.44 nm, σ_E = 0.2494 eV, 积分强度 / Integral = 8.8210e+06
+  峰 2 / Peak 2:
+    λ = 539.84 nm, σ_E = 0.0989 eV, 积分强度 / Integral = 1.4424e+06
+  峰 3 / Peak 3:
+    λ = 574.89 nm, σ_E = 0.1950 eV, 积分强度 / Integral = 2.3634e+07
+
+样品 / Sample: egg-1-50
+  R² = 0.123414
+  RMSE = 2.1997e+04 (相对RMSE = 36.54%)
+  背景 / Background B = 2.5139e+04
+  峰 1 / Peak 1:
+    λ = 410.05 nm, σ_E = 0.2425 eV, 积分强度 / Integral = 4.7890e+06
+  峰 2 / Peak 2:
+    λ = 574.89 nm, σ_E = 0.2068 eV, 积分强度 / Integral = 1.2720e+07
+  峰 3 / Peak 3:
+    λ = 659.75 nm, σ_E = 0.0567 eV, 积分强度 / Integral = 3.5941e+05
+
+样品 / Sample: egg-1-100
+  R² = 0.769620
+  RMSE = 5.6072e+03 (相对RMSE = 18.31%)
+  背景 / Background B = 1.3131e+04
+  峰 1 / Peak 1:
+    λ = 425.67 nm, σ_E = 0.1813 eV, 积分强度 / Integral = 1.8612e+06
+  峰 2 / Peak 2:
+    λ = 570.88 nm, σ_E = 0.1625 eV, 积分强度 / Integral = 3.6889e+06
+  峰 3 / Peak 3:
+    λ = 710.45 nm, σ_E = 0.4428 eV, 积分强度 / Integral = 1.1906e+06
+
+样品 / Sample: egg-2-0
+  R² = 0.790845
+  RMSE = 4.0199e+04 (相对RMSE = 19.29%)
+  背景 / Background B = 8.3508e+04
+  峰 1 / Peak 1:
+    λ = 406.88 nm, σ_E = 0.2571 eV, 积分强度 / Integral = 1.4267e+07
+  峰 2 / Peak 2:
+    λ = 532.72 nm, σ_E = 0.0788 eV, 积分强度 / Integral = 1.9504e+06
+  峰 3 / Peak 3:
+    λ = 572.25 nm, σ_E = 0.1783 eV, 积分强度 / Integral = 3.5755e+07
+
+样品 / Sample: egg-2-2
+  R² = 0.852059
+  RMSE = 3.4240e+04 (相对RMSE = 16.79%)
+  背景 / Background B = 8.0513e+04
+  峰 1 / Peak 1:
+    λ = 404.57 nm, σ_E = 0.2456 eV, 积分强度 / Integral = 1.2645e+07
+  峰 2 / Peak 2:
+    λ = 531.13 nm, σ_E = 0.0683 eV, 积分强度 / Integral = 1.4084e+06
+  峰 3 / Peak 3:
+    λ = 571.42 nm, σ_E = 0.1772 eV, 积分强度 / Integral = 3.5536e+07
+
+样品 / Sample: egg-2-10
+  R² = 0.830960
+  RMSE = 3.0049e+04 (相对RMSE = 17.80%)
+  背景 / Background B = 6.8139e+04
+  峰 1 / Peak 1:
+    λ = 405.46 nm, σ_E = 0.2386 eV, 积分强度 / Integral = 1.0391e+07
+  峰 2 / Peak 2:
+    λ = 531.83 nm, σ_E = 0.0705 eV, 积分强度 / Integral = 1.1712e+06
+  峰 3 / Peak 3:
+    λ = 572.15 nm, σ_E = 0.1792 eV, 积分强度 / Integral = 2.9581e+07
+
+样品 / Sample: egg-2-20
+  R² = 0.666163
+  RMSE = 3.1863e+04 (相对RMSE = 24.32%)
+  背景 / Background B = 5.4821e+04
+  峰 1 / Peak 1:
+    λ = 406.36 nm, σ_E = 0.2432 eV, 积分强度 / Integral = 8.7749e+06
+  峰 2 / Peak 2:
+    λ = 536.47 nm, σ_E = 0.0889 eV, 积分强度 / Integral = 1.1893e+06
+  峰 3 / Peak 3:
+    λ = 573.90 nm, σ_E = 0.1897 eV, 积分强度 / Integral = 2.4018e+07
+
+样品 / Sample: egg-2-50
+  R² = 0.317519
+  RMSE = 2.0686e+04 (相对RMSE = 32.38%)
+  背景 / Background B = 2.6964e+04
+  峰 1 / Peak 1:
+    λ = 409.17 nm, σ_E = 0.2378 eV, 积分强度 / Integral = 4.7735e+06
+  峰 2 / Peak 2:
+    λ = 573.74 nm, σ_E = 0.1990 eV, 积分强度 / Integral = 1.2661e+07
+  峰 3 / Peak 3:
+    λ = 654.06 nm, σ_E = 0.0739 eV, 积分强度 / Integral = 5.7470e+05
+
+样品 / Sample: egg-2-100
+  R² = 0.781350
+  RMSE = 4.8453e+03 (相对RMSE = 17.99%)
+  背景 / Background B = 1.1468e+04
+  峰 1 / Peak 1:
+    λ = 424.75 nm, σ_E = 0.1747 eV, 积分强度 / Integral = 1.5712e+06
+  峰 2 / Peak 2:
+    λ = 570.40 nm, σ_E = 0.1615 eV, 积分强度 / Integral = 3.1804e+06
+  峰 3 / Peak 3:
+    λ = 689.31 nm, σ_E = 0.4396 eV, 积分强度 / Integral = 1.1846e+06
+
+样品 / Sample: egg-3-0
+  R² = 0.806230
+  RMSE = 3.8965e+04 (相对RMSE = 18.84%)
+  背景 / Background B = 8.1603e+04
+  峰 1 / Peak 1:
+    λ = 405.27 nm, σ_E = 0.2575 eV, 积分强度 / Integral = 1.4025e+07
+  峰 2 / Peak 2:
+    λ = 532.13 nm, σ_E = 0.0767 eV, 积分强度 / Integral = 1.8026e+06
+  峰 3 / Peak 3:
+    λ = 571.86 nm, σ_E = 0.1784 eV, 积分强度 / Integral = 3.5871e+07
+
+样品 / Sample: egg-3-2
+  R² = 0.836298
+  RMSE = 3.5073e+04 (相对RMSE = 17.78%)
+  背景 / Background B = 8.0113e+04
+  峰 1 / Peak 1:
+    λ = 403.61 nm, σ_E = 0.2422 eV, 积分强度 / Integral = 1.2253e+07
+  峰 2 / Peak 2:
+    λ = 530.63 nm, σ_E = 0.0674 eV, 积分强度 / Integral = 1.2914e+06
+  峰 3 / Peak 3:
+    λ = 571.14 nm, σ_E = 0.1771 eV, 积分强度 / Integral = 3.4359e+07
+
+样品 / Sample: egg-3-10
+  R² = 0.759435
+  RMSE = 2.9814e+04 (相对RMSE = 20.85%)
+  背景 / Background B = 5.9897e+04
+  峰 1 / Peak 1:
+    λ = 406.20 nm, σ_E = 0.2347 eV, 积分强度 / Integral = 9.0797e+06
+  峰 2 / Peak 2:
+    λ = 533.80 nm, σ_E = 0.0765 eV, 积分强度 / Integral = 1.0525e+06
+  峰 3 / Peak 3:
+    λ = 572.75 nm, σ_E = 0.1840 eV, 积分强度 / Integral = 2.5383e+07
+
+样品 / Sample: egg-3-20
+  R² = 0.737820
+  RMSE = 2.4667e+04 (相对RMSE = 21.36%)
+  背景 / Background B = 4.7694e+04
+  峰 1 / Peak 1:
+    λ = 406.00 nm, σ_E = 0.2330 eV, 积分强度 / Integral = 7.4267e+06
+  峰 2 / Peak 2:
+    λ = 533.43 nm, σ_E = 0.0717 eV, 积分强度 / Integral = 7.0815e+05
+  峰 3 / Peak 3:
+    λ = 573.26 nm, σ_E = 0.1886 eV, 积分强度 / Integral = 2.0892e+07
+
+样品 / Sample: egg-3-50
+  R² = 0.674499
+  RMSE = 1.4618e+04 (相对RMSE = 22.45%)
+  背景 / Background B = 2.8216e+04
+  峰 1 / Peak 1:
+    λ = 408.91 nm, σ_E = 0.2207 eV, 积分强度 / Integral = 4.1455e+06
+  峰 2 / Peak 2:
+    λ = 568.62 nm, σ_E = 0.1841 eV, 积分强度 / Integral = 1.1229e+07
+  峰 3 / Peak 3:
+    λ = 644.89 nm, σ_E = 0.0801 eV, 积分强度 / Integral = 7.2874e+05
+
+样品 / Sample: egg-3-100
+  R² = 0.774719
+  RMSE = 5.0872e+03 (相对RMSE = 18.25%)
+  背景 / Background B = 1.1950e+04
+  峰 1 / Peak 1:
+    λ = 425.71 nm, σ_E = 0.1776 eV, 积分强度 / Integral = 1.6383e+06
+  峰 2 / Peak 2:
+    λ = 569.54 nm, σ_E = 0.1633 eV, 积分强度 / Integral = 3.3630e+06
+  峰 3 / Peak 3:
+    λ = 703.18 nm, σ_E = 0.4452 eV, 积分强度 / Integral = 1.1256e+06
+

@@ -1,0 +1,202 @@
+======================================================================
+光谱拟合批量结果汇总 / Batch Spectrum Fitting Results Summary
+======================================================================
+
+样品 / Sample: milk-1-0
+  R² = 0.824906
+  RMSE = 3.5165e+04 (相对RMSE = 18.15%)
+  背景 / Background B = 7.7355e+04
+  峰 1 / Peak 1:
+    λ = 404.61 nm, σ_E = 0.2495 eV, 积分强度 / Integral = 1.2587e+07
+  峰 2 / Peak 2:
+    λ = 530.67 nm, σ_E = 0.0669 eV, 积分强度 / Integral = 1.3917e+06
+  峰 3 / Peak 3:
+    λ = 571.07 nm, σ_E = 0.1777 eV, 积分强度 / Integral = 3.3720e+07
+
+样品 / Sample: milk-1-2
+  R² = 0.794051
+  RMSE = 3.7311e+04 (相对RMSE = 19.53%)
+  背景 / Background B = 7.7077e+04
+  峰 1 / Peak 1:
+    λ = 405.46 nm, σ_E = 0.2502 eV, 积分强度 / Integral = 1.2691e+07
+  峰 2 / Peak 2:
+    λ = 532.43 nm, σ_E = 0.0752 eV, 积分强度 / Integral = 1.5048e+06
+  峰 3 / Peak 3:
+    λ = 571.91 nm, σ_E = 0.1791 eV, 积分强度 / Integral = 3.3416e+07
+
+样品 / Sample: milk-1-10
+  R² = 0.882941
+  RMSE = 2.0872e+04 (相对RMSE = 14.37%)
+  背景 / Background B = 6.0642e+04
+  峰 1 / Peak 1:
+    λ = 408.88 nm, σ_E = 0.2255 eV, 积分强度 / Integral = 8.6202e+06
+  峰 2 / Peak 2:
+    λ = 548.58 nm, σ_E = 0.1358 eV, 积分强度 / Integral = 1.3371e+07
+  峰 3 / Peak 3:
+    λ = 603.59 nm, σ_E = 0.1321 eV, 积分强度 / Integral = 1.1145e+07
+
+样品 / Sample: milk-1-20
+  R² = 0.765136
+  RMSE = 2.1483e+04 (相对RMSE = 20.57%)
+  背景 / Background B = 4.5218e+04
+  峰 1 / Peak 1:
+    λ = 411.10 nm, σ_E = 0.2160 eV, 积分强度 / Integral = 6.3419e+06
+  峰 2 / Peak 2:
+    λ = 531.39 nm, σ_E = 0.0626 eV, 积分强度 / Integral = 5.3515e+05
+  峰 3 / Peak 3:
+    λ = 572.37 nm, σ_E = 0.1814 eV, 积分强度 / Integral = 1.8490e+07
+
+样品 / Sample: milk-1-50
+  R² = 0.899874
+  RMSE = 8.7746e+03 (相对RMSE = 13.28%)
+  背景 / Background B = 2.9727e+04
+  峰 1 / Peak 1:
+    λ = 413.63 nm, σ_E = 0.1825 eV, 积分强度 / Integral = 3.2305e+06
+  峰 2 / Peak 2:
+    λ = 558.86 nm, σ_E = 0.1501 eV, 积分强度 / Integral = 8.0030e+06
+  峰 3 / Peak 3:
+    λ = 617.12 nm, σ_E = 0.1188 eV, 积分强度 / Integral = 2.8768e+06
+
+样品 / Sample: milk-1-100
+  R² = 0.692837
+  RMSE = 3.0159e+03 (相对RMSE = 24.78%)
+  背景 / Background B = 4.6408e+03
+  峰 1 / Peak 1:
+    λ = 432.30 nm, σ_E = 0.1680 eV, 积分强度 / Integral = 6.6743e+05
+  峰 2 / Peak 2:
+    λ = 575.08 nm, σ_E = 0.2129 eV, 积分强度 / Integral = 1.7274e+06
+  峰 3 / Peak 3:
+    λ = 958.68 nm, σ_E = 0.4355 eV, 积分强度 / Integral = 6.3947e+04
+
+样品 / Sample: milk-2-0
+  R² = 0.822362
+  RMSE = 3.6146e+04 (相对RMSE = 17.78%)
+  背景 / Background B = 7.8853e+04
+  峰 1 / Peak 1:
+    λ = 407.15 nm, σ_E = 0.2527 eV, 积分强度 / Integral = 1.3922e+07
+  峰 2 / Peak 2:
+    λ = 530.15 nm, σ_E = 0.0616 eV, 积分强度 / Integral = 1.1470e+06
+  峰 3 / Peak 3:
+    λ = 570.49 nm, σ_E = 0.1790 eV, 积分强度 / Integral = 3.5485e+07
+
+样品 / Sample: milk-2-2
+  R² = 0.779135
+  RMSE = 3.3171e+04 (相对RMSE = 20.00%)
+  背景 / Background B = 6.7851e+04
+  峰 1 / Peak 1:
+    λ = 408.00 nm, σ_E = 0.2429 eV, 积分强度 / Integral = 1.1008e+07
+  峰 2 / Peak 2:
+    λ = 532.43 nm, σ_E = 0.0740 eV, 积分强度 / Integral = 1.2573e+06
+  峰 3 / Peak 3:
+    λ = 571.70 nm, σ_E = 0.1799 eV, 积分强度 / Integral = 2.9023e+07
+
+样品 / Sample: milk-2-10
+  R² = 0.799543
+  RMSE = 3.1264e+04 (相对RMSE = 18.93%)
+  背景 / Background B = 6.8074e+04
+  峰 1 / Peak 1:
+    λ = 407.75 nm, σ_E = 0.2367 eV, 积分强度 / Integral = 1.0710e+07
+  峰 2 / Peak 2:
+    λ = 529.63 nm, σ_E = 0.0564 eV, 积分强度 / Integral = 7.7505e+05
+  峰 3 / Peak 3:
+    λ = 571.16 nm, σ_E = 0.1795 eV, 积分强度 / Integral = 2.8901e+07
+
+样品 / Sample: milk-2-20
+  R² = 0.759366
+  RMSE = 2.6300e+04 (相对RMSE = 20.69%)
+  背景 / Background B = 5.4849e+04
+  峰 1 / Peak 1:
+    λ = 409.61 nm, σ_E = 0.2261 eV, 积分强度 / Integral = 7.9698e+06
+  峰 2 / Peak 2:
+    λ = 531.73 nm, σ_E = 0.0651 eV, 积分强度 / Integral = 7.1820e+05
+  峰 3 / Peak 3:
+    λ = 572.37 nm, σ_E = 0.1809 eV, 积分强度 / Integral = 2.2312e+07
+
+样品 / Sample: milk-2-50
+  R² = -0.224733
+  RMSE = 2.5818e+04 (相对RMSE = 46.48%)
+  背景 / Background B = 2.6003e+04
+  峰 1 / Peak 1:
+    λ = 475.99 nm, σ_E = 0.2053 eV, 积分强度 / Integral = 4.5037e+06
+  峰 2 / Peak 2:
+    λ = 563.94 nm, σ_E = 0.1759 eV, 积分强度 / Integral = 7.7693e+06
+  峰 3 / Peak 3:
+    λ = 875.94 nm, σ_E = 0.3571 eV, 积分强度 / Integral = 5.0949e+05
+
+样品 / Sample: milk-2-100
+  R² = 0.913037
+  RMSE = 1.5009e+03 (相对RMSE = 12.78%)
+  背景 / Background B = 2.7722e+03
+  峰 1 / Peak 1:
+    λ = 414.87 nm, σ_E = 0.1855 eV, 积分强度 / Integral = 5.8640e+05
+  峰 2 / Peak 2:
+    λ = 569.36 nm, σ_E = 0.2207 eV, 积分强度 / Integral = 2.2316e+06
+  峰 3 / Peak 3:
+    λ = 1599.63 nm, σ_E = 0.4340 eV, 积分强度 / Integral = 1.6702e+03
+
+样品 / Sample: milk-3-0
+  R² = 0.821467
+  RMSE = 3.8206e+04 (相对RMSE = 18.33%)
+  背景 / Background B = 8.4955e+04
+  峰 1 / Peak 1:
+    λ = 406.25 nm, σ_E = 0.2479 eV, 积分强度 / Integral = 1.3071e+07
+  峰 2 / Peak 2:
+    λ = 530.77 nm, σ_E = 0.0664 eV, 积分强度 / Integral = 1.4454e+06
+  峰 3 / Peak 3:
+    λ = 571.34 nm, σ_E = 0.1770 eV, 积分强度 / Integral = 3.6375e+07
+
+样品 / Sample: milk-3-2
+  R² = 0.809324
+  RMSE = 3.4608e+04 (相对RMSE = 18.46%)
+  背景 / Background B = 7.5961e+04
+  峰 1 / Peak 1:
+    λ = 407.51 nm, σ_E = 0.2455 eV, 积分强度 / Integral = 1.2403e+07
+  峰 2 / Peak 2:
+    λ = 530.90 nm, σ_E = 0.0653 eV, 积分强度 / Integral = 1.1652e+06
+  峰 3 / Peak 3:
+    λ = 571.27 nm, σ_E = 0.1782 eV, 积分强度 / Integral = 3.2430e+07
+
+样品 / Sample: milk-3-10
+  R² = 0.810384
+  RMSE = 2.9339e+04 (相对RMSE = 18.55%)
+  背景 / Background B = 6.5784e+04
+  峰 1 / Peak 1:
+    λ = 408.58 nm, σ_E = 0.2333 eV, 积分强度 / Integral = 9.8706e+06
+  峰 2 / Peak 2:
+    λ = 530.50 nm, σ_E = 0.0609 eV, 积分强度 / Integral = 8.6864e+05
+  峰 3 / Peak 3:
+    λ = 571.56 nm, σ_E = 0.1783 eV, 积分强度 / Integral = 2.7548e+07
+
+样品 / Sample: milk-3-20
+  R² = 0.823067
+  RMSE = 2.0460e+04 (相对RMSE = 17.74%)
+  背景 / Background B = 5.0343e+04
+  峰 1 / Peak 1:
+    λ = 411.00 nm, σ_E = 0.2111 eV, 积分强度 / Integral = 6.6421e+06
+  峰 2 / Peak 2:
+    λ = 529.02 nm, σ_E = 0.0526 eV, 积分强度 / Integral = 4.5573e+05
+  峰 3 / Peak 3:
+    λ = 571.73 nm, σ_E = 0.1778 eV, 积分强度 / Integral = 1.9750e+07
+
+样品 / Sample: milk-3-50
+  R² = 0.775470
+  RMSE = 1.2997e+04 (相对RMSE = 19.76%)
+  背景 / Background B = 3.0208e+04
+  峰 1 / Peak 1:
+    λ = 413.60 nm, σ_E = 0.1931 eV, 积分强度 / Integral = 3.5902e+06
+  峰 2 / Peak 2:
+    λ = 528.91 nm, σ_E = 0.0488 eV, 积分强度 / Integral = 2.3682e+05
+  峰 3 / Peak 3:
+    λ = 573.50 nm, σ_E = 0.1816 eV, 积分强度 / Integral = 1.1416e+07
+
+样品 / Sample: milk-3-100
+  R² = 0.956249
+  RMSE = 2.3265e+03 (相对RMSE = 8.66%)
+  背景 / Background B = 1.0214e+04
+  峰 1 / Peak 1:
+    λ = 421.89 nm, σ_E = 0.1505 eV, 积分强度 / Integral = 1.1157e+06
+  峰 2 / Peak 2:
+    λ = 533.82 nm, σ_E = 0.0827 eV, 积分强度 / Integral = 3.4420e+05
+  峰 3 / Peak 3:
+    λ = 585.62 nm, σ_E = 0.1647 eV, 积分强度 / Integral = 3.9292e+06
+

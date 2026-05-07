@@ -125,7 +125,7 @@ SAVE_RESULTS = False
    area(C) = integral I(lambda, C) d lambda
    ```
 
-4. 丢弃 0 浓度点。
+4. 如需排除特定浓度点，可通过 `EXCLUDE_CONCENTRATIONS` 配置。
 5. 当前只拟合一个指数候选模型：
 
    ```text
@@ -142,7 +142,7 @@ SAVE_RESULTS = False
 1. 从 `Concentration` 字符串中解析数值浓度。
 2. 自动检测结果表中包含多少个峰。
 3. 对每个峰的 `A_prime`, `lambda0_nm`, `sigma_E_eV`, `peak_position_nm`, `E0_eV`, `max_intensity`, `integrated_intensity` 作图。
-4. 默认忽略浓度 `0` 和 `0.2` 后拟合参数趋势。
+4. 默认不忽略任何浓度点。
 5. 根据参数类型使用预设模型：
    - `A_prime`, `max_intensity`, `integrated_intensity`: 指数拟合。
    - `lambda0_nm`, `sigma_E_eV`, `peak_position_nm`, `E0_eV`: 线性拟合。

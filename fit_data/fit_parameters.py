@@ -31,9 +31,9 @@ FIGSIZE = (10, 6)                    # 图片尺寸 / Figure size
 LINEAR_FIT_CSV = RESULTS_DIR / "results_parameter.csv"  # 线性拟合结果输出 / Linear fit results output
 
 # 拟合时忽略的浓度点配置 / Concentration points to ignore during fitting
-IGNORE_CONCENTRATIONS = [0, 0.2]  # 要忽略的特定浓度值列表（0对应空白） / List of specific concentration values to ignore (0 for blank)
-                                        # 例如 / Example: [0, 0.05, 0.1, 5.0]
-                                        # 留空则不忽略任何浓度 / Leave empty to not ignore any concentrations
+IGNORE_CONCENTRATIONS = []  # 要忽略的特定浓度值列表 / List of specific concentration values to ignore
+                            # 例如 / Example: [0.05, 0.1, 5.0]
+                            # 留空则不忽略任何浓度 / Leave empty to not ignore any concentrations
 
 # 要绘制的参数列表 / Parameters to plot
 PARAMETERS = [

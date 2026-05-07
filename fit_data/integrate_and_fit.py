@@ -30,13 +30,14 @@ from scipy.optimize import curve_fit
 
 BASE_DIR = Path(__file__).parent
 RESULTS_DIR = BASE_DIR / "results"
-DATA_FILE = BASE_DIR / "data.csv"
+DATA_FILE = BASE_DIR / "dataset/data.csv"
 PLOT_DIR = BASE_DIR / "fit_plots"
 INTEGRATED_CSV = RESULTS_DIR / "results_integrated_intensity.csv"
 MODEL_SUMMARY_CSV = RESULTS_DIR / "results_intensity_models.csv"
 SPECTRA_FIG = PLOT_DIR / "spectra_by_concentration.png"
 FIT_FIG = PLOT_DIR / "integrated_intensity_fit.png"
 INTEGRATION_RANGE = (400.0, 700.0)  # nm
+EXCLUDE_CONCENTRATIONS: Tuple[float, ...] = (6.0,)
 
 
 # -----------------------------------------------------------------------------
@@ -220,7 +221,9 @@ def main() -> None:
     plot_all_spectra(wavelengths, spectra, SPECTRA_FIG)
 
     integrated_df = integrate_intensity(wavelengths, spectra, INTEGRATION_RANGE)
-    integrated_df = integrated_df[integrated_df["concentration_uM"] != 0].reset_index(drop=True)
+    if EXCLUDE_CONCENTRATIONS:
+        keep_mask = ~integrated_df["concentration_uM"].isin(EXCLUDE_CONCENTRATIONS)
+        integrated_df = integrated_df[keep_mask].reset_index(drop=True)
     integrated_df.to_csv(INTEGRATED_CSV, index=False)
 
     x = integrated_df["concentration_uM"].to_numpy(dtype=float)
