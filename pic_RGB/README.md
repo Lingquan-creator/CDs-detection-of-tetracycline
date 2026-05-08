@@ -38,8 +38,9 @@ bg_ring_inner_x = 80
 bg_ring_inner_y = 80
 bg_ring_outer_x = 240
 bg_ring_outer_y = 240
-move_step = 2
-size_step = 20
+move_step = 1
+size_step = 1
+spin_repeat_interval_ms = 100
 angle_step_deg = 0.5
 ```
 

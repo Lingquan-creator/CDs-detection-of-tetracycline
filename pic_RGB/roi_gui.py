@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import cv2
 import numpy as np
-from PySide6.QtCore import Qt, Signal, QPointF, QRectF, QEvent, QEventLoop
+from PySide6.QtCore import Qt, Signal, QPointF, QRectF, QEvent, QEventLoop, QTimer
 from PySide6.QtGui import (
     QImage,
     QPixmap,
@@ -33,10 +33,94 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QScrollArea,
     QGridLayout,
+    QStyle,
+    QStyleOptionSpinBox,
 )
 
 from roi_config import ROISettings
 from roi_manual import ManualROITools
+
+
+DEFAULT_SPIN_REPEAT_INTERVAL_MS = 100
+
+try:
+    SPINBOX_COMPLEX_CONTROL = QStyle.ComplexControl.CC_SpinBox
+    SPINBOX_UP_CONTROL = QStyle.SubControl.SC_SpinBoxUp
+    SPINBOX_DOWN_CONTROL = QStyle.SubControl.SC_SpinBoxDown
+except AttributeError:
+    SPINBOX_COMPLEX_CONTROL = QStyle.CC_SpinBox
+    SPINBOX_UP_CONTROL = QStyle.SC_SpinBoxUp
+    SPINBOX_DOWN_CONTROL = QStyle.SC_SpinBoxDown
+
+
+def _mouse_event_pos(event: QMouseEvent):
+    if hasattr(event, "position"):
+        return event.position().toPoint()
+    return event.pos()
+
+
+class RepeatStepSpinBox(QSpinBox):
+    """Integer spinbox with 1-unit clicks and 10 Hz press-and-hold stepping."""
+
+    def __init__(self, repeat_interval_ms: int = DEFAULT_SPIN_REPEAT_INTERVAL_MS, parent=None):
+        super().__init__(parent)
+        self._held_step_direction = 0
+        self._repeat_timer = QTimer(self)
+        self._repeat_timer.setInterval(max(1, int(repeat_interval_ms)))
+        self._repeat_timer.timeout.connect(self._repeat_held_step)
+        self.setAccelerated(False)
+
+    def _step_button_direction(self, event: QMouseEvent) -> int:
+        option = QStyleOptionSpinBox()
+        self.initStyleOption(option)
+        style = self.style()
+        pos = _mouse_event_pos(event)
+        up_rect = style.subControlRect(
+            SPINBOX_COMPLEX_CONTROL,
+            option,
+            SPINBOX_UP_CONTROL,
+            self,
+        )
+        down_rect = style.subControlRect(
+            SPINBOX_COMPLEX_CONTROL,
+            option,
+            SPINBOX_DOWN_CONTROL,
+            self,
+        )
+        if up_rect.contains(pos):
+            return 1
+        if down_rect.contains(pos):
+            return -1
+        return 0
+
+    def _repeat_held_step(self):
+        if self._held_step_direction:
+            self.stepBy(self._held_step_direction)
+
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.LeftButton:
+            direction = self._step_button_direction(event)
+            if direction:
+                self.setFocus(Qt.MouseFocusReason)
+                self._held_step_direction = direction
+                self.stepBy(direction)
+                self._repeat_timer.start()
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        if self._held_step_direction:
+            self._repeat_timer.stop()
+            self._held_step_direction = 0
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def leaveEvent(self, event):
+        self._repeat_timer.stop()
+        self._held_step_direction = 0
+        super().leaveEvent(event)
 
 
 @dataclass
@@ -396,6 +480,7 @@ class ControlsWidget(QWidget):
     def __init__(self, settings: ROISettings, parent=None):
         super().__init__(parent)
         self._updating_controls = False
+        self.spin_repeat_interval_ms = int(settings.spin_repeat_interval_ms)
         self.layout = QVBoxLayout(self)
 
         self.mode_group = QGroupBox("Mouse Drag Target")
@@ -504,7 +589,7 @@ class ControlsWidget(QWidget):
         self.radio_bg_outer.toggled.connect(self._on_mode_changed)
 
     def _create_spinbox(self, min_val, max_val, tooltip, single_step=1):
-        sb = QSpinBox()
+        sb = RepeatStepSpinBox(repeat_interval_ms=self.spin_repeat_interval_ms)
         sb.setRange(min_val, max_val)
         sb.setSingleStep(max(1, int(single_step)))
         sb.setToolTip(tooltip)

@@ -11,9 +11,9 @@ from typing import Any, Dict, Optional
 # Paths
 # ============================================
 PROJECT_DIR = Path(__file__).resolve().parent
-DATA_DIR = Path(os.environ.get("PIC_RGB_DATA_DIR", str(PROJECT_DIR / "../dataset/food"))).expanduser().resolve()
+DATA_DIR = Path(os.environ.get("PIC_RGB_DATA_DIR", str(PROJECT_DIR / "../dataset/RAW"))).expanduser().resolve()
 OUTPUT_DIR = Path(
-    os.environ.get("PIC_RGB_OUTPUT_DIR", str(PROJECT_DIR / "../dataset/food"))
+    os.environ.get("PIC_RGB_OUTPUT_DIR", str(PROJECT_DIR / "../dataset/RAW/roi_results"))
 ).expanduser().resolve()
 
 # ============================================
@@ -27,8 +27,9 @@ DEFAULT_PARAMS: Dict[str, Any] = {
     "bg_ring_inner_y": 80,
     "bg_ring_outer_x": 240,
     "bg_ring_outer_y": 240,
-    "move_step": 2,
-    "size_step": 20,
+    "move_step": 1,
+    "size_step": 1,
+    "spin_repeat_interval_ms": 100,
     "angle_step_deg": 0.5,
 }
 
@@ -49,8 +50,9 @@ class ROISettings:
     bg_ring_inner_y: int = 80
     bg_ring_outer_x: int = 240
     bg_ring_outer_y: int = 240
-    move_step: int = 5
-    size_step: int = 20
+    move_step: int = 1
+    size_step: int = 1
+    spin_repeat_interval_ms: int = 100
     angle_step_deg: float = 0.5
 
     @classmethod
@@ -132,7 +134,10 @@ def print_config():
     print(f"  ROI angle: {settings.roi_angle_deg} deg")
     print(f"  BG ring inner: ({settings.bg_ring_inner_x}, {settings.bg_ring_inner_y}) px")
     print(f"  BG ring outer: ({settings.bg_ring_outer_x}, {settings.bg_ring_outer_y}) px")
-    print(f"  Move step: {settings.move_step}px | Size step: {settings.size_step}px | Angle step: {settings.angle_step_deg} deg")
+    print(
+        f"  Move step: {settings.move_step}px | Size step: {settings.size_step}px | "
+        f"Spin repeat: {settings.spin_repeat_interval_ms} ms | Angle step: {settings.angle_step_deg} deg"
+    )
     print(f"\nSelection cache: reuse={REUSE_LAST_SELECTION} -> {SELECTION_CACHE_PATH}")
     print("\nGUI shortcuts:")
     for line in GUI_SHORTCUTS:
