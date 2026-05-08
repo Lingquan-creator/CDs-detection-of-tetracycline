@@ -1,0 +1,5 @@
+model,sample_group,prediction_column,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
+exp,milk/2,conc_pred,3,,16.2416,14.7637,14.7637,9.9812,24.3369
+rgb_ridge,milk/2,conc_pred,3,,12.6607,10.8772,10.8772,7.90764,19.8691
+gs_posterior_median,milk/2,posterior_median,3,,1.89289,1.1357,1.1357,0.07199,3.27728
+gs_posterior_mean,milk/2,posterior_mean,3,,23.9451,21.1699,21.1699,13.31,36.9941

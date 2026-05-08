@@ -1,0 +1,4 @@
+filename,posterior_log_mean,posterior_log_std,posterior_mean,posterior_median,posterior_mode,posterior_std,ci_90_low,ci_90_high,map_bin_concentration,map_bin_probability,conc_true,residual_mean,abs_error_mean,residual_median,abs_error_median,nll,sample_type,batch,sample_group,sample_concentration_group
+milk-1-100.dng,4.45023,0.311428,89.9024,85.6468,77.7302,28.6909,51.3147,142.949,80,0.304679,100,-10.0976,10.0976,-14.3532,14.3532,1705.94,milk,1,milk,milk/100
+milk-2-100.dng,4.39827,0.311438,85.351,81.3105,73.7943,27.2393,48.7159,135.713,80,0.312512,100,-14.649,14.649,-18.6895,18.6895,1696.06,milk,2,milk,milk/100
+milk-3-100.dng,4.04689,0.311594,60.0653,57.2191,51.9248,19.1796,34.2731,95.5274,60,0.408619,100,-39.9347,39.9347,-42.7809,42.7809,1629.07,milk,3,milk,milk/100

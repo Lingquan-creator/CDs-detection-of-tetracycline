@@ -1,0 +1,4 @@
+filename,exposure_time,conc_pred,selected_channel,G1_sig_value,R_sig_conc_pred,G1_sig_conc_pred,B_sig_conc_pred,G2_sig_conc_pred,G_sig_conc_pred,conc_true,residual,sample_type,batch,sample_group,abs_error_residual,sample_concentration_group
+milk-1-0.dng,1,42.0008,G1_sig,490.039,43.0376,42.0008,39.4314,42.1776,42.0889,0,42.0008,milk,1,milk,42.0008,milk/0
+milk-2-0.dng,1,10.1073,G1_sig,1185.79,10.0261,10.1073,7.35718,10.0583,10.0828,0,10.1073,milk,2,milk,10.1073,milk/0
+milk-3-0.dng,1,10.1093,G1_sig,1185.72,9.7552,10.1093,9.17718,10.0552,10.0822,0,10.1093,milk,3,milk,10.1093,milk/0

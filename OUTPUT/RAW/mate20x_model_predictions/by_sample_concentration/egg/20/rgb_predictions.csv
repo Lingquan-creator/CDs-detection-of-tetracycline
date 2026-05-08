@@ -1,0 +1,3 @@
+filename,conc_pred,conc_true,residual,sample_type,batch,sample_group,abs_error_residual,sample_concentration_group
+egg-1-20.dng,17.2606,20,-2.7394,egg,1,egg,2.7394,egg/20
+egg-2-20.dng,20.1235,20,0.1235,egg,2,egg,0.1235,egg/20

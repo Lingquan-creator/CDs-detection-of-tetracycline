@@ -1,0 +1,140 @@
+EXP predictions: /home/jzh/CDs/OUTPUT/RAW/mate20x_model_predictions/exp_predictions.csv
+RGB predictions: /home/jzh/CDs/OUTPUT/RAW/mate20x_model_predictions/rgb_predictions.csv
+GS summary:      /home/jzh/CDs/OUTPUT/RAW/mate20x_model_predictions/gs_posterior_summary.csv
+Evaluation plot: /home/jzh/CDs/OUTPUT/RAW/mate20x_model_predictions/prediction_evaluation.png
+Group plots:     /home/jzh/CDs/OUTPUT/RAW/mate20x_model_predictions/group_evaluation_plots
+
+Sample/concentration dirs: /home/jzh/CDs/OUTPUT/RAW/mate20x_model_predictions/by_sample_concentration
+
+[all]
+  exp (conc_pred): n=48, R2=0.484229, RMSE=25.363, MAE=17.3004, mean_error=-7.63283, median_abs_error=9.8175, max_abs_error=68.1279
+  rgb_ridge (conc_pred): n=48, R2=0.621804, RMSE=21.7185, MAE=13.1194, mean_error=9.38578, median_abs_error=8.3177, max_abs_error=91.106
+  gs_posterior_median (posterior_median): n=48, R2=0.45948, RMSE=25.9644, MAE=16.1312, mean_error=-11.7275, median_abs_error=6.58844, max_abs_error=73.2506
+  gs_posterior_mean (posterior_mean): n=48, R2=0.269862, RMSE=30.1769, MAE=21.697, mean_error=-2.69486, median_abs_error=13.1722, max_abs_error=71.8974
+
+[chicken]
+  exp (conc_pred): n=18, R2=0.459664, RMSE=25.9599, MAE=17.1677, mean_error=-9.77856, median_abs_error=8.05529, max_abs_error=65.8633
+  rgb_ridge (conc_pred): n=18, R2=0.945265, RMSE=8.26233, MAE=6.73076, mean_error=3.64577, median_abs_error=7.9434, max_abs_error=18.6017
+  gs_posterior_median (posterior_median): n=18, R2=0.165413, RMSE=32.2632, MAE=20.6929, mean_error=-16.9217, median_abs_error=7.86174, max_abs_error=73.2506
+  gs_posterior_mean (posterior_mean): n=18, R2=-0.180373, RMSE=38.3691, MAE=29.0522, mean_error=-5.21838, median_abs_error=21.1686, max_abs_error=71.8974
+
+[egg]
+  exp (conc_pred): n=12, R2=0.222264, RMSE=31.145, MAE=20.5008, mean_error=-15.4204, median_abs_error=8.26122, max_abs_error=68.1279
+  rgb_ridge (conc_pred): n=12, R2=0.92421, RMSE=9.7225, MAE=7.46471, mean_error=-2.84228, median_abs_error=6.76174, max_abs_error=18.5527
+  gs_posterior_median (posterior_median): n=12, R2=0.457882, RMSE=26.0027, MAE=15.4034, mean_error=-6.59873, median_abs_error=6.4287, max_abs_error=64.3415
+  gs_posterior_mean (posterior_mean): n=12, R2=0.469551, RMSE=25.7214, MAE=16.3702, mean_error=-4.31812, median_abs_error=7.60869, max_abs_error=62.5482
+
+[milk]
+  exp (conc_pred): n=18, R2=0.683437, RMSE=19.8702, MAE=15.2994, mean_error=-0.295361, median_abs_error=10.0442, max_abs_error=43.877
+  rgb_ridge (conc_pred): n=18, R2=0.0967377, RMSE=33.5644, MAE=23.2778, mean_error=23.2778, median_abs_error=16.0451, max_abs_error=91.106
+  gs_posterior_median (posterior_median): n=18, R2=0.754613, RMSE=17.4943, MAE=12.0546, mean_error=-9.95242, median_abs_error=6.4914, max_abs_error=42.7809
+  gs_posterior_mean (posterior_mean): n=18, R2=0.586971, RMSE=22.6967, MAE=17.893, mean_error=0.91083, median_abs_error=13.2578, max_abs_error=45.3405
+
+[chicken/0]
+  exp (conc_pred): n=3, R2=nan, RMSE=6.6859, MAE=6.54184, mean_error=6.54184, median_abs_error=6.33291, max_abs_error=8.32728
+  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=0.887942, MAE=0.787339, mean_error=0.787339, median_abs_error=0.497049, max_abs_error=1.36792
+  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=1.05464, MAE=0.668084, mean_error=0.668084, median_abs_error=0.182688, max_abs_error=1.81753
+  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=7.7545, MAE=4.54225, mean_error=4.54225, median_abs_error=0.192725, max_abs_error=13.4298
+
+[chicken/2]
+  exp (conc_pred): n=3, R2=nan, RMSE=9.68747, MAE=9.51524, mean_error=9.51524, median_abs_error=10.7167, max_abs_error=10.8839
+  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=9.13415, MAE=9.1042, mean_error=9.1042, median_abs_error=9.3505, max_abs_error=9.8608
+  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=9.04713, MAE=8.86326, mean_error=8.86326, median_abs_error=9.2512, max_abs_error=10.8663
+  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=34.8214, MAE=26.6261, mean_error=26.6261, median_abs_error=11.5056, max_abs_error=58.3504
+
+[chicken/10]
+  exp (conc_pred): n=3, R2=nan, RMSE=6.14673, MAE=5.21104, mean_error=4.80336, median_abs_error=7.2383, max_abs_error=7.7833
+  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=6.99439, MAE=5.87333, mean_error=5.87333, median_abs_error=7.7855, max_abs_error=9.2642
+  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=2.42799, MAE=2.20557, mean_error=-0.115433, median_abs_error=2.68825, max_abs_error=3.1352
+  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=42.1114, MAE=35.2813, mean_error=35.2813, median_abs_error=44.0269, max_abs_error=58.0292
+
+[chicken/20]
+  exp (conc_pred): n=3, R2=nan, RMSE=2.31156, MAE=2.1412, mean_error=0.0651333, median_abs_error=1.8949, max_abs_error=3.3095
+  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=9.93731, MAE=9.78637, mean_error=9.78637, median_abs_error=8.5988, max_abs_error=12.2262
+  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=9.26099, MAE=6.7835, mean_error=-5.3087, median_abs_error=2.4395, max_abs_error=15.6988
+  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=7.10512, MAE=5.42583, mean_error=4.67757, median_abs_error=3.3734, max_abs_error=11.7817
+
+[chicken/50]
+  exp (conc_pred): n=3, R2=nan, RMSE=22.0477, MAE=21.7757, mean_error=-21.7757, median_abs_error=22.3937, max_abs_error=25.661
+  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=7.59643, MAE=7.0393, mean_error=4.11743, median_abs_error=5.7335, max_abs_error=11.0016
+  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=38.5318, MAE=38.1172, mean_error=-38.1172, median_abs_error=41.7834, max_abs_error=42.4151
+  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=36.9557, MAE=36.5515, mean_error=-36.5515, median_abs_error=39.5115, max_abs_error=41.2355
+
+[chicken/100]
+  exp (conc_pred): n=3, R2=nan, RMSE=58.1011, MAE=57.8212, mean_error=-57.8212, median_abs_error=54.2059, max_abs_error=65.8633
+  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=10.9544, MAE=7.79403, mean_error=-7.79403, median_abs_error=3.5182, max_abs_error=18.6017
+  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=67.7213, MAE=67.52, mean_error=-67.52, median_abs_error=68.6796, max_abs_error=73.2506
+  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=66.1127, MAE=65.886, mean_error=-65.886, median_abs_error=67.0966, max_abs_error=71.8974
+
+[egg/0]
+  exp (conc_pred): n=2, R2=nan, RMSE=5.60331, MAE=5.60318, mean_error=5.60318, median_abs_error=5.60318, max_abs_error=5.641
+  rgb_ridge (conc_pred): n=2, R2=nan, RMSE=1.94418, MAE=1.94335, mean_error=1.94335, median_abs_error=1.94335, max_abs_error=1.99995
+  gs_posterior_median (posterior_median): n=2, R2=nan, RMSE=4.59011, MAE=4.11095, mean_error=4.11095, median_abs_error=4.11095, max_abs_error=6.15281
+  gs_posterior_mean (posterior_mean): n=2, R2=nan, RMSE=11.7519, MAE=10.9029, mean_error=10.9029, median_abs_error=10.9029, max_abs_error=15.2885
+
+[egg/2]
+  exp (conc_pred): n=2, R2=nan, RMSE=9.61177, MAE=9.29763, mean_error=9.29763, median_abs_error=9.29763, max_abs_error=11.7349
+  rgb_ridge (conc_pred): n=2, R2=nan, RMSE=8.39267, MAE=8.31358, mean_error=8.31358, median_abs_error=8.31358, max_abs_error=9.463
+  gs_posterior_median (posterior_median): n=2, R2=nan, RMSE=8.56253, MAE=8.5549, mean_error=8.5549, median_abs_error=8.5549, max_abs_error=8.9163
+  gs_posterior_mean (posterior_mean): n=2, R2=nan, RMSE=9.08727, MAE=9.07935, mean_error=9.07935, median_abs_error=9.07935, max_abs_error=9.4586
+
+[egg/10]
+  exp (conc_pred): n=2, R2=nan, RMSE=0.964675, MAE=0.93146, mean_error=-0.25096, median_abs_error=0.93146, max_abs_error=1.18242
+  rgb_ridge (conc_pred): n=2, R2=nan, RMSE=4.52687, MAE=3.5486, mean_error=3.5486, median_abs_error=3.5486, max_abs_error=6.3593
+  gs_posterior_median (posterior_median): n=2, R2=nan, RMSE=10.037, MAE=9.0255, mean_error=9.0255, median_abs_error=9.0255, max_abs_error=13.4165
+  gs_posterior_mean (posterior_mean): n=2, R2=nan, RMSE=10.9845, MAE=9.9707, mean_error=9.9707, median_abs_error=9.9707, max_abs_error=14.5799
+
+[egg/20]
+  exp (conc_pred): n=2, R2=nan, RMSE=7.57159, MAE=7.13875, mean_error=-7.13875, median_abs_error=7.13875, max_abs_error=9.6621
+  rgb_ridge (conc_pred): n=2, R2=nan, RMSE=1.93902, MAE=1.43145, mean_error=-1.30795, median_abs_error=1.43145, max_abs_error=2.7394
+  gs_posterior_median (posterior_median): n=2, R2=nan, RMSE=4.72526, MAE=4.72255, mean_error=4.72255, median_abs_error=4.72255, max_abs_error=4.8826
+  gs_posterior_mean (posterior_mean): n=2, R2=nan, RMSE=5.95342, MAE=5.95105, mean_error=5.95105, median_abs_error=5.95105, max_abs_error=6.1189
+
+[egg/50]
+  exp (conc_pred): n=2, R2=nan, RMSE=32.2244, MAE=32.2141, mean_error=-32.2141, median_abs_error=32.2141, max_abs_error=33.0298
+  rgb_ridge (conc_pred): n=2, R2=nan, RMSE=11.325, MAE=11.1006, mean_error=-11.1006, median_abs_error=11.1006, max_abs_error=13.3437
+  gs_posterior_median (posterior_median): n=2, R2=nan, RMSE=4.92494, MAE=4.2955, mean_error=-4.2955, median_abs_error=4.2955, max_abs_error=6.7046
+  gs_posterior_mean (posterior_mean): n=2, R2=nan, RMSE=3.23943, MAE=2.5289, mean_error=-2.0245, median_abs_error=2.5289, max_abs_error=4.5534
+
+[egg/100]
+  exp (conc_pred): n=2, R2=nan, RMSE=67.8204, MAE=67.8196, mean_error=-67.8196, median_abs_error=67.8196, max_abs_error=68.1279
+  rgb_ridge (conc_pred): n=2, R2=nan, RMSE=18.4509, MAE=18.4507, mean_error=-18.4507, median_abs_error=18.4507, max_abs_error=18.5527
+  gs_posterior_median (posterior_median): n=2, R2=nan, RMSE=61.7668, MAE=61.7107, mean_error=-61.7107, median_abs_error=61.7107, max_abs_error=64.3415
+  gs_posterior_mean (posterior_mean): n=2, R2=nan, RMSE=59.8519, MAE=59.7882, mean_error=-59.7882, median_abs_error=59.7882, max_abs_error=62.5482
+
+[milk/0]
+  exp (conc_pred): n=3, R2=nan, RMSE=25.6152, MAE=20.7391, mean_error=20.7391, median_abs_error=10.1093, max_abs_error=42.0008
+  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=22.5797, MAE=16.532, mean_error=16.532, median_abs_error=9.91239, max_abs_error=37.7844
+  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=6.57776, MAE=4.74958, mean_error=4.74958, median_abs_error=2.21739, max_abs_error=11.1395
+  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=6.90994, MAE=5.02288, mean_error=5.02288, median_abs_error=2.32829, max_abs_error=11.6929
+
+[milk/2]
+  exp (conc_pred): n=3, R2=nan, RMSE=16.2416, MAE=14.7637, mean_error=14.7637, median_abs_error=9.9812, max_abs_error=24.3369
+  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=12.6607, MAE=10.8772, mean_error=10.8772, median_abs_error=7.90764, max_abs_error=19.8691
+  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=1.89289, MAE=1.1357, mean_error=1.1357, median_abs_error=0.07199, max_abs_error=3.27728
+  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=23.9451, MAE=21.1699, mean_error=21.1699, median_abs_error=13.31, max_abs_error=36.9941
+
+[milk/10]
+  exp (conc_pred): n=3, R2=nan, RMSE=7.12469, MAE=6.86257, mean_error=6.86257, median_abs_error=5.5241, max_abs_error=9.5704
+  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=8.1066, MAE=7.226, mean_error=7.226, median_abs_error=5.9692, max_abs_error=12.2211
+  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=5.00805, MAE=4.68135, mean_error=-4.68135, median_abs_error=4.66506, max_abs_error=6.8685
+  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=32.1141, MAE=29.2999, mean_error=29.2999, median_abs_error=29.4202, max_abs_error=45.3405
+
+[milk/20]
+  exp (conc_pred): n=3, R2=nan, RMSE=3.29428, MAE=2.96593, mean_error=2.32767, median_abs_error=3.7301, max_abs_error=4.2103
+  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=13.2711, MAE=11.8323, mean_error=11.8323, median_abs_error=7.7732, max_abs_error=20.3288
+  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=10.9216, MAE=8.41172, mean_error=-7.56892, median_abs_error=6.1143, max_abs_error=17.8567
+  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=3.47651, MAE=3.4285, mean_error=-1.5909, median_abs_error=3.3664, max_abs_error=4.1627
+
+[milk/50]
+  exp (conc_pred): n=3, R2=nan, RMSE=12.6342, MAE=12.1365, mean_error=-12.1365, median_abs_error=11.5873, max_abs_error=16.6849
+  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=25.9557, MAE=25.4088, mean_error=25.4088, median_abs_error=23.805, max_abs_error=32.5518
+  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=29.1535, MAE=28.075, mean_error=-28.075, median_abs_error=25.5522, max_abs_error=38.7071
+  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=28.0928, MAE=26.8763, mean_error=-26.8763, median_abs_error=24.2958, max_abs_error=37.9294
+
+[milk/100]
+  exp (conc_pred): n=3, R2=nan, RMSE=35.0398, MAE=34.3287, mean_error=-34.3287, median_abs_error=31.9225, max_abs_error=43.877
+  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=71.9287, MAE=67.7907, mean_error=67.7907, median_abs_error=77.57, max_abs_error=91.106
+  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=28.1988, MAE=25.2745, mean_error=-25.2745, median_abs_error=18.6895, max_abs_error=42.7809
+  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=25.2411, MAE=21.5604, mean_error=-21.5604, median_abs_error=14.649, max_abs_error=39.9347
+

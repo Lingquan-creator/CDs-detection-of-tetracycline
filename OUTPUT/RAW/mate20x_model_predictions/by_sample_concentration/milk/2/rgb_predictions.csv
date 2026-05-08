@@ -1,0 +1,4 @@
+filename,conc_pred,conc_true,residual,sample_type,batch,sample_group,abs_error_residual,sample_concentration_group
+milk-1-2.dng,21.8691,2,19.8691,milk,1,milk,19.8691,milk/2
+milk-2-2.dng,9.90764,2,7.90764,milk,2,milk,7.90764,milk/2
+milk-3-2.dng,6.8548,2,4.8548,milk,3,milk,4.8548,milk/2

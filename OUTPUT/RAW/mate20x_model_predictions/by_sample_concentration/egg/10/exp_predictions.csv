@@ -1,0 +1,3 @@
+filename,exposure_time,conc_pred,selected_channel,G1_sig_value,R_sig_conc_pred,G1_sig_conc_pred,B_sig_conc_pred,G2_sig_conc_pred,G_sig_conc_pred,conc_true,residual,sample_type,batch,sample_group,abs_error_residual,sample_concentration_group
+egg-1-10.dng,1,8.81758,G1_sig,1233.36,8.20583,8.81758,7.59869,8.76852,8.79303,10,-1.18242,egg,1,egg,1.18242,egg/10
+egg-2-10.dng,1,10.6805,G1_sig,1165.32,9.87688,10.6805,9.63187,10.6632,10.6718,10,0.6805,egg,2,egg,0.6805,egg/10

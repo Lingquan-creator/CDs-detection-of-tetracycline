@@ -1,0 +1,4 @@
+filename,posterior_log_mean,posterior_log_std,posterior_mean,posterior_median,posterior_mode,posterior_std,ci_90_low,ci_90_high,map_bin_concentration,map_bin_probability,conc_true,residual_mean,abs_error_mean,residual_median,abs_error_median,nll,sample_type,batch,sample_group,sample_concentration_group
+chicken-1-20.dng,2.86565,0.380333,18.8776,17.5605,15.1955,7.44742,9.39387,32.8267,16,0.35817,20,-1.1224,1.1224,-2.4395,2.4395,947.958,chicken,1,chicken,chicken/20
+chicken-2-20.dng,1.45889,2,31.7817,4.30119,0.078778,232.676,0.160282,115.422,2,0.141194,20,11.7817,11.7817,-15.6988,15.6988,16.96,chicken,2,chicken,chicken/20
+chicken-3-20.dng,3.10064,0.319241,23.3734,22.2122,20.06,7.65596,13.1384,37.5527,24,0.31785,20,3.3734,3.3734,2.2122,2.2122,1389.86,chicken,3,chicken,chicken/20

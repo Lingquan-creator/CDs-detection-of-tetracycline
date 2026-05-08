@@ -1,0 +1,8 @@
+Sample type: egg
+Concentration: 50
+Output dir: /home/jzh/CDs/OUTPUT/RAW/mate20x_model_predictions/by_sample_concentration/egg/50
+
+  exp (conc_pred): n=2, R2=nan, RMSE=32.2244, MAE=32.2141, mean_error=-32.2141, median_abs_error=32.2141, max_abs_error=33.0298
+  rgb_ridge (conc_pred): n=2, R2=nan, RMSE=11.325, MAE=11.1006, mean_error=-11.1006, median_abs_error=11.1006, max_abs_error=13.3437
+  gs_posterior_median (posterior_median): n=2, R2=nan, RMSE=4.92494, MAE=4.2955, mean_error=-4.2955, median_abs_error=4.2955, max_abs_error=6.7046
+  gs_posterior_mean (posterior_mean): n=2, R2=nan, RMSE=3.23943, MAE=2.5289, mean_error=-2.0245, median_abs_error=2.5289, max_abs_error=4.5534
