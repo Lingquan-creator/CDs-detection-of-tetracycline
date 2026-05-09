@@ -1,5 +1,5 @@
 model,sample_group,prediction_column,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
 exp,egg/20,conc_pred,2,,7.57159,7.13875,-7.13875,7.13875,9.6621
-rgb_ridge,egg/20,conc_pred,2,,1.93902,1.43145,-1.30795,1.43145,2.7394
-gs_posterior_median,egg/20,posterior_median,2,,4.72526,4.72255,4.72255,4.72255,4.8826
-gs_posterior_mean,egg/20,posterior_mean,2,,5.95342,5.95105,5.95105,5.95105,6.1189
+rgb_ridge,egg/20,conc_pred,2,,4.42129,4.32065,-4.32065,4.32065,5.2586
+gs_posterior_median,egg/20,posterior_median,2,,12.1905,12.1665,-12.1665,12.1665,12.9304
+gs_posterior_mean,egg/20,posterior_mean,2,,11.8046,11.7773,-11.7773,11.7773,12.5792

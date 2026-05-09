@@ -1,0 +1,7 @@
+food,step,scan,variant_id,phase,sample_group,alpha,beta,weight_eps,effective_weight_eps,n_features,feature_names,use_ratio_rg,use_ratio_bg,use_ratio_rb,use_delta_rg,use_delta_rb,use_delta_gb,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
+milk,step2,weight_eps,weight_eps_30_alpha_1e03_beta_1,loo,milk,1000,1,30,30,7,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RG,True,True,True,True,False,False,18,0.9588,7.16834,4.54093,1.05977,2.06969,20
+milk,step2,weight_eps,weight_eps_50_alpha_1e03_beta_1,loo,milk,1000,1,50,50,7,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RG,True,True,True,True,False,False,18,0.954914,7.49881,4.91008,1.04392,2.26061,20
+milk,step2,weight_eps,weight_eps_80_alpha_1e03_beta_1,loo,milk,1000,1,80,80,7,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RG,True,True,True,True,False,False,18,0.952144,7.72575,5.06898,0.81647,2.63685,20
+milk,step2,weight_eps,weight_eps_120_alpha_1e03_beta_1,loo,milk,1000,1,120,120,7,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RG,True,True,True,True,False,False,18,0.949583,7.92973,5.26207,0.859121,3.42088,20
+milk,step2,weight_eps,weight_eps_10_alpha_1e03_beta_1,loo,milk,1000,1,10,10,7,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RG,True,True,True,True,False,False,18,0.932357,9.1851,5.72455,2.18249,2.26158,20
+milk,step2,weight_eps,weight_eps_1_alpha_1e03_beta_1,loo,milk,1000,1,1,1,7,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RG,True,True,True,True,False,False,18,0.163134,32.3072,21.9154,0.642017,12.767,80

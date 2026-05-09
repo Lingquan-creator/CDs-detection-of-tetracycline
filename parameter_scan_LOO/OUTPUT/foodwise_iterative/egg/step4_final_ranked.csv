@@ -1,0 +1,2 @@
+food,step,scan,variant_id,phase,sample_group,alpha,beta,weight_eps,effective_weight_eps,n_features,feature_names,use_ratio_rg,use_ratio_bg,use_ratio_rb,use_delta_rg,use_delta_rb,use_delta_gb,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
+egg,step4,final,final_alpha_1e02_beta_0_weight_eps_1,loo,egg,100,0,1,inf,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_RG,True,True,False,True,False,False,12,0.973733,5.72374,4.22127,-0.638688,1.92571,10.1739

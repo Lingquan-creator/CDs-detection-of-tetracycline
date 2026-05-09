@@ -1,4 +1,4 @@
 filename,conc_pred,conc_true,residual,sample_type,batch,sample_group,abs_error_residual,sample_concentration_group
-chicken-1-50.dng,61.0016,50,11.0016,chicken,1,chicken,11.0016,chicken/50
-chicken-2-50.dng,45.6172,50,-4.3828,chicken,2,chicken,4.3828,chicken/50
-chicken-3-50.dng,55.7335,50,5.7335,chicken,3,chicken,5.7335,chicken/50
+chicken-1-50.dng,45.3674,50,-4.6326,chicken,1,chicken,4.6326,chicken/50
+chicken-2-50.dng,34.2292,50,-15.7708,chicken,2,chicken,15.7708,chicken/50
+chicken-3-50.dng,43.2274,50,-6.7726,chicken,3,chicken,6.7726,chicken/50

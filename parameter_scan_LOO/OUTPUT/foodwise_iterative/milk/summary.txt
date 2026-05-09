@@ -1,0 +1,16 @@
+Food: milk
+Rows: 18
+Train CSV: /home/jzh/CDs/dataset/RAW/roi_results/roi_detailed_statistics.csv
+Optimization order: input -> hyperparameter -> input -> hyperparameter
+Selection criterion: leave-one-out R2, tie-broken by RMSE
+Initial hyperparameters: alpha=100, beta=1, weight_eps=30
+Final features: ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_GB
+Final hyperparameters: alpha=1000, beta=1, weight_eps=30
+
+[stage summary]
+               stage                            variant_id   alpha beta weight_eps        r2      rmse       mae                                                  feature_names
+         step1_input   ratio_rg_ratio_bg_ratio_rb_delta_rg   100.0  1.0       30.0  0.955249  7.470905  4.504347 ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RG
+step2_hyperparameter final_alpha_1e03_beta_1_weight_eps_30  1000.0  1.0       30.0    0.9588  7.168341  4.540933 ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RG
+         step3_input   ratio_rg_ratio_rb_delta_rg_delta_gb  1000.0  1.0       30.0  0.958817  7.166851   4.55702 ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_GB
+step4_hyperparameter final_alpha_1e03_beta_1_weight_eps_30  1000.0  1.0       30.0  0.958817  7.166851   4.55702 ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_GB
+                best                             milk_best  1000.0  1.0       30.0  0.958817  7.166851   4.55702 ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_GB

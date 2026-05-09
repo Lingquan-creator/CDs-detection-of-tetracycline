@@ -1,0 +1,12 @@
+Food: egg
+Optimization order: input -> hyperparameter -> input -> hyperparameter
+Selection criterion: RAW prediction R2, tie-broken by RMSE
+Final features: ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG
+Final hyperparameters: alpha=100, beta=1, weight_eps=30
+
+               stage                            variant_id  alpha beta weight_eps        r2      rmse       mae                                feature_names
+         step1_input                     ratio_rg_delta_rg  100.0  1.0       30.0  0.965745  6.536359  5.898149 ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG
+step2_hyperparameter final_alpha_1e02_beta_1_weight_eps_30  100.0  1.0       30.0  0.965745  6.536359  5.898149 ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG
+         step3_input                     ratio_rg_delta_rg  100.0  1.0       30.0  0.965745  6.536359  5.898149 ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG
+step4_hyperparameter final_alpha_1e02_beta_1_weight_eps_30  100.0  1.0       30.0  0.965745  6.536359  5.898149 ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG
+                best                              egg_best  100.0  1.0       30.0  0.965745  6.536359  5.898149 ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG

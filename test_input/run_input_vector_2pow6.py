@@ -23,7 +23,8 @@ import matplotlib.pyplot as plt
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "test_input" / "OUTPUT"
 TRAIN_CSV = ROOT / "dataset" / "mate20x" / "roi_detailed_statistics.csv"
-TEST_CSV = ROOT / "dataset" / "food" / "roi_detailed_statistics.csv"
+TEST_CSV = ROOT / "dataset" / "RAW" / "roi_results" / "roi_detailed_statistics.csv"
+RAW_NAME_RE = re.compile(r"^(?P<sample>.+)-(?P<batch>\d+)-(?P<concentration>[-+]?\d+(?:\.\d+)?)$")
 NUMBER_RE = re.compile(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?")
 
 sys.path.insert(0, str(ROOT / "concentration_regression"))
@@ -47,12 +48,18 @@ EPS = 1e-6
 
 def concentration_from_filename(filename: object) -> float:
     stem = Path(str(filename)).stem
+    raw_match = RAW_NAME_RE.fullmatch(stem)
+    if raw_match:
+        return float(raw_match.group("concentration"))
     match = NUMBER_RE.search(stem)
     return float(match.group(0)) if match else math.nan
 
 
 def group_from_filename(filename: object) -> str:
     stem = Path(str(filename)).stem.lower()
+    raw_match = RAW_NAME_RE.fullmatch(stem)
+    if raw_match:
+        return raw_match.group("sample").lower()
     if stem.startswith("chicken"):
         return "chicken"
     if stem.startswith("egg"):
@@ -169,8 +176,8 @@ def variant_name(features: tuple[str, ...]) -> str:
 
 
 def save_top_plot(metrics_df: pd.DataFrame) -> None:
-    food_all = metrics_df[(metrics_df["phase"] == "food") & (metrics_df["sample_group"] == "all")]
-    top = food_all.sort_values("r2", ascending=False).head(20)
+    raw_all = metrics_df[(metrics_df["phase"] == "raw") & (metrics_df["sample_group"] == "all")]
+    top = raw_all.sort_values("r2", ascending=False).head(20)
     labels = top["variant_id"].str.replace("_", "\n")
     fig, axes = plt.subplots(1, 3, figsize=(18, 6), dpi=150)
     colors = ["#2ca02c" if idx == 0 else "#1f77b4" for idx in range(len(top))]
@@ -179,13 +186,13 @@ def save_top_plot(metrics_df: pd.DataFrame) -> None:
         ax.set_title(title)
         ax.grid(axis="y", alpha=0.25)
         ax.tick_params(axis="x", labelsize=7)
-    fig.suptitle("Top 20 input-vector combinations on food test set")
+    fig.suptitle("Top 20 input-vector combinations on RAW test set")
     fig.tight_layout()
     fig.savefig(OUT_DIR / "top20_metric_comparison.png", bbox_inches="tight")
     plt.close(fig)
 
 
-def save_best_prediction_plot(best_df: pd.DataFrame, variant_id: str) -> None:
+def save_best_prediction_plot(best_df: pd.DataFrame, variant_id: str, out_path: Path | None = None) -> None:
     fig, ax = plt.subplots(figsize=(6.5, 5.4), dpi=150)
     colors = {"chicken": "#d62728", "egg": "#ff7f0e", "other": "#777777"}
     for group, part in best_df.groupby("sample_group"):
@@ -214,7 +221,7 @@ def save_best_prediction_plot(best_df: pd.DataFrame, variant_id: str) -> None:
     ax.grid(alpha=0.25)
     ax.legend(loc="best", fontsize=8)
     fig.tight_layout()
-    fig.savefig(OUT_DIR / "best_food_prediction.png", bbox_inches="tight")
+    fig.savefig(out_path or OUT_DIR / "best_raw_prediction.png", bbox_inches="tight")
     plt.close(fig)
 
 
@@ -243,7 +250,7 @@ def main() -> None:
         for phase, source_df, pred, pred_raw in (
             ("train", train_df, train_pred, train_pred_raw),
             ("loo", train_df, loo_pred, np.full_like(loo_pred, np.nan, dtype=float)),
-            ("food", test_df, test_pred, test_pred_raw),
+            ("raw", test_df, test_pred, test_pred_raw),
         ):
             out = source_df[["filename", "conc_true", "sample_group"]].copy()
             out.insert(0, "variant_id", variant_id)
@@ -255,7 +262,7 @@ def main() -> None:
             out["residual"] = out["conc_pred"] - out["conc_true"]
             prediction_rows.append(out)
 
-            groups = ["all"] if phase != "food" else ["all", "chicken", "egg"]
+            groups = ["all"] if phase != "raw" else ["all", *sorted(out["sample_group"].unique())]
             for group in groups:
                 part = out if group == "all" else out[out["sample_group"] == group]
                 row: dict[str, object] = {
@@ -275,21 +282,43 @@ def main() -> None:
     metrics_df.to_csv(OUT_DIR / "input_vector_2pow6_metrics.csv", index=False, float_format="%.6g")
     predictions_df.to_csv(OUT_DIR / "input_vector_2pow6_predictions.csv", index=False, float_format="%.6g")
 
-    food_all = metrics_df[(metrics_df["phase"] == "food") & (metrics_df["sample_group"] == "all")]
-    ranked = food_all.sort_values("r2", ascending=False).reset_index(drop=True)
-    ranked.to_csv(OUT_DIR / "food_all_ranked.csv", index=False, float_format="%.6g")
+    raw_all = metrics_df[(metrics_df["phase"] == "raw") & (metrics_df["sample_group"] == "all")]
+    ranked = raw_all.sort_values("r2", ascending=False).reset_index(drop=True)
+    ranked.to_csv(OUT_DIR / "raw_all_ranked.csv", index=False, float_format="%.6g")
 
     best_variant = str(ranked.iloc[0]["variant_id"])
-    best_food = predictions_df[(predictions_df["phase"] == "food") & (predictions_df["variant_id"] == best_variant)]
-    best_food.to_csv(OUT_DIR / "best_food_predictions.csv", index=False, float_format="%.6g")
+    best_raw = predictions_df[(predictions_df["phase"] == "raw") & (predictions_df["variant_id"] == best_variant)]
+    best_raw.to_csv(OUT_DIR / "best_raw_predictions.csv", index=False, float_format="%.6g")
     save_top_plot(metrics_df)
-    save_best_prediction_plot(best_food, best_variant)
+    save_best_prediction_plot(best_raw, best_variant)
+
+    foodwise_dir = OUT_DIR / "foodwise"
+    raw_foods = metrics_df.loc[metrics_df["phase"] == "raw", "sample_group"].unique()
+    for food in sorted(raw_foods):
+        if food == "all":
+            continue
+        food_dir = foodwise_dir / food
+        food_dir.mkdir(parents=True, exist_ok=True)
+        food_ranked = metrics_df[
+            (metrics_df["phase"] == "raw")
+            & (metrics_df["sample_group"] == food)
+        ].sort_values(["r2", "rmse"], ascending=[False, True]).reset_index(drop=True)
+        food_ranked.to_csv(food_dir / "raw_ranked.csv", index=False, float_format="%.6g")
+        food_best_variant = str(food_ranked.iloc[0]["variant_id"])
+        food_best = predictions_df[
+            (predictions_df["phase"] == "raw")
+            & (predictions_df["sample_group"] == food)
+            & (predictions_df["variant_id"] == food_best_variant)
+        ]
+        food_best.to_csv(food_dir / "best_raw_predictions.csv", index=False, float_format="%.6g")
+        save_best_prediction_plot(food_best, food_best_variant, food_dir / "best_raw_prediction.png")
 
     with (OUT_DIR / "input_vector_2pow6_summary.txt").open("w", encoding="utf-8") as f:
         f.write("Base features: ln_R_sig, ln_G_sig, ln_B_sig\n")
         f.write("Optional features: Ratio_RG, Ratio_BG, Ratio_RB, Delta_RG, Delta_RB, Delta_GB\n")
         f.write("Correction: ROI-BG; model: RidgeCV + log target + isotonic calibration\n\n")
-        for phase in ("train", "loo", "food"):
+        f.write("Selection criterion: best RAW test R2 (phase=raw, sample_group=all)\n\n")
+        for phase in ("train", "loo", "raw"):
             f.write(f"[{phase}]\n")
             phase_df = metrics_df[(metrics_df["phase"] == phase) & (metrics_df["sample_group"] == "all")]
             for _, row in phase_df.sort_values("r2", ascending=False).head(20).iterrows():

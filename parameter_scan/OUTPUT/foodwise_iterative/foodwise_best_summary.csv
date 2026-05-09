@@ -1,0 +1,4 @@
+food,step,scan,variant_id,phase,sample_group,alpha,beta,weight_eps,effective_weight_eps,n_features,feature_names,use_ratio_rg,use_ratio_bg,use_ratio_rb,use_delta_rg,use_delta_rb,use_delta_gb,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error,stage
+chicken,best,final,chicken_best,raw,chicken,100,1,50,50,7,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_RB,True,False,True,True,True,False,18,0.947709,8.07581,6.53106,2.145,6.44957,20.5757,best
+egg,best,final,egg_best,raw,egg,100,1,30,30,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.965745,6.53636,5.89815,3.1466,5.82431,12.4593,best
+milk,best,final,milk_best,raw,milk,100,1,30,30,8,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB,False,True,True,True,True,True,18,0.862253,13.1073,9.89521,0.146709,6.2033,30.7262,best

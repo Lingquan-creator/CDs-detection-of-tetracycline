@@ -108,10 +108,13 @@ def set_global_seed(seed: int) -> None:
     torch.use_deterministic_algorithms(True, warn_only=True)
 
 
-def make_sample_weights(y: np.ndarray, weight_eps: float) -> np.ndarray:
+def make_sample_weights(y: np.ndarray, weight_eps: float, weight_beta: float = 1.0) -> np.ndarray:
     if weight_eps < 0:
         raise ValueError("--weight-eps must be >= 0.")
-    weights = 1.0 / (np.asarray(y, dtype=float) + float(weight_eps))
+    denom = weight_beta * np.asarray(y, dtype=float) + float(weight_eps)
+    if np.any(denom <= 0):
+        raise ValueError("weight_beta * concentration + weight_eps must stay positive.")
+    weights = 1.0 / denom
     return weights / np.mean(weights)
 
 
@@ -128,13 +131,18 @@ def resolve_use_bg(df: pd.DataFrame, g_mode: str, use_bg_arg: str) -> bool:
 def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: str) -> pd.DataFrame:
     if feature_set == "full":
         return feature_df
-    if feature_set not in {"compact", "compact_exposure"}:
+    if feature_set not in {"compact", "compact_exposure", "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb"}:
         raise ValueError(f"Unsupported feature set: {feature_set}")
 
     no_exposure_columns = (
         ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Delta_RG", "Delta_GB")
         if use_bg
         else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Delta_RG", "Delta_GB")
+    )
+    optimized_columns = (
+        ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Ratio_RB", "Delta_RG", "Delta_RB", "Delta_GB")
+        if use_bg
+        else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Ratio_RB", "Delta_RG", "Delta_RB", "Delta_GB")
     )
     exposure_columns = (
         (
@@ -167,7 +175,10 @@ def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: s
             "ln_exposure",
         )
     )
-    selected_columns = exposure_columns if feature_set == "compact_exposure" else no_exposure_columns
+    if feature_set == "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb":
+        selected_columns = optimized_columns
+    else:
+        selected_columns = exposure_columns if feature_set == "compact_exposure" else no_exposure_columns
     missing = [column for column in selected_columns if column not in feature_df.columns]
     if missing:
         raise ValueError(f"Cannot build {feature_set} feature set; missing columns: {missing}")
@@ -242,6 +253,7 @@ def fit_model(
     std_reg_lambda: float,
     max_std_log: float,
     weight_eps: float,
+    weight_beta: float,
     grad_clip_norm: float,
     seed: int,
     g_mode: str,
@@ -253,7 +265,7 @@ def fit_model(
 
     X_std, feature_mean, feature_std = standardize_features(X)
     y_std, target_log_mean, target_log_std = standardize_target_log(y)
-    sample_weight = make_sample_weights(y, weight_eps)
+    sample_weight = make_sample_weights(y, weight_eps, weight_beta)
 
     x_tensor = torch.as_tensor(X_std, dtype=torch.float32)
     y_tensor = torch.as_tensor(y_std, dtype=torch.float32)
@@ -313,6 +325,8 @@ def fit_model(
         ),
         "g_mode": str(g_mode),
         "use_bg": bool(use_bg),
+        "weight_eps": float(weight_eps),
+        "weight_beta": float(weight_beta),
         "target_eps": float(TARGET_EPS),
         "seed": int(seed),
         "epochs_requested": int(epochs),
@@ -535,6 +549,7 @@ def run_leave_one_out(
     std_reg_lambda: float,
     max_std_log: float,
     weight_eps: float,
+    weight_beta: float,
     grad_clip_norm: float,
     seed: int,
     g_mode: str,
@@ -559,6 +574,7 @@ def run_leave_one_out(
             std_reg_lambda=std_reg_lambda,
             max_std_log=max_std_log,
             weight_eps=weight_eps,
+            weight_beta=weight_beta,
             grad_clip_norm=grad_clip_norm,
             seed=seed + fold_idx + 1,
             g_mode=g_mode,
@@ -669,7 +685,7 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
         help="Use background-subtracted features when available.",
     )
     parser.add_argument("--hidden-dim", type=int, default=default_cfg.hidden_dim, help="Hidden layer width.")
-    parser.add_argument("--feature-set", choices=["full", "compact", "compact_exposure"], default=default_cfg.feature_set, help="Feature set used for training.")
+    parser.add_argument("--feature-set", choices=["full", "compact", "compact_exposure", "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb"], default=default_cfg.feature_set, help="Feature set used for training.")
     parser.add_argument("--dropout", type=float, default=default_cfg.dropout, help="Dropout rate.")
     parser.add_argument("--learning-rate", type=float, default=default_cfg.learning_rate, help="AdamW learning rate.")
     parser.add_argument("--weight-decay", type=float, default=default_cfg.weight_decay, help="AdamW weight decay.")
@@ -679,6 +695,7 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
     parser.add_argument("--std-reg-lambda", type=float, default=default_cfg.std_reg_lambda, help="L2 penalty on predicted posterior std.")
     parser.add_argument("--max-std-log", type=float, default=default_cfg.max_std_log, help="Posterior std ceiling after converting back to log-concentration space.")
     parser.add_argument("--weight-eps", type=float, default=default_cfg.weight_eps, help="Sample weight denominator offset.")
+    parser.add_argument("--weight-beta", "--beta", dest="weight_beta", type=float, default=default_cfg.weight_beta, help="Sample weight beta in 1 / (weight_beta * conc + weight_eps).")
     parser.add_argument("--grad-clip-norm", type=float, default=default_cfg.grad_clip_norm, help="Gradient clipping norm.")
     parser.add_argument("--seed", type=int, default=default_cfg.seed, help="Random seed.")
     parser.add_argument("--confidence", type=float, default=default_cfg.confidence, help="Credible interval coverage.")
@@ -730,6 +747,7 @@ def main() -> None:
         std_reg_lambda=float(args.std_reg_lambda),
         max_std_log=float(args.max_std_log),
         weight_eps=float(args.weight_eps),
+        weight_beta=float(args.weight_beta),
         grad_clip_norm=float(args.grad_clip_norm),
         seed=int(args.seed),
         g_mode=args.g_mode,
@@ -761,6 +779,7 @@ def main() -> None:
         std_reg_lambda=float(args.std_reg_lambda),
         max_std_log=float(args.max_std_log),
         weight_eps=float(args.weight_eps),
+        weight_beta=float(args.weight_beta),
         grad_clip_norm=float(args.grad_clip_norm),
         seed=int(args.seed),
         g_mode=args.g_mode,

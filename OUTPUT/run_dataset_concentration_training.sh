@@ -10,6 +10,10 @@ TRAIN_DATASET_NAME="${TRAIN_DATASET_NAME:-}"
 ROI_CSV_NAME="${ROI_CSV_NAME:-roi_detailed_statistics.csv}"
 ROI_CSV="${ROI_CSV:-}"
 EXCLUDE_DATASET_NAMES="${EXCLUDE_DATASET_NAMES:-food}"
+OPTIMIZED_FEATURE_SET="${OPTIMIZED_FEATURE_SET:-ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb}"
+RIDGE_ALPHA="${RIDGE_ALPHA:-100}"
+WEIGHT_BETA="${WEIGHT_BETA:-1}"
+WEIGHT_EPS="${WEIGHT_EPS:-30}"
 
 if [[ ! -d "${DATASET_DIR}" ]]; then
   echo "Dataset directory not found: ${DATASET_DIR}" >&2
@@ -91,7 +95,9 @@ for ROI_CSV in "${roi_csvs[@]}"; do
   python "${ROOT_DIR}/concentration_GS/train.py" \
     --roi-csv "${ROI_CSV}" \
     --use-bg true \
-    --feature-set compact \
+    --feature-set "${OPTIMIZED_FEATURE_SET}" \
+    --weight-beta "${WEIGHT_BETA}" \
+    --weight-eps "${WEIGHT_EPS}" \
     --model-out "${out_dir}/gs_amortized_posterior_model.pt" \
     --train-out "${out_dir}/gs_train_posterior_summary.csv" \
     --loo-out "${out_dir}/gs_loo_posterior_summary.csv" \
@@ -104,8 +110,11 @@ for ROI_CSV in "${roi_csvs[@]}"; do
   python "${ROOT_DIR}/concentration_regression/train.py" \
     --roi-csv "${ROI_CSV}" \
     --use-bg true \
-    --feature-set compact \
+    --feature-set "${OPTIMIZED_FEATURE_SET}" \
     --bg-correction subtract \
+    --alpha "${RIDGE_ALPHA}" \
+    --weight-beta "${WEIGHT_BETA}" \
+    --weight-eps "${WEIGHT_EPS}" \
     --model-out "${out_dir}/rgb_concentration_model.pkl" \
     --pred-out "${out_dir}/rgb_ridge_predictions.csv" \
     --loo-out "${out_dir}/rgb_ridge_predictions_loo.csv" \

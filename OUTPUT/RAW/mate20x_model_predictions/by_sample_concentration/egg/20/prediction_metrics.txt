@@ -3,6 +3,6 @@ Concentration: 20
 Output dir: /home/jzh/CDs/OUTPUT/RAW/mate20x_model_predictions/by_sample_concentration/egg/20
 
   exp (conc_pred): n=2, R2=nan, RMSE=7.57159, MAE=7.13875, mean_error=-7.13875, median_abs_error=7.13875, max_abs_error=9.6621
-  rgb_ridge (conc_pred): n=2, R2=nan, RMSE=1.93902, MAE=1.43145, mean_error=-1.30795, median_abs_error=1.43145, max_abs_error=2.7394
-  gs_posterior_median (posterior_median): n=2, R2=nan, RMSE=4.72526, MAE=4.72255, mean_error=4.72255, median_abs_error=4.72255, max_abs_error=4.8826
-  gs_posterior_mean (posterior_mean): n=2, R2=nan, RMSE=5.95342, MAE=5.95105, mean_error=5.95105, median_abs_error=5.95105, max_abs_error=6.1189
+  rgb_ridge (conc_pred): n=2, R2=nan, RMSE=4.42129, MAE=4.32065, mean_error=-4.32065, median_abs_error=4.32065, max_abs_error=5.2586
+  gs_posterior_median (posterior_median): n=2, R2=nan, RMSE=12.1905, MAE=12.1665, mean_error=-12.1665, median_abs_error=12.1665, max_abs_error=12.9304
+  gs_posterior_mean (posterior_mean): n=2, R2=nan, RMSE=11.8046, MAE=11.7773, mean_error=-11.7773, median_abs_error=11.7773, max_abs_error=12.5792

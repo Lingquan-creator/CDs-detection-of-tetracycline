@@ -9,6 +9,11 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_ROI_CSV = ROOT_DIR / "dataset/RAW/roi_results/roi_detailed_statistics.csv"
@@ -24,7 +29,7 @@ FILENAME_RE = re.compile(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Calculate spike recovery with C2=0 and LOD=3*sigma/S from ROI statistics."
+            "Calculate spike recovery with C2=0 and recovery RSD from ROI statistics and model predictions."
         )
     )
     parser.add_argument("--roi-csv", type=Path, default=DEFAULT_ROI_CSV)
@@ -109,6 +114,106 @@ def recovery_quality_flags(recovery_mean: object, recovery_rsd: object) -> dict[
     }
 
 
+def recovery_heatmap_label(recovery: float, rsd: float, n: float) -> str:
+    rec_text = "" if not np.isfinite(recovery) else f"{recovery:.1f}%"
+    rsd_text = "RSD n/a" if not np.isfinite(rsd) else f"RSD {rsd:.2f}%"
+    n_text = "" if not np.isfinite(n) else f"n={int(n)}"
+    return "\n".join(part for part in (rec_text, rsd_text, n_text) if part)
+
+
+def draw_recovery_heatmap(
+    summary: pd.DataFrame,
+    *,
+    row_cols: list[str],
+    col_col: str,
+    title: str,
+    out_path: Path,
+    table_path: Path,
+) -> None:
+    if summary.empty:
+        return
+
+    required = set(row_cols + [col_col, "recovery_mean_percent", "recovery_rsd_percent", "n"])
+    missing = sorted(required - set(summary.columns))
+    if missing:
+        raise ValueError(f"Cannot draw recovery heatmap, missing columns: {missing}")
+
+    view = summary.copy()
+    view["row_label"] = view[row_cols].astype(str).agg(" / ".join, axis=1)
+    table = view.pivot_table(
+        index="row_label",
+        columns=col_col,
+        values=["recovery_mean_percent", "recovery_rsd_percent", "n"],
+        aggfunc="first",
+    )
+    recovery = table["recovery_mean_percent"].copy()
+    rsd = table["recovery_rsd_percent"].reindex_like(recovery)
+    n_table = table["n"].reindex_like(recovery)
+    recovery.to_csv(table_path, float_format="%.6g")
+
+    values = recovery.to_numpy(dtype=float)
+    if values.size == 0:
+        return
+
+    fig_w = max(7.0, 1.35 * max(1, recovery.shape[1]) + 2.5)
+    fig_h = max(4.5, 0.55 * max(1, recovery.shape[0]) + 1.8)
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=160, constrained_layout=True)
+    image = ax.imshow(values, cmap="RdYlGn", vmin=0, vmax=150, aspect="auto")
+    ax.set_xticks(np.arange(recovery.shape[1]))
+    ax.set_yticks(np.arange(recovery.shape[0]))
+    ax.set_xticklabels([str(col) for col in recovery.columns], rotation=35, ha="right")
+    ax.set_yticklabels([str(idx) for idx in recovery.index])
+    ax.set_title(title)
+    ax.set_xlabel(col_col)
+    ax.set_ylabel(" / ".join(row_cols))
+
+    for i in range(recovery.shape[0]):
+        for j in range(recovery.shape[1]):
+            rec = float(recovery.iloc[i, j]) if pd.notna(recovery.iloc[i, j]) else math.nan
+            rec_rsd = float(rsd.iloc[i, j]) if pd.notna(rsd.iloc[i, j]) else math.nan
+            n_value = float(n_table.iloc[i, j]) if pd.notna(n_table.iloc[i, j]) else math.nan
+            if not np.isfinite(rec):
+                continue
+            text_color = "white" if rec < 45 or rec > 125 else "black"
+            ax.text(
+                j,
+                i,
+                recovery_heatmap_label(rec, rec_rsd, n_value),
+                ha="center",
+                va="center",
+                fontsize=7,
+                color=text_color,
+            )
+
+    cbar = fig.colorbar(image, ax=ax, fraction=0.035, pad=0.03)
+    cbar.set_label("Recovery mean (%)")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path)
+    plt.close(fig)
+
+
+def draw_recovery_heatmaps(signal_summary: pd.DataFrame, model_summary: pd.DataFrame, output_dir: Path) -> None:
+    figures_dir = output_dir / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
+    draw_recovery_heatmap(
+        model_summary,
+        row_cols=["matrix", "added_concentration_c3"],
+        col_col="model",
+        title="Model recovery mean with triplicate RSD",
+        out_path=figures_dir / "model_recovery_heatmap_rsd.png",
+        table_path=output_dir / "model_recovery_heatmap_table.csv",
+    )
+    draw_recovery_heatmap(
+        signal_summary,
+        row_cols=["matrix", "added_concentration_c3"],
+        col_col="signal",
+        title="Signal-calibration recovery mean with triplicate RSD",
+        out_path=figures_dir / "signal_recovery_heatmap_rsd.png",
+        table_path=output_dir / "signal_recovery_heatmap_table.csv",
+    )
+
+
 def signal_columns(df: pd.DataFrame) -> list[str]:
     preferred = [
         "R_sig",
@@ -124,39 +229,19 @@ def signal_columns(df: pd.DataFrame) -> list[str]:
     return [col for col in preferred if col in df.columns]
 
 
-def calculate_signal_recovery_and_lod(
+def calculate_signal_recovery(
     df: pd.DataFrame,
     output_dir: Path,
     *,
     c2: float = 0.0,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     sample_rows: list[dict[str, object]] = []
     summary_rows: list[dict[str, object]] = []
-    lod_rows: list[dict[str, object]] = []
 
     for matrix, matrix_df in df.groupby("matrix", sort=True):
         for signal in signal_columns(matrix_df):
             x, y = finite_xy(matrix_df, "added_concentration", signal)
-            slope, intercept, r2 = linear_fit(x, y)
-
-            blank = matrix_df.loc[matrix_df["added_concentration"] == 0, signal].to_numpy(dtype=float)
-            blank = blank[np.isfinite(blank)]
-            sigma = float(np.std(blank, ddof=1)) if blank.size > 1 else math.nan
-            lod = 3.0 * sigma / abs(slope) if np.isfinite(sigma) and slope != 0 else math.nan
-
-            lod_rows.append(
-                {
-                    "matrix": matrix,
-                    "signal": signal,
-                    "slope_S": slope,
-                    "intercept": intercept,
-                    "r2": r2,
-                    "blank_n": int(blank.size),
-                    "blank_sigma": sigma,
-                    "lod": lod,
-                    "lod_formula": "LOD=3*sigma/abs(S)",
-                }
-            )
+            slope, intercept, _ = linear_fit(x, y)
 
             nonzero = matrix_df[matrix_df["added_concentration"] > 0].copy()
             if nonzero.empty or not np.isfinite(slope) or slope == 0:
@@ -213,12 +298,10 @@ def calculate_signal_recovery_and_lod(
 
     sample_out = pd.DataFrame(sample_rows)
     summary_out = pd.DataFrame(summary_rows)
-    lod_out = pd.DataFrame(lod_rows)
 
     sample_out.to_csv(output_dir / "signal_recovery_samples.csv", index=False, float_format="%.6g")
     summary_out.to_csv(output_dir / "signal_recovery_summary.csv", index=False, float_format="%.6g")
-    lod_out.to_csv(output_dir / "lod_results.csv", index=False, float_format="%.6g")
-    return sample_out, summary_out, lod_out
+    return sample_out, summary_out
 
 
 def load_prediction_sources(prediction_dir: Path) -> list[tuple[str, Path, str]]:
@@ -313,7 +396,6 @@ def write_report(
     roi_csv: Path,
     prediction_dir: Path,
     signal_summary: pd.DataFrame,
-    lod: pd.DataFrame,
     model_summary: pd.DataFrame,
 ) -> None:
     def markdown_table(df: pd.DataFrame) -> str:
@@ -330,33 +412,27 @@ def write_report(
         rows = ["| " + " | ".join(row) + " |" for row in view.astype(str).to_numpy()]
         return "\n".join([header, separator, *rows])
 
-    report_path = output_dir / "recovery_lod_report.md"
-    primary_lod = lod[lod["signal"].isin(["G_sig", "G_sig_calc"])].copy()
-    if not primary_lod.empty:
-        primary_lod = primary_lod.sort_values(["matrix", "signal"])
+    report_path = output_dir / "recovery_report.md"
 
     with report_path.open("w", encoding="utf-8") as f:
-        f.write("# Recovery and LOD Results\n\n")
+        f.write("# Recovery and RSD Results\n\n")
         f.write(f"ROI CSV: `{roi_csv}`\n\n")
         f.write(f"Prediction directory: `{prediction_dir}`\n\n")
-        f.write("Formulas from `temp` images:\n\n")
+        f.write("Formula:\n\n")
         f.write("- Recovery: `R(%) = (c1 - c2) / c3 * 100`; this run uses `c2 = 0`.\n")
-        f.write("- LOD: `LOD = 3 * sigma / S`; this run uses `abs(S)` because several signals decrease with concentration.\n\n")
+        f.write("- RSD: standard deviation of replicate recoveries divided by mean recovery.\n\n")
         f.write("Output files:\n\n")
         for name in [
             "signal_recovery_samples.csv",
             "signal_recovery_summary.csv",
-            "lod_results.csv",
             "model_recovery_samples.csv",
             "model_recovery_summary.csv",
+            "model_recovery_heatmap_table.csv",
+            "signal_recovery_heatmap_table.csv",
+            "figures/model_recovery_heatmap_rsd.png",
+            "figures/signal_recovery_heatmap_rsd.png",
         ]:
             f.write(f"- `{name}`\n")
-        f.write("\n## Primary LOD Rows (G signal)\n\n")
-        if primary_lod.empty:
-            f.write("No G-signal LOD rows were generated.\n")
-        else:
-            f.write(markdown_table(primary_lod))
-            f.write("\n")
 
         f.write("\n## Model Recovery Summary Head\n\n")
         if model_summary.empty:
@@ -379,19 +455,24 @@ def main() -> None:
     prediction_dir = args.prediction_dir.expanduser().resolve()
     output_dir = args.output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    for stale_name in ("lod_results.csv", "recovery_lod_report.md"):
+        stale_path = output_dir / stale_name
+        if stale_path.exists():
+            stale_path.unlink()
 
     roi_df = pd.read_csv(roi_csv)
     roi_df = add_filename_metadata(roi_df)
     roi_df = build_signal_columns(roi_df)
 
-    _, signal_summary, lod = calculate_signal_recovery_and_lod(roi_df, output_dir, c2=0.0)
+    _, signal_summary = calculate_signal_recovery(roi_df, output_dir, c2=0.0)
     _, model_summary = calculate_model_recovery(prediction_dir, output_dir, c2=0.0)
-    write_report(output_dir, roi_csv, prediction_dir, signal_summary, lod, model_summary)
+    draw_recovery_heatmaps(signal_summary, model_summary, output_dir)
+    write_report(output_dir, roi_csv, prediction_dir, signal_summary, model_summary)
 
     print(f"Saved results to {output_dir}")
-    print(f"LOD rows: {len(lod)}")
     print(f"Signal recovery summary rows: {len(signal_summary)}")
     print(f"Model recovery summary rows: {len(model_summary)}")
+    print(f"Recovery heatmaps: {output_dir / 'figures'}")
 
 
 if __name__ == "__main__":

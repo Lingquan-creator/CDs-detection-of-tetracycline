@@ -1,0 +1,7 @@
+scan,variant_id,alpha,beta,weight_eps,effective_weight_eps,phase,sample_group,n_features,feature_names,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
+weight_eps,weight_eps_120_alpha_1e02_beta_1,100,1,120,120,raw,all,8,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB,48,0.783333,16.4387,10.4544,0.811156,5.96068,55.6279
+weight_eps,weight_eps_80_alpha_1e02_beta_1,100,1,80,80,raw,all,8,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB,48,0.782476,16.4712,10.4367,1.06755,6.06714,56.7997
+weight_eps,weight_eps_50_alpha_1e02_beta_1,100,1,50,50,raw,all,8,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB,48,0.780151,16.559,10.529,1.49124,5.69831,58.562
+weight_eps,weight_eps_30_alpha_1e02_beta_1,100,1,30,30,raw,all,8,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB,48,0.774339,16.7765,10.6897,2.12934,5.86741,61.353
+weight_eps,weight_eps_10_alpha_1e02_beta_1,100,1,10,10,raw,all,8,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB,48,0.730886,18.3206,11.4903,4.78932,9.29466,74.4263
+weight_eps,weight_eps_1_alpha_1e02_beta_1,100,1,1,1,raw,all,8,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB,48,-1.75095,58.5752,42.9389,42.9389,26.1857,140

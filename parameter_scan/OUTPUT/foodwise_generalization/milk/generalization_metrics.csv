@@ -1,0 +1,5 @@
+source_food,eval_group,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error,alpha,beta,weight_eps,n_features,feature_names
+milk,all,48,0.575512,23.0094,14.2904,-10.1349,6.14605,64.8396,100,1,30,8,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB
+milk,chicken,18,0.481387,25.4328,15.53,-15.3643,6.09091,63.8167,100,1,30,8,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB
+milk,egg,12,0.286589,29.8292,19.024,-17.7131,7.53835,64.8396,100,1,30,8,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB
+milk,milk,18,0.862253,13.1073,9.89521,0.146709,6.2033,30.7262,100,1,30,8,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB

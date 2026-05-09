@@ -1,5 +1,5 @@
 model,sample_group,prediction_column,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
 exp,milk/50,conc_pred,3,,12.6342,12.1365,-12.1365,11.5873,16.6849
-rgb_ridge,milk/50,conc_pred,3,,25.9557,25.4088,25.4088,23.805,32.5518
-gs_posterior_median,milk/50,posterior_median,3,,29.1535,28.075,-28.075,25.5522,38.7071
-gs_posterior_mean,milk/50,posterior_mean,3,,28.0928,26.8763,-26.8763,24.2958,37.9294
+rgb_ridge,milk/50,conc_pred,3,,11.3666,9.85857,9.85857,6.3425,17.8409
+gs_posterior_median,milk/50,posterior_median,3,,4.97455,4.56987,-3.27627,5.1048,6.6644
+gs_posterior_mean,milk/50,posterior_mean,3,,4.04369,3.96893,-0.954933,4.5114,4.521

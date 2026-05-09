@@ -91,8 +91,10 @@ python "${ROOT_DIR}/concentration_GS/predict.py" \
   --plot-out "${GS_PLOT}" \
   2>&1 | tee "${PRED_OUTPUT_DIR}/gs_predict.log"
 
+rm -rf "${GROUP_PLOT_DIR}" "${SUBSET_OUTPUT_DIR}"
+
 echo "[EVAL] Extracting sample type, batch, and concentration from filenames..."
-python - "${EXP_PRED_CSV}" "${RGB_PRED_CSV}" "${GS_SUMMARY_CSV}" "${METRICS_CSV}" "${METRICS_TXT}" "${EVAL_PLOT}" "${GROUP_PLOT_DIR}" "${SUBSET_OUTPUT_DIR}" <<'PY'
+python - "${EXP_PRED_CSV}" "${RGB_PRED_CSV}" "${GS_SUMMARY_CSV}" "${METRICS_CSV}" "${METRICS_TXT}" "${EVAL_PLOT}" "${GROUP_PLOT_DIR}" "${SUBSET_OUTPUT_DIR}" "${EXP_PLOT}" "${RGB_PLOT}" "${GS_PLOT}" <<'PY'
 from __future__ import annotations
 
 import math
@@ -254,6 +256,56 @@ def draw_eval_plot(
     plt.close(fig)
 
 
+def draw_single_prediction_plot(
+    df: pd.DataFrame,
+    pred_col: str,
+    title: str,
+    out_path: Path,
+) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), dpi=150)
+
+    y_true = df["conc_true"].to_numpy(dtype=float)
+    y_pred = df[pred_col].to_numpy(dtype=float)
+    valid = np.isfinite(y_true) & np.isfinite(y_pred)
+    if np.any(valid):
+        x = y_true[valid]
+        y = y_pred[valid]
+        groups = df.loc[valid, "sample_type"].astype(str).to_numpy()
+        for sample_type in sorted(set(groups)):
+            mask = groups == sample_type
+            axes[0].scatter(x[mask], y[mask], s=32, alpha=0.85, label=sample_type)
+
+        low = float(min(np.min(x), np.min(y)))
+        high = float(max(np.max(x), np.max(y)))
+        pad = max((high - low) * 0.04, 1.0)
+        low -= pad
+        high += pad
+        axes[0].plot([low, high], [low, high], color="black", linestyle="--", linewidth=1.0)
+        axes[0].set_xlim(low, high)
+        axes[0].set_ylim(low, high)
+        axes[0].set_xlabel("True concentration from filename last field (uM)")
+        axes[0].set_ylabel("Predicted concentration (uM)")
+        axes[0].set_title(f"{title}: prediction vs truth")
+        axes[0].legend(title="Sample")
+        axes[0].grid(alpha=0.25)
+
+        residual = y - x
+        axes[1].hist(residual, bins=18, color="#ff7f0e", alpha=0.82)
+        axes[1].axvline(0.0, color="black", linestyle="--", linewidth=1.0)
+        axes[1].set_xlabel("Residual (pred - true)")
+        axes[1].set_ylabel("Count")
+        axes[1].set_title(f"{title}: residual distribution")
+        axes[1].grid(alpha=0.25)
+    else:
+        axes[0].text(0.5, 0.5, "No finite labels", ha="center", va="center")
+        axes[1].text(0.5, 0.5, "No finite labels", ha="center", va="center")
+
+    fig.tight_layout()
+    fig.savefig(out_path, bbox_inches="tight")
+    plt.close(fig)
+
+
 def write_subset_outputs(
     exp: pd.DataFrame,
     rgb: pd.DataFrame,
@@ -318,6 +370,9 @@ metrics_txt = Path(sys.argv[5])
 eval_plot = Path(sys.argv[6])
 group_plot_dir = Path(sys.argv[7])
 subset_output_dir = Path(sys.argv[8])
+exp_plot = Path(sys.argv[9])
+rgb_plot = Path(sys.argv[10])
+gs_plot = Path(sys.argv[11])
 
 exp = add_truth_group_and_errors(pd.read_csv(exp_csv), "conc_pred", "residual")
 rgb = add_truth_group_and_errors(pd.read_csv(rgb_csv), "conc_pred", "residual")
@@ -346,6 +401,10 @@ sample_concentration_groups = [
 exp.to_csv(exp_csv, index=False, float_format="%.6g")
 rgb.to_csv(rgb_csv, index=False, float_format="%.6g")
 gs.to_csv(gs_csv, index=False, float_format="%.6g")
+
+draw_single_prediction_plot(exp, "conc_pred", "EXP", exp_plot)
+draw_single_prediction_plot(rgb, "conc_pred", "RGB Ridge", rgb_plot)
+draw_single_prediction_plot(gs, "posterior_median", "GS median", gs_plot)
 
 groups = ["all"] + sample_groups + sample_concentration_groups
 rows = []

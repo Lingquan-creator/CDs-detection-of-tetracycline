@@ -1,7 +1,0 @@
-scan,variant_id,alpha,beta,weight_eps,effective_weight_eps,phase,sample_group,n_features,feature_names,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
-weight_eps,weight_eps_50_alpha_1e08_beta_1,1e+08,1,50,50,loo,all,7,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RB,24,0.985065,8.74775,4.11407,-1.4642,2.21322,40
-weight_eps,weight_eps_80_alpha_1e08_beta_1,1e+08,1,80,80,loo,all,7,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RB,24,0.985061,8.74903,4.14563,-1.44976,2.13435,40
-weight_eps,weight_eps_120_alpha_1e08_beta_1,1e+08,1,120,120,loo,all,7,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RB,24,0.985044,8.75395,4.18201,-1.44611,2.08907,40
-weight_eps,weight_eps_30_alpha_1e08_beta_1,1e+08,1,30,30,loo,all,7,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RB,24,0.985024,8.75994,4.11506,-1.49009,2.24967,40
-weight_eps,weight_eps_10_alpha_1e08_beta_1,1e+08,1,10,10,loo,all,7,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RB,24,0.984473,8.9195,4.59174,-1.61726,2.74983,40
-weight_eps,weight_eps_1_alpha_1e08_beta_1,1e+08,1,1,1,loo,all,7,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RB,24,0.937644,17.8746,12.7651,-3.35517,9.36272,40.5174

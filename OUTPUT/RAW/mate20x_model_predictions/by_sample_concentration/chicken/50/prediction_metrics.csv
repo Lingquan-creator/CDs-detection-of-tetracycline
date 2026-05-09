@@ -1,5 +1,5 @@
 model,sample_group,prediction_column,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
 exp,chicken/50,conc_pred,3,,22.0477,21.7757,-21.7757,22.3937,25.661
-rgb_ridge,chicken/50,conc_pred,3,,7.59643,7.0393,4.11743,5.7335,11.0016
-gs_posterior_median,chicken/50,posterior_median,3,,38.5318,38.1172,-38.1172,41.7834,42.4151
-gs_posterior_mean,chicken/50,posterior_mean,3,,36.9557,36.5515,-36.5515,39.5115,41.2355
+rgb_ridge,chicken/50,conc_pred,3,,10.264,9.05867,-9.05867,6.7726,15.7708
+gs_posterior_median,chicken/50,posterior_median,3,,21.1208,20.4158,-20.4158,17.6338,27.981
+gs_posterior_mean,chicken/50,posterior_mean,3,,19.7791,18.9459,-18.9459,16.0258,26.887

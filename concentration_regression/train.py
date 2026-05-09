@@ -25,7 +25,7 @@ from sklearn.model_selection import LeaveOneOut
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from config import ALPHAS, CLIP_MIN, DEFAULT_BG_CORRECTION, TARGET_EPS, TARGET_TRANSFORM, WEIGHT_EPS, TrainConfig
+from config import ALPHAS, CLIP_MIN, DEFAULT_BG_CORRECTION, TARGET_EPS, TARGET_TRANSFORM, WEIGHT_BETA, WEIGHT_EPS, TrainConfig
 from physics_features import build_feature_frame, extract_concentration_from_name, has_background_columns
 
 matplotlib.use("Agg")
@@ -79,10 +79,13 @@ def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> Tuple[float,
     return r2, rmse, mae
 
 
-def make_sample_weights(y: np.ndarray, weight_eps: float) -> np.ndarray:
+def make_sample_weights(y: np.ndarray, weight_eps: float, weight_beta: float = 1.0) -> np.ndarray:
     if weight_eps < 0:
         raise ValueError("--weight-eps must be >= 0.")
-    weights = 1.0 / (y + weight_eps)
+    denom = weight_beta * np.asarray(y, dtype=float) + float(weight_eps)
+    if np.any(denom <= 0):
+        raise ValueError("weight_beta * concentration + weight_eps must stay positive.")
+    weights = 1.0 / denom
     return weights / np.mean(weights)
 
 
@@ -94,7 +97,7 @@ def train_model(
     sample_weight: np.ndarray,
 ) -> Pipeline:
     model = Pipeline(
-        [("scaler", StandardScaler()), ("regressor", RidgeCV(alphas=tuple(alphas), scoring="neg_mean_squared_error"))]
+        [("scaler", StandardScaler()), ("regressor", RidgeCV(alphas=list(alphas), scoring="neg_mean_squared_error"))]
     )
     model.fit(X, y_target, regressor__sample_weight=sample_weight)
     return model
@@ -144,7 +147,7 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
     parser.add_argument("--alpha-grid", nargs="+", type=float, help="Alpha grid for RidgeCV.")
     parser.add_argument(
         "--feature-set",
-        choices=["full", "compact", "compact_exposure", "ln_rgb"],
+        choices=["full", "compact", "compact_exposure", "ln_rgb", "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb"],
         default=default_cfg.feature_set,
         help="Feature set: compact=ln RGB + ratios; compact_exposure adds exposure_time.",
     )
@@ -154,7 +157,8 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
         default=getattr(default_cfg, "bg_correction", DEFAULT_BG_CORRECTION),
         help="Background correction mode for --use-bg true: subtract=ROI-BG, divide=ROI/BG, relative=(ROI-BG)/BG.",
     )
-    parser.add_argument("--weight-eps", type=float, default=WEIGHT_EPS, help="Sample weight: 1 / (conc + weight_eps).")
+    parser.add_argument("--weight-eps", type=float, default=WEIGHT_EPS, help="Sample weight: 1 / (weight_beta * conc + weight_eps).")
+    parser.add_argument("--weight-beta", "--beta", dest="weight_beta", type=float, default=WEIGHT_BETA, help="Sample weight beta in 1 / (weight_beta * conc + weight_eps).")
     parser.add_argument("--clip-min", type=float, default=CLIP_MIN, help="Min signal after bg subtraction.")
     return parser.parse_args()
 
@@ -212,7 +216,7 @@ def resolve_use_bg(df: pd.DataFrame, g_mode: str, use_bg_arg: str) -> bool:
 def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: str) -> pd.DataFrame:
     if feature_set == "full":
         return feature_df
-    if feature_set not in {"compact", "compact_exposure", "ln_rgb"}:
+    if feature_set not in {"compact", "compact_exposure", "ln_rgb", "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb"}:
         raise ValueError(f"Unsupported feature set: {feature_set}")
 
     ln_rgb_columns = (
@@ -224,6 +228,11 @@ def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: s
         ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Delta_RG", "Delta_GB")
         if use_bg
         else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Delta_RG", "Delta_GB")
+    )
+    optimized_columns = (
+        ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Ratio_RB", "Delta_RG", "Delta_RB", "Delta_GB")
+        if use_bg
+        else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Ratio_RB", "Delta_RG", "Delta_RB", "Delta_GB")
     )
     exposure_columns = (
         (
@@ -258,6 +267,8 @@ def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: s
     )
     if feature_set == "ln_rgb":
         selected_columns = ln_rgb_columns
+    elif feature_set == "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb":
+        selected_columns = optimized_columns
     else:
         selected_columns = exposure_columns if feature_set == "compact_exposure" else no_exposure_columns
     missing = [column for column in selected_columns if column not in feature_df.columns]
@@ -285,6 +296,7 @@ def train_candidate(
     target_eps: float,
     alphas: Tuple[float, ...],
     weight_eps: float,
+    weight_beta: float,
     clip_min: float,
     feature_set: str,
     bg_correction: str,
@@ -293,7 +305,7 @@ def train_candidate(
     feature_df = select_feature_set(feature_df, use_bg=use_bg, feature_set=feature_set)
     X = feature_df.to_numpy(dtype=float)
     y_target = transform_target(y_true, target_transform, target_eps)
-    sample_weight = make_sample_weights(y_true, weight_eps)
+    sample_weight = make_sample_weights(y_true, weight_eps, weight_beta)
 
     model = train_model(X, y_target, alphas=alphas, sample_weight=sample_weight)
     y_pred_target = model.predict(X)
@@ -326,6 +338,7 @@ def run_leave_one_out(
     target_transform: str,
     target_eps: float,
     weight_eps: float,
+    weight_beta: float,
 ) -> np.ndarray:
     loo = LeaveOneOut()
     y_pred_loo = np.zeros_like(y_true, dtype=float)
@@ -336,7 +349,7 @@ def run_leave_one_out(
         y_train = y_true[train_idx]
 
         y_train_target = transform_target(y_train, target_transform, target_eps)
-        w_train = make_sample_weights(y_train, weight_eps)
+        w_train = make_sample_weights(y_train, weight_eps, weight_beta)
         model_fold = train_model(X_train, y_train_target, alphas=alphas, sample_weight=w_train)
 
         pred_test_target = model_fold.predict(X_test)
@@ -409,6 +422,7 @@ def save_outputs(
     target_eps: float,
     alphas: Tuple[float, ...],
     weight_eps: float,
+    weight_beta: float,
     feature_set: str,
     bg_correction: str,
     selected_feature_names: Tuple[str, ...],
@@ -431,6 +445,7 @@ def save_outputs(
         "feature_set": feature_set,
         "bg_correction": bg_correction,
         "weight_eps": weight_eps,
+        "weight_beta": weight_beta,
         "isotonic": calibrator,
         "sklearn_version": sklearn_version,
         "python_version": platform.python_version(),
@@ -512,6 +527,7 @@ def main() -> None:
             target_eps=TARGET_EPS,
             alphas=alphas,
             weight_eps=float(args.weight_eps),
+            weight_beta=float(args.weight_beta),
             clip_min=float(args.clip_min),
             feature_set=str(args.feature_set),
             bg_correction=bg_correction,
@@ -546,6 +562,7 @@ def main() -> None:
         target_transform=target_transform,
         target_eps=TARGET_EPS,
         weight_eps=float(args.weight_eps),
+        weight_beta=float(args.weight_beta),
     )
 
     train_metrics = evaluate_predictions(y_true, y_pred)
@@ -574,6 +591,7 @@ def main() -> None:
         target_eps=TARGET_EPS,
         alphas=alphas,
         weight_eps=float(args.weight_eps),
+        weight_beta=float(args.weight_beta),
         feature_set=feature_set,
         bg_correction=bg_correction,
         selected_feature_names=selected_feature_names,

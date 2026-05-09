@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import itertools
 import math
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,6 +34,16 @@ from train import apply_calibrator, fit_calibrator, inverse_target, transform_ta
 
 
 CSV_FLOAT_FORMAT = "%.6g"
+RAW_NAME_RE = re.compile(r"^(?P<sample>.+)-(?P<batch>\d+)-(?P<concentration>[-+]?\d+(?:\.\d+)?)$")
+BASE_FEATURES = ("ln_R_sig", "ln_G_sig", "ln_B_sig")
+OPTIONAL_FEATURES = (
+    "Ratio_RG",
+    "Ratio_BG",
+    "Ratio_RB",
+    "Delta_RG",
+    "Delta_RB",
+    "Delta_GB",
+)
 ALPHA_VALUES = (0.0, 1.0, 10.0, 100.0, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8)
 BETA_VALUES = (0.0, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, 10.0, 100.0, 1000.0)
 WEIGHT_EPS_VALUES = (1.0, 10.0, 30.0, 50.0, 80.0, 120.0)
@@ -54,6 +66,13 @@ class Variant:
     variant_id: str
     alpha: float
     beta: float
+
+
+@dataclass(frozen=True)
+class HyperParams:
+    alpha: float
+    beta: float
+    weight_eps: float
 
 
 def make_sample_weights(y: np.ndarray, *, weight_eps: float, beta: float) -> np.ndarray:
@@ -105,11 +124,22 @@ def metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float | int]:
 
 def group_from_filename(filename: object) -> str:
     stem = Path(str(filename)).stem.lower()
+    raw_match = RAW_NAME_RE.fullmatch(stem)
+    if raw_match:
+        return raw_match.group("sample").lower()
     if stem.startswith("chicken"):
         return "chicken"
     if stem.startswith("egg"):
         return "egg"
     return "other"
+
+
+def concentration_from_filename(filename: object) -> float | None:
+    stem = Path(str(filename)).stem
+    raw_match = RAW_NAME_RE.fullmatch(stem)
+    if raw_match:
+        return float(raw_match.group("concentration"))
+    return extract_concentration_from_name(filename)
 
 
 def load_labeled_roi(csv_path: Path) -> tuple[pd.DataFrame, np.ndarray]:
@@ -119,7 +149,7 @@ def load_labeled_roi(csv_path: Path) -> tuple[pd.DataFrame, np.ndarray]:
     if "filename" not in df.columns:
         raise ValueError(f"ROI CSV must include filename column: {csv_path}")
     df = df.copy()
-    df["conc_true"] = df["filename"].apply(extract_concentration_from_name)
+    df["conc_true"] = df["filename"].apply(concentration_from_filename)
     df = df.dropna(subset=["conc_true"]).sort_values("conc_true").reset_index(drop=True)
     if df.empty:
         raise ValueError(f"No valid concentration labels parsed from: {csv_path}")
@@ -160,6 +190,240 @@ def build_selected_features(df: pd.DataFrame, *, feature_names: Iterable[str]) -
     if missing:
         raise ValueError(f"Selected input vector requires missing features: {missing}")
     return features.loc[:, list(feature_names)]
+
+
+def build_all_features(df: pd.DataFrame) -> pd.DataFrame:
+    features = build_feature_frame(
+        df,
+        g_mode="avg",
+        use_bg=True,
+        clip_min=CLIP_MIN,
+        bg_correction="subtract",
+    )
+    return add_test_input_vector_features(features)
+
+
+def variant_name(optional_features: tuple[str, ...]) -> str:
+    if not optional_features:
+        return "ln_rgb_only"
+    return "_".join(feature.lower() for feature in optional_features)
+
+
+def loo_predict_fixed_params(X: np.ndarray, y_true: np.ndarray, params: HyperParams) -> np.ndarray:
+    y_pred = np.zeros_like(y_true, dtype=float)
+    loo = LeaveOneOut()
+    for fold_train_idx, fold_test_idx in loo.split(X):
+        X_fold_train = X[fold_train_idx]
+        X_fold_test = X[fold_test_idx]
+        y_fold_train = y_true[fold_train_idx]
+        y_fold_target = transform_target(y_fold_train, TARGET_TRANSFORM, TARGET_EPS)
+        fold_weight = make_sample_weights(y_fold_train, weight_eps=params.weight_eps, beta=params.beta)
+        fold_model = train_model_fixed_alpha(
+            X_fold_train,
+            y_fold_target,
+            alpha=params.alpha,
+            sample_weight=fold_weight,
+        )
+        fold_train_raw = inverse_target(fold_model.predict(X_fold_train), TARGET_TRANSFORM, TARGET_EPS)
+        fold_calibrator = fit_calibrator(fold_train_raw, y_fold_train, fold_weight)
+        fold_test_raw = inverse_target(fold_model.predict(X_fold_test), TARGET_TRANSFORM, TARGET_EPS)
+        y_pred[fold_test_idx] = apply_calibrator(fold_test_raw, fold_calibrator)
+    return y_pred
+
+
+def evaluate_loo(
+    df: pd.DataFrame,
+    y_true: np.ndarray,
+    feature_table: pd.DataFrame,
+    feature_names: tuple[str, ...],
+    params: HyperParams,
+    *,
+    food: str,
+    step: str,
+    scan: str,
+    variant_id: str,
+) -> tuple[dict[str, object], pd.DataFrame]:
+    X = feature_table.loc[:, list(feature_names)].to_numpy(dtype=float)
+    y_pred = loo_predict_fixed_params(X, y_true, params)
+    pred_df = df[["filename", "conc_true", "sample_group"]].copy()
+    pred_df.insert(0, "food", food)
+    pred_df.insert(1, "step", step)
+    pred_df.insert(2, "scan", scan)
+    pred_df.insert(3, "variant_id", variant_id)
+    pred_df["phase"] = "loo"
+    pred_df["alpha"] = params.alpha
+    pred_df["beta"] = params.beta
+    pred_df["weight_eps"] = params.weight_eps
+    pred_df["effective_weight_eps"] = math.inf if params.beta == 0 else params.weight_eps / params.beta
+    pred_df["feature_names"] = ";".join(feature_names)
+    pred_df["n_features"] = len(feature_names)
+    pred_df["conc_pred"] = y_pred
+    pred_df["residual"] = pred_df["conc_pred"] - pred_df["conc_true"]
+
+    metric_row: dict[str, object] = {
+        "food": food,
+        "step": step,
+        "scan": scan,
+        "variant_id": variant_id,
+        "phase": "loo",
+        "sample_group": food,
+        "alpha": params.alpha,
+        "beta": params.beta,
+        "weight_eps": params.weight_eps,
+        "effective_weight_eps": math.inf if params.beta == 0 else params.weight_eps / params.beta,
+        "n_features": len(feature_names),
+        "feature_names": ";".join(feature_names),
+    }
+    for feature in OPTIONAL_FEATURES:
+        metric_row[f"use_{feature.lower()}"] = feature in feature_names
+    metric_row.update(metrics(y_true, y_pred))
+    return metric_row, pred_df
+
+
+def rank_metric_rows(rows: list[dict[str, object]]) -> pd.DataFrame:
+    return pd.DataFrame(rows).sort_values(["r2", "rmse"], ascending=[False, True]).reset_index(drop=True)
+
+
+def search_input_vectors(
+    df: pd.DataFrame,
+    y_true: np.ndarray,
+    feature_table: pd.DataFrame,
+    params: HyperParams,
+    *,
+    food: str,
+    step: str,
+    out_dir: Path,
+) -> tuple[tuple[str, ...], pd.DataFrame]:
+    metric_rows: list[dict[str, object]] = []
+    prediction_rows: list[pd.DataFrame] = []
+
+    for mask in itertools.product((False, True), repeat=len(OPTIONAL_FEATURES)):
+        optional = tuple(feature for feature, enabled in zip(OPTIONAL_FEATURES, mask) if enabled)
+        feature_names = (*BASE_FEATURES, *optional)
+        name = variant_name(optional)
+        row, pred = evaluate_loo(
+            df,
+            y_true,
+            feature_table,
+            feature_names,
+            params,
+            food=food,
+            step=step,
+            scan="input",
+            variant_id=name,
+        )
+        metric_rows.append(row)
+        prediction_rows.append(pred)
+
+    ranked = rank_metric_rows(metric_rows)
+    predictions = pd.concat(prediction_rows, ignore_index=True)
+    ranked.to_csv(out_dir / f"{step}_input_ranked.csv", index=False, float_format=CSV_FLOAT_FORMAT)
+    predictions.to_csv(out_dir / f"{step}_input_predictions.csv", index=False, float_format=CSV_FLOAT_FORMAT)
+    best_features = tuple(str(ranked.iloc[0]["feature_names"]).split(";"))
+    return best_features, ranked.iloc[0].to_frame().T
+
+
+def scan_hyperparameters(
+    df: pd.DataFrame,
+    y_true: np.ndarray,
+    feature_table: pd.DataFrame,
+    feature_names: tuple[str, ...],
+    start_params: HyperParams,
+    *,
+    food: str,
+    step: str,
+    out_dir: Path,
+) -> tuple[HyperParams, pd.DataFrame]:
+    metric_rows: list[dict[str, object]] = []
+    prediction_rows: list[pd.DataFrame] = []
+
+    def add_eval(scan: str, variant_id: str, params: HyperParams) -> None:
+        row, pred = evaluate_loo(
+            df,
+            y_true,
+            feature_table,
+            feature_names,
+            params,
+            food=food,
+            step=step,
+            scan=scan,
+            variant_id=variant_id,
+        )
+        metric_rows.append(row)
+        prediction_rows.append(pred)
+
+    for alpha in ALPHA_VALUES:
+        add_eval(
+            "alpha",
+            f"alpha_{alpha:.0e}_beta_{start_params.beta:g}_weight_eps_{start_params.weight_eps:g}".replace("+", ""),
+            HyperParams(alpha=float(alpha), beta=start_params.beta, weight_eps=start_params.weight_eps),
+        )
+    alpha_rank = rank_metric_rows([row for row in metric_rows if row["scan"] == "alpha"])
+    best_alpha = float(alpha_rank.iloc[0]["alpha"])
+
+    for beta in BETA_VALUES:
+        add_eval(
+            "beta",
+            f"beta_{beta:.0e}_alpha_{best_alpha:.0e}_weight_eps_{start_params.weight_eps:g}".replace("+", ""),
+            HyperParams(alpha=best_alpha, beta=float(beta), weight_eps=start_params.weight_eps),
+        )
+    beta_rank = rank_metric_rows([row for row in metric_rows if row["scan"] == "beta"])
+    best_beta = float(beta_rank.iloc[0]["beta"])
+
+    for weight_eps in WEIGHT_EPS_VALUES:
+        add_eval(
+            "weight_eps",
+            f"weight_eps_{weight_eps:g}_alpha_{best_alpha:.0e}_beta_{best_beta:g}".replace("+", ""),
+            HyperParams(alpha=best_alpha, beta=best_beta, weight_eps=float(weight_eps)),
+        )
+    weight_eps_rank = rank_metric_rows([row for row in metric_rows if row["scan"] == "weight_eps"])
+    best_weight_eps = float(weight_eps_rank.iloc[0]["weight_eps"])
+
+    final_params = HyperParams(alpha=best_alpha, beta=best_beta, weight_eps=best_weight_eps)
+    add_eval(
+        "final",
+        f"final_alpha_{best_alpha:.0e}_beta_{best_beta:g}_weight_eps_{best_weight_eps:g}".replace("+", ""),
+        final_params,
+    )
+
+    metrics_df = pd.DataFrame(metric_rows)
+    predictions_df = pd.concat(prediction_rows, ignore_index=True)
+    metrics_df.to_csv(out_dir / f"{step}_hyperparameter_metrics.csv", index=False, float_format=CSV_FLOAT_FORMAT)
+    predictions_df.to_csv(out_dir / f"{step}_hyperparameter_predictions.csv", index=False, float_format=CSV_FLOAT_FORMAT)
+
+    for scan in ("alpha", "beta", "weight_eps", "final"):
+        scan_rank = rank_metric_rows(metrics_df[metrics_df["scan"] == scan].to_dict("records"))
+        scan_rank.to_csv(out_dir / f"{step}_{scan}_ranked.csv", index=False, float_format=CSV_FLOAT_FORMAT)
+
+    final_rank = rank_metric_rows(metrics_df[metrics_df["scan"] == "final"].to_dict("records"))
+    return final_params, final_rank.iloc[0].to_frame().T
+
+
+def save_food_plot(best_predictions: pd.DataFrame, out_path: Path, title: str) -> None:
+    if best_predictions.empty:
+        return
+    fig, ax = plt.subplots(figsize=(5.8, 5.2), dpi=150)
+    ax.scatter(
+        best_predictions["conc_true"],
+        best_predictions["conc_pred"],
+        s=42,
+        alpha=0.85,
+        color="#1f77b4",
+        edgecolor="white",
+        linewidth=0.4,
+    )
+    low = float(min(best_predictions["conc_true"].min(), best_predictions["conc_pred"].min()))
+    high = float(max(best_predictions["conc_true"].max(), best_predictions["conc_pred"].max()))
+    pad = max((high - low) * 0.05, 1.0)
+    ax.plot([low - pad, high + pad], [low - pad, high + pad], "k--", linewidth=1.0)
+    row = metrics(best_predictions["conc_true"].to_numpy(float), best_predictions["conc_pred"].to_numpy(float))
+    ax.set_title(f"{title}\nR2={row['r2']:.4g}, RMSE={row['rmse']:.4g}, MAE={row['mae']:.4g}")
+    ax.set_xlabel("Ground truth (uM)")
+    ax.set_ylabel("Predicted concentration (uM)")
+    ax.grid(alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(out_path, bbox_inches="tight")
+    plt.close(fig)
 
 
 def fit_predict_variant(
@@ -206,7 +470,7 @@ def fit_predict_variant(
     for phase, df, y_true, y_pred in (
         ("train", train_df, y_train, train_pred),
         ("loo", train_df, y_train, loo_pred),
-        ("food", test_df, y_test, test_pred),
+        ("raw_reference", test_df, y_test, test_pred),
     ):
         phase_df = pd.DataFrame(
             {
@@ -227,7 +491,7 @@ def fit_predict_variant(
 
     metric_rows: list[dict[str, object]] = []
     for phase, df in predictions.groupby("phase", sort=False):
-        groups = ("all", "chicken", "egg") if phase == "food" else ("all",)
+        groups = ("all", *sorted(df["sample_group"].unique())) if phase == "raw_reference" else ("all",)
         for group in groups:
             part = df if group == "all" else df[df["sample_group"] == group]
             row = {
@@ -252,9 +516,9 @@ def fit_predict_variant(
 
 
 def plot_scan(metrics_df: pd.DataFrame, scan_name: str, x_col: str, out_path: Path) -> None:
-    food_all = metrics_df[
+    raw_all = metrics_df[
         (metrics_df["scan"] == scan_name)
-        & (metrics_df["phase"] == "food")
+        & (metrics_df["phase"] == "raw_reference")
         & (metrics_df["sample_group"] == "all")
     ].copy()
     loo_all = metrics_df[
@@ -262,12 +526,12 @@ def plot_scan(metrics_df: pd.DataFrame, scan_name: str, x_col: str, out_path: Pa
         & (metrics_df["phase"] == "loo")
         & (metrics_df["sample_group"] == "all")
     ].copy()
-    if food_all.empty:
+    if raw_all.empty:
         return
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.6), dpi=150)
     for ax, metric_name, title in zip(axes, ("r2", "rmse", "mae"), ("R2", "RMSE", "MAE")):
-        for source, label, color in ((food_all, "food all", "#1f77b4"), (loo_all, "mate20x LOO", "#d62728")):
+        for source, label, color in ((raw_all, "RAW reference", "#1f77b4"), (loo_all, "RAW LOO", "#d62728")):
             if source.empty:
                 continue
             source = source.sort_values(x_col)
@@ -324,11 +588,17 @@ def plot_best_prediction(predictions: pd.DataFrame, best_variant: str, phase: st
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Scan Ridge alpha and beta in sample-weight formula.")
-    parser.add_argument("--train-csv", type=Path, default=ROOT / "dataset" / "mate20x" / "roi_detailed_statistics.csv")
-    parser.add_argument("--test-csv", type=Path, default=ROOT / "dataset" / "food" / "roi_detailed_statistics.csv")
-    parser.add_argument("--out-dir", type=Path, default=ROOT / "parameter_scan_LOO" / "OUTPUT")
+    parser = argparse.ArgumentParser(description="Food-wise iterative input-vector and hyperparameter optimization.")
+    parser.add_argument("--train-csv", type=Path, default=ROOT / "dataset" / "RAW" / "roi_results" / "roi_detailed_statistics.csv")
+    parser.add_argument("--test-csv", type=Path, default=ROOT / "dataset" / "RAW" / "roi_results" / "roi_detailed_statistics.csv")
+    parser.add_argument("--out-dir", type=Path, default=ROOT / "parameter_scan_LOO" / "OUTPUT" / "foodwise_iterative")
     parser.add_argument("--weight-eps", type=float, default=WEIGHT_EPS)
+    parser.add_argument(
+        "--foods",
+        nargs="*",
+        default=None,
+        help="Food groups to optimize. Defaults to all sample groups parsed from filenames.",
+    )
     return parser.parse_args()
 
 
@@ -338,155 +608,118 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     train_df, y_train = load_labeled_roi(args.train_csv)
-    test_df, y_test = load_labeled_roi(args.test_csv)
-    feature_names = load_best_input_vector()
+    train_df = train_df.copy()
+    train_df["sample_group"] = train_df["filename"].apply(group_from_filename)
 
-    all_metric_rows: list[dict[str, object]] = []
-    all_predictions: list[pd.DataFrame] = []
+    available_foods = sorted(train_df["sample_group"].unique())
+    foods = args.foods or available_foods
+    missing_foods = sorted(set(foods) - set(available_foods))
+    if missing_foods:
+        raise ValueError(f"Requested food group(s) not found in {args.train_csv}: {', '.join(missing_foods)}")
 
-    alpha_variants = [
-        Variant(scan="alpha", variant_id=f"alpha_{alpha:.0e}_beta_1".replace("+", ""), alpha=alpha, beta=1.0)
-        for alpha in ALPHA_VALUES
-    ]
-    for variant in alpha_variants:
-        print(f"[alpha scan] {variant.variant_id}: alpha={variant.alpha:g}, beta={variant.beta:g}")
-        rows, preds = fit_predict_variant(
-            variant,
-            train_df,
-            y_train,
-            test_df,
-            y_test,
-            weight_eps=float(args.weight_eps),
-            out_dir=out_dir,
-            feature_names=feature_names,
+    initial_params = HyperParams(alpha=100.0, beta=1.0, weight_eps=float(args.weight_eps))
+    summary_rows: list[pd.DataFrame] = []
+
+    for food in foods:
+        food_dir = out_dir / food
+        food_dir.mkdir(parents=True, exist_ok=True)
+        food_df = train_df[train_df["sample_group"] == food].copy().sort_values(["conc_true", "filename"]).reset_index(drop=True)
+        y_food = food_df["conc_true"].to_numpy(dtype=float)
+        if y_food.size < 3:
+            raise ValueError(f"Need at least 3 rows for LOO optimization: {food}")
+        feature_table = build_all_features(food_df)
+
+        print(f"[{food}] step1 input vector search with alpha={initial_params.alpha:g}, beta={initial_params.beta:g}, weight_eps={initial_params.weight_eps:g}")
+        step1_features, step1_best = search_input_vectors(
+            food_df,
+            y_food,
+            feature_table,
+            initial_params,
+            food=food,
+            step="step1",
+            out_dir=food_dir,
         )
-        all_metric_rows.extend(rows)
-        all_predictions.append(preds)
 
-    metrics_df = pd.DataFrame(all_metric_rows)
-    alpha_loo = metrics_df[
-        (metrics_df["scan"] == "alpha")
-        & (metrics_df["phase"] == "loo")
-        & (metrics_df["sample_group"] == "all")
-    ].copy()
-    best_alpha_row = alpha_loo.sort_values(["r2", "rmse"], ascending=[False, True]).iloc[0]
-    best_alpha = float(best_alpha_row["alpha"])
-
-    beta_variants = [
-        Variant(scan="beta", variant_id=f"beta_{beta:.0e}_alpha_{best_alpha:.0e}".replace("+", ""), alpha=best_alpha, beta=beta)
-        for beta in BETA_VALUES
-    ]
-    for variant in beta_variants:
-        print(f"[beta scan] {variant.variant_id}: alpha={variant.alpha:g}, beta={variant.beta:g}")
-        rows, preds = fit_predict_variant(
-            variant,
-            train_df,
-            y_train,
-            test_df,
-            y_test,
-            weight_eps=float(args.weight_eps),
-            out_dir=out_dir,
-            feature_names=feature_names,
+        print(f"[{food}] step2 hyperparameter search with features={';'.join(step1_features)}")
+        step2_params, step2_best = scan_hyperparameters(
+            food_df,
+            y_food,
+            feature_table,
+            step1_features,
+            initial_params,
+            food=food,
+            step="step2",
+            out_dir=food_dir,
         )
-        all_metric_rows.extend(rows)
-        all_predictions.append(preds)
 
-    weight_eps_variants = [
-        Variant(
-            scan="weight_eps",
-            variant_id=f"weight_eps_{weight_eps:g}_alpha_{best_alpha:.0e}_beta_1".replace("+", ""),
-            alpha=best_alpha,
-            beta=1.0,
+        print(f"[{food}] step3 input vector search with alpha={step2_params.alpha:g}, beta={step2_params.beta:g}, weight_eps={step2_params.weight_eps:g}")
+        step3_features, step3_best = search_input_vectors(
+            food_df,
+            y_food,
+            feature_table,
+            step2_params,
+            food=food,
+            step="step3",
+            out_dir=food_dir,
         )
-        for weight_eps in WEIGHT_EPS_VALUES
-    ]
-    for variant, weight_eps in zip(weight_eps_variants, WEIGHT_EPS_VALUES):
-        print(f"[weight_eps scan] {variant.variant_id}: alpha={variant.alpha:g}, beta={variant.beta:g}, weight_eps={weight_eps:g}")
-        rows, preds = fit_predict_variant(
-            variant,
-            train_df,
-            y_train,
-            test_df,
-            y_test,
-            weight_eps=float(weight_eps),
-            out_dir=out_dir,
-            feature_names=feature_names,
+
+        print(f"[{food}] step4 hyperparameter search with features={';'.join(step3_features)}")
+        step4_params, step4_best = scan_hyperparameters(
+            food_df,
+            y_food,
+            feature_table,
+            step3_features,
+            step2_params,
+            food=food,
+            step="step4",
+            out_dir=food_dir,
         )
-        all_metric_rows.extend(rows)
-        all_predictions.append(preds)
 
-    metrics_df = pd.DataFrame(all_metric_rows)
-    predictions_df = pd.concat(all_predictions, ignore_index=True)
+        final_row, final_predictions = evaluate_loo(
+            food_df,
+            y_food,
+            feature_table,
+            step3_features,
+            step4_params,
+            food=food,
+            step="best",
+            scan="final",
+            variant_id=f"{food}_best",
+        )
+        final_predictions.to_csv(food_dir / "best_loo_predictions.csv", index=False, float_format=CSV_FLOAT_FORMAT)
+        save_food_plot(final_predictions, food_dir / "best_loo_prediction.png", f"{food} best LOO")
 
-    metrics_path = out_dir / "regression_parameter_scan_metrics.csv"
-    predictions_path = out_dir / "regression_parameter_scan_predictions.csv"
-    alpha_rank_path = out_dir / "alpha_loo_all_ranked.csv"
-    beta_rank_path = out_dir / "beta_loo_all_ranked.csv"
-    summary_path = out_dir / "summary.txt"
+        food_summary = pd.concat(
+            [
+                step1_best.assign(stage="step1_input"),
+                step2_best.assign(stage="step2_hyperparameter"),
+                step3_best.assign(stage="step3_input"),
+                step4_best.assign(stage="step4_hyperparameter"),
+                pd.DataFrame([final_row]).assign(stage="best"),
+            ],
+            ignore_index=True,
+        )
+        food_summary.to_csv(food_dir / "summary.csv", index=False, float_format=CSV_FLOAT_FORMAT)
+        summary_rows.append(pd.DataFrame([final_row]).assign(stage="best"))
 
-    metrics_df.to_csv(metrics_path, index=False, float_format=CSV_FLOAT_FORMAT)
-    predictions_df.to_csv(predictions_path, index=False, float_format=CSV_FLOAT_FORMAT)
+        with (food_dir / "summary.txt").open("w", encoding="utf-8") as f:
+            f.write(f"Food: {food}\n")
+            f.write(f"Rows: {len(food_df)}\n")
+            f.write(f"Train CSV: {args.train_csv.resolve()}\n")
+            f.write("Optimization order: input -> hyperparameter -> input -> hyperparameter\n")
+            f.write("Selection criterion: leave-one-out R2, tie-broken by RMSE\n")
+            f.write(f"Initial hyperparameters: alpha={initial_params.alpha:g}, beta={initial_params.beta:g}, weight_eps={initial_params.weight_eps:g}\n")
+            f.write(f"Final features: {';'.join(step3_features)}\n")
+            f.write(f"Final hyperparameters: alpha={step4_params.alpha:g}, beta={step4_params.beta:g}, weight_eps={step4_params.weight_eps:g}\n")
+            f.write("\n[stage summary]\n")
+            f.write(food_summary[["stage", "variant_id", "alpha", "beta", "weight_eps", "r2", "rmse", "mae", "feature_names"]].to_string(index=False))
+            f.write("\n")
 
-    alpha_rank = metrics_df[
-        (metrics_df["scan"] == "alpha")
-        & (metrics_df["phase"] == "loo")
-        & (metrics_df["sample_group"] == "all")
-    ].sort_values(["r2", "rmse"], ascending=[False, True])
-    beta_rank = metrics_df[
-        (metrics_df["scan"] == "beta")
-        & (metrics_df["phase"] == "loo")
-        & (metrics_df["sample_group"] == "all")
-    ].sort_values(["r2", "rmse"], ascending=[False, True])
-    weight_eps_rank = metrics_df[
-        (metrics_df["scan"] == "weight_eps")
-        & (metrics_df["phase"] == "loo")
-        & (metrics_df["sample_group"] == "all")
-    ].sort_values(["r2", "rmse"], ascending=[False, True])
-    alpha_rank.to_csv(alpha_rank_path, index=False, float_format=CSV_FLOAT_FORMAT)
-    beta_rank.to_csv(beta_rank_path, index=False, float_format=CSV_FLOAT_FORMAT)
-    weight_eps_rank.to_csv(out_dir / "weight_eps_loo_all_ranked.csv", index=False, float_format=CSV_FLOAT_FORMAT)
+    best_summary = pd.concat(summary_rows, ignore_index=True).sort_values("food").reset_index(drop=True)
+    best_summary.to_csv(out_dir / "foodwise_best_summary.csv", index=False, float_format=CSV_FLOAT_FORMAT)
 
-    best_overall = metrics_df[
-        (metrics_df["phase"] == "loo")
-        & (metrics_df["sample_group"] == "all")
-    ].sort_values(["r2", "rmse"], ascending=[False, True]).iloc[0]
-
-    plot_scan(metrics_df, "alpha", "alpha", out_dir / "alpha_scan_metrics.png")
-    plot_scan(metrics_df, "beta", "beta", out_dir / "beta_scan_metrics.png")
-    plot_scan(metrics_df, "weight_eps", "weight_eps", out_dir / "weight_eps_scan_metrics.png")
-    plot_best_prediction(predictions_df, str(best_overall["variant_id"]), "loo", out_dir / "best_loo_prediction.png")
-    plot_best_prediction(predictions_df, str(best_overall["variant_id"]), "food", out_dir / "best_food_reference_prediction.png")
-
-    with summary_path.open("w", encoding="utf-8") as f:
-        f.write(f"Train CSV: {args.train_csv.resolve()}\n")
-        f.write(f"Test CSV:  {args.test_csv.resolve()}\n")
-        f.write(f"Input vector source: {BEST_INPUT_VECTOR_CSV.resolve()}\n")
-        f.write(f"Input vector used: {';'.join(feature_names)}\n")
-        f.write(f"weight formula: w_i = 1 / (beta * C_i + weight_eps), weight_eps={float(args.weight_eps):.6g}\n")
-        f.write("Model selection criterion: leave-one-out validation on the training set (phase=loo, sample_group=all)\n")
-        f.write(f"alpha scan beta fixed at 1; beta scan alpha fixed at best LOO alpha from alpha scan: {best_alpha:.6g}\n")
-        f.write(f"weight_eps scan alpha fixed at {best_alpha:.6g}, beta fixed at 1\n\n")
-        f.write("[best alpha scan rows: loo all]\n")
-        f.write(alpha_rank[["variant_id", "alpha", "beta", "r2", "rmse", "mae", "mean_error"]].head(10).to_string(index=False))
-        f.write("\n\n[best beta scan rows: loo all]\n")
-        f.write(beta_rank[["variant_id", "alpha", "beta", "effective_weight_eps", "r2", "rmse", "mae", "mean_error"]].head(10).to_string(index=False))
-        f.write("\n\n[best weight_eps scan rows: loo all]\n")
-        f.write(weight_eps_rank[["variant_id", "alpha", "beta", "weight_eps", "effective_weight_eps", "r2", "rmse", "mae", "mean_error"]].head(10).to_string(index=False))
-        f.write("\n\n[best overall: loo all]\n")
-        f.write(best_overall[["scan", "variant_id", "alpha", "beta", "effective_weight_eps", "r2", "rmse", "mae", "mean_error"]].to_string())
-        f.write("\n")
-
-    print(f"Saved metrics -> {metrics_path}")
-    print(f"Saved predictions -> {predictions_path}")
-    print(f"Saved summary -> {summary_path}")
-    print("\nBest alpha scan rows:")
-    print(alpha_rank[["variant_id", "alpha", "beta", "r2", "rmse", "mae", "mean_error"]].head(10).to_string(index=False))
-    print("\nBest beta scan rows:")
-    print(beta_rank[["variant_id", "alpha", "beta", "effective_weight_eps", "r2", "rmse", "mae", "mean_error"]].head(10).to_string(index=False))
-    print("\nBest weight_eps scan rows:")
-    print(weight_eps_rank[["variant_id", "alpha", "beta", "weight_eps", "effective_weight_eps", "r2", "rmse", "mae", "mean_error"]].head(10).to_string(index=False))
-    print("\nBest overall:")
-    print(best_overall[["scan", "variant_id", "alpha", "beta", "effective_weight_eps", "r2", "rmse", "mae", "mean_error"]].to_string())
+    print(f"Saved food-wise iterative optimization -> {out_dir}")
+    print(best_summary[["food", "alpha", "beta", "weight_eps", "r2", "rmse", "mae", "feature_names"]].to_string(index=False))
 
 
 if __name__ == "__main__":

@@ -3,6 +3,6 @@ Concentration: 50
 Output dir: /home/jzh/CDs/OUTPUT/RAW/mate20x_model_predictions/by_sample_concentration/milk/50
 
   exp (conc_pred): n=3, R2=nan, RMSE=12.6342, MAE=12.1365, mean_error=-12.1365, median_abs_error=11.5873, max_abs_error=16.6849
-  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=25.9557, MAE=25.4088, mean_error=25.4088, median_abs_error=23.805, max_abs_error=32.5518
-  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=29.1535, MAE=28.075, mean_error=-28.075, median_abs_error=25.5522, max_abs_error=38.7071
-  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=28.0928, MAE=26.8763, mean_error=-26.8763, median_abs_error=24.2958, max_abs_error=37.9294
+  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=11.3666, MAE=9.85857, mean_error=9.85857, median_abs_error=6.3425, max_abs_error=17.8409
+  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=4.97455, MAE=4.56987, mean_error=-3.27627, median_abs_error=5.1048, max_abs_error=6.6644
+  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=4.04369, MAE=3.96893, mean_error=-0.954933, median_abs_error=4.5114, max_abs_error=4.521

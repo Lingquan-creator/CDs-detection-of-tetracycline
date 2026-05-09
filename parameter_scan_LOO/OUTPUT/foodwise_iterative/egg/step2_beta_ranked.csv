@@ -1,0 +1,10 @@
+food,step,scan,variant_id,phase,sample_group,alpha,beta,weight_eps,effective_weight_eps,n_features,feature_names,use_ratio_rg,use_ratio_bg,use_ratio_rb,use_delta_rg,use_delta_rb,use_delta_gb,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
+egg,step2,beta,beta_1e-01_alpha_1e02_weight_eps_30,loo,egg,100,0.1,30,300,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.973194,5.78217,4.32991,-0.656611,2.29689,10.1758
+egg,step2,beta,beta_1e-02_alpha_1e02_weight_eps_30,loo,egg,100,0.01,30,3000,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.973192,5.78239,4.33968,-0.63693,2.3524,10.1674
+egg,step2,beta,beta_1e-03_alpha_1e02_weight_eps_30,loo,egg,100,0.001,30,30000,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.97319,5.7826,4.34068,-0.634905,2.35687,10.1666
+egg,step2,beta,beta_1e-04_alpha_1e02_weight_eps_30,loo,egg,100,0.0001,30,300000,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.973189,5.78263,4.34078,-0.634702,2.35731,10.1665
+egg,step2,beta,beta_0e00_alpha_1e02_weight_eps_30,loo,egg,100,0,30,inf,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.973189,5.78263,4.34079,-0.63468,2.35736,10.1665
+egg,step2,beta,beta_1e00_alpha_1e02_weight_eps_30,loo,egg,100,1,30,30,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.972577,5.84827,4.25591,-0.873864,2.3703,10.3224
+egg,step2,beta,beta_1e01_alpha_1e02_weight_eps_30,loo,egg,100,10,30,3,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.967402,6.37626,4.52414,-2.11636,2.97186,14.5217
+egg,step2,beta,beta_1e02_alpha_1e02_weight_eps_30,loo,egg,100,100,30,0.3,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.963499,6.74721,4.99392,-1.88236,4.06476,15.5302
+egg,step2,beta,beta_1e03_alpha_1e02_weight_eps_30,loo,egg,100,1000,30,0.03,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.961964,6.88766,5.1818,-1.48433,5.28481,15.6948

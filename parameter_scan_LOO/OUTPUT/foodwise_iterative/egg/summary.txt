@@ -1,0 +1,16 @@
+Food: egg
+Rows: 12
+Train CSV: /home/jzh/CDs/dataset/RAW/roi_results/roi_detailed_statistics.csv
+Optimization order: input -> hyperparameter -> input -> hyperparameter
+Selection criterion: leave-one-out R2, tie-broken by RMSE
+Initial hyperparameters: alpha=100, beta=1, weight_eps=30
+Final features: ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_RG
+Final hyperparameters: alpha=100, beta=0, weight_eps=1
+
+[stage summary]
+               stage                              variant_id  alpha beta weight_eps        r2      rmse       mae                                         feature_names
+         step1_input                       ratio_rg_delta_rg  100.0  1.0       30.0  0.972577  5.848275  4.255908          ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG
+step2_hyperparameter final_alpha_1e02_beta_0.1_weight_eps_50  100.0  0.1       50.0  0.973196  5.781879  4.334215          ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG
+         step3_input              ratio_rg_ratio_bg_delta_rg  100.0  0.1       50.0  0.973533  5.745408  4.267107 ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_RG
+step4_hyperparameter    final_alpha_1e02_beta_0_weight_eps_1  100.0  0.0        1.0  0.973733  5.723736  4.221265 ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_RG
+                best                                egg_best  100.0  0.0        1.0  0.973733  5.723736  4.221265 ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Delta_RG

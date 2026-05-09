@@ -1,0 +1,13 @@
+food,step,scan,variant_id,filename,conc_true,sample_group,phase,alpha,beta,weight_eps,effective_weight_eps,feature_names,n_features,conc_pred_raw,conc_pred,residual
+egg,best,final,egg_best,egg-1-0.dng,0,egg,raw,100,1,30,30,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,5,1.34073,5.72004,5.72004
+egg,best,final,egg_best,egg-2-0.dng,0,egg,raw,100,1,30,30,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,5,1.34108,5.72004,5.72004
+egg,best,final,egg_best,egg-1-2.dng,2,egg,raw,100,1,30,30,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,5,1.63941,9.15247,7.15247
+egg,best,final,egg_best,egg-2-2.dng,2,egg,raw,100,1,30,30,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,5,1.99255,14.4593,12.4593
+egg,best,final,egg_best,egg-1-10.dng,10,egg,raw,100,1,30,30,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,5,1.85017,12.2421,2.24211
+egg,best,final,egg_best,egg-2-10.dng,10,egg,raw,100,1,30,30,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,5,2.3045,19.3171,9.31713
+egg,best,final,egg_best,egg-1-20.dng,20,egg,raw,100,1,30,30,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,5,2.46076,21.7504,1.75039
+egg,best,final,egg_best,egg-2-20.dng,20,egg,raw,100,1,30,30,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,5,2.81845,25.9286,5.92857
+egg,best,final,egg_best,egg-1-50.dng,50,egg,raw,100,1,30,30,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,5,4.15355,46.1378,-3.86224
+egg,best,final,egg_best,egg-2-50.dng,50,egg,raw,100,1,30,30,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,5,4.56405,53.9785,3.97852
+egg,best,final,egg_best,egg-1-100.dng,100,egg,raw,100,1,30,30,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,5,10.5645,93.4615,-6.53854
+egg,best,final,egg_best,egg-2-100.dng,100,egg,raw,100,1,30,30,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,5,10.6672,93.8915,-6.10848

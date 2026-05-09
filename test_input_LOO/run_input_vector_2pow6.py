@@ -22,8 +22,9 @@ import matplotlib.pyplot as plt
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "test_input_LOO" / "OUTPUT"
-TRAIN_CSV = ROOT / "dataset" / "mate20x" / "roi_detailed_statistics.csv"
-TEST_CSV = ROOT / "dataset" / "food" / "roi_detailed_statistics.csv"
+TRAIN_CSV = ROOT / "dataset" / "RAW" / "roi_results" / "roi_detailed_statistics.csv"
+TEST_CSV = ROOT / "dataset" / "RAW" / "roi_results" / "roi_detailed_statistics.csv"
+RAW_NAME_RE = re.compile(r"^(?P<sample>.+)-(?P<batch>\d+)-(?P<concentration>[-+]?\d+(?:\.\d+)?)$")
 NUMBER_RE = re.compile(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?")
 
 sys.path.insert(0, str(ROOT / "concentration_regression"))
@@ -47,12 +48,18 @@ EPS = 1e-6
 
 def concentration_from_filename(filename: object) -> float:
     stem = Path(str(filename)).stem
+    raw_match = RAW_NAME_RE.fullmatch(stem)
+    if raw_match:
+        return float(raw_match.group("concentration"))
     match = NUMBER_RE.search(stem)
     return float(match.group(0)) if match else math.nan
 
 
 def group_from_filename(filename: object) -> str:
     stem = Path(str(filename)).stem.lower()
+    raw_match = RAW_NAME_RE.fullmatch(stem)
+    if raw_match:
+        return raw_match.group("sample").lower()
     if stem.startswith("chicken"):
         return "chicken"
     if stem.startswith("egg"):
@@ -185,7 +192,7 @@ def save_top_plot(metrics_df: pd.DataFrame) -> None:
     plt.close(fig)
 
 
-def save_best_prediction_plot(best_df: pd.DataFrame, variant_id: str) -> None:
+def save_best_prediction_plot(best_df: pd.DataFrame, variant_id: str, out_path: Path | None = None) -> None:
     fig, ax = plt.subplots(figsize=(6.5, 5.4), dpi=150)
     colors = {"chicken": "#d62728", "egg": "#ff7f0e", "other": "#777777"}
     for group, part in best_df.groupby("sample_group"):
@@ -214,8 +221,61 @@ def save_best_prediction_plot(best_df: pd.DataFrame, variant_id: str) -> None:
     ax.grid(alpha=0.25)
     ax.legend(loc="best", fontsize=8)
     fig.tight_layout()
-    fig.savefig(OUT_DIR / "best_loo_prediction.png", bbox_inches="tight")
+    fig.savefig(out_path or OUT_DIR / "best_loo_prediction.png", bbox_inches="tight")
     plt.close(fig)
+
+
+def save_foodwise_loo_search(df: pd.DataFrame, out_root: Path) -> None:
+    out_root.mkdir(parents=True, exist_ok=True)
+    for food in sorted(df["sample_group"].unique()):
+        food_dir = out_root / food
+        food_dir.mkdir(parents=True, exist_ok=True)
+        food_df = df[df["sample_group"] == food].copy().sort_values(["conc_true", "filename"]).reset_index(drop=True)
+        y_food = food_df["conc_true"].to_numpy(dtype=float)
+        food_features = build_feature_table(food_df)
+
+        metric_rows: list[dict[str, object]] = []
+        prediction_rows: list[pd.DataFrame] = []
+        for mask in itertools.product((False, True), repeat=len(OPTIONAL_FEATURES)):
+            optional = tuple(feature for feature, enabled in zip(OPTIONAL_FEATURES, mask) if enabled)
+            feature_names = (*BASE_FEATURES, *optional)
+            variant_id = variant_name(optional)
+            X = food_features.loc[:, list(feature_names)].to_numpy(dtype=float)
+            loo_pred = run_loo(X, y_food)
+
+            out = food_df[["filename", "conc_true", "sample_group"]].copy()
+            out.insert(0, "variant_id", variant_id)
+            out["phase"] = "loo"
+            out["feature_names"] = ";".join(feature_names)
+            out["n_features"] = len(feature_names)
+            out["conc_pred_raw"] = np.nan
+            out["conc_pred"] = loo_pred
+            out["residual"] = out["conc_pred"] - out["conc_true"]
+            prediction_rows.append(out)
+
+            row: dict[str, object] = {
+                "variant_id": variant_id,
+                "phase": "loo",
+                "sample_group": food,
+                "feature_names": ";".join(feature_names),
+                "n_features": len(feature_names),
+            }
+            for feature in OPTIONAL_FEATURES:
+                row[f"use_{feature.lower()}"] = feature in optional
+            row.update(metrics(out["conc_true"].to_numpy(float), out["conc_pred"].to_numpy(float)))
+            metric_rows.append(row)
+
+        metrics_df = pd.DataFrame(metric_rows)
+        predictions_df = pd.concat(prediction_rows, ignore_index=True)
+        ranked = metrics_df.sort_values(["r2", "rmse"], ascending=[False, True]).reset_index(drop=True)
+        metrics_df.to_csv(food_dir / "input_vector_2pow6_metrics.csv", index=False, float_format="%.6g")
+        predictions_df.to_csv(food_dir / "input_vector_2pow6_predictions.csv", index=False, float_format="%.6g")
+        ranked.to_csv(food_dir / "loo_ranked.csv", index=False, float_format="%.6g")
+
+        best_variant = str(ranked.iloc[0]["variant_id"])
+        best_loo = predictions_df[predictions_df["variant_id"] == best_variant]
+        best_loo.to_csv(food_dir / "best_loo_predictions.csv", index=False, float_format="%.6g")
+        save_best_prediction_plot(best_loo, best_variant, food_dir / "best_loo_prediction.png")
 
 
 def main() -> None:
@@ -243,7 +303,7 @@ def main() -> None:
         for phase, source_df, pred, pred_raw in (
             ("train", train_df, train_pred, train_pred_raw),
             ("loo", train_df, loo_pred, np.full_like(loo_pred, np.nan, dtype=float)),
-            ("food", test_df, test_pred, test_pred_raw),
+            ("raw_reference", test_df, test_pred, test_pred_raw),
         ):
             out = source_df[["filename", "conc_true", "sample_group"]].copy()
             out.insert(0, "variant_id", variant_id)
@@ -255,7 +315,7 @@ def main() -> None:
             out["residual"] = out["conc_pred"] - out["conc_true"]
             prediction_rows.append(out)
 
-            groups = ["all"] if phase != "food" else ["all", "chicken", "egg"]
+            groups = ["all"] if phase != "raw_reference" else ["all", *sorted(out["sample_group"].unique())]
             for group in groups:
                 part = out if group == "all" else out[out["sample_group"] == group]
                 row: dict[str, object] = {
@@ -284,13 +344,14 @@ def main() -> None:
     best_loo.to_csv(OUT_DIR / "best_loo_predictions.csv", index=False, float_format="%.6g")
     save_top_plot(metrics_df)
     save_best_prediction_plot(best_loo, best_variant)
+    save_foodwise_loo_search(train_df, OUT_DIR / "foodwise")
 
     with (OUT_DIR / "input_vector_2pow6_summary.txt").open("w", encoding="utf-8") as f:
         f.write("Base features: ln_R_sig, ln_G_sig, ln_B_sig\n")
         f.write("Optional features: Ratio_RG, Ratio_BG, Ratio_RB, Delta_RG, Delta_RB, Delta_GB\n")
         f.write("Correction: ROI-BG; model: RidgeCV + log target + isotonic calibration\n\n")
         f.write("Model selection criterion: leave-one-out validation on the training set (phase=loo, sample_group=all)\n\n")
-        for phase in ("train", "loo", "food"):
+        for phase in ("train", "loo", "raw_reference"):
             f.write(f"[{phase}]\n")
             phase_df = metrics_df[(metrics_df["phase"] == phase) & (metrics_df["sample_group"] == "all")]
             for _, row in phase_df.sort_values("r2", ascending=False).head(20).iterrows():

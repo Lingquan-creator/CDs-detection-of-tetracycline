@@ -270,6 +270,8 @@ def build_feature_frame(
             "Ratio_RG": r_sig / (g_sig + _EPS),
             "Delta_RG": (g_sig - r_sig) / (g_sig + r_sig + _EPS),
             "Ratio_BG": b_sig / (g_sig + _EPS),
+            "Ratio_RB": r_sig / (b_sig + _EPS),
+            "Delta_RB": (b_sig - r_sig) / (b_sig + r_sig + _EPS),
             "Delta_GB": (b_sig - g_sig) / (b_sig + g_sig + _EPS),
             "Var_G": g_var,
             "exposure_time": exposure,

@@ -1,0 +1,26 @@
+Food-wise best combinations evaluated on all RAW foods
+Train CSV: /home/jzh/CDs/dataset/mate20x/roi_detailed_statistics.csv
+Test CSV: /home/jzh/CDs/dataset/RAW/roi_results/roi_detailed_statistics.csv
+Robust ranking: max min_food_r2, then max all_r2, then min all_rmse.
+
+[robust rank]
+source_food   all_r2  all_rmse  mean_food_r2  min_food_r2 worst_food_by_r2  alpha  beta  weight_eps                                                           feature_names
+    chicken 0.710912 18.988341      0.733163     0.340610             milk  100.0   1.0        50.0          ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_RB
+       milk 0.575512 23.009362      0.543410     0.286589              egg  100.0   1.0        30.0 ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB
+        egg 0.067301 34.106926      0.167128    -1.102144             milk  100.0   1.0        30.0                            ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG
+
+[best robust generalization]
+source_food                                                   chicken
+alpha                                                           100.0
+beta                                                              1.0
+weight_eps                                                       50.0
+n_features                                                          7
+feature_names       ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;D...
+all_r2                                                       0.710912
+all_rmse                                                    18.988341
+all_mae                                                      11.84168
+mean_food_r2                                                 0.733163
+min_food_r2                                                   0.34061
+mean_food_rmse                                              15.759728
+max_food_rmse                                                28.67762
+worst_food_by_r2                                                 milk

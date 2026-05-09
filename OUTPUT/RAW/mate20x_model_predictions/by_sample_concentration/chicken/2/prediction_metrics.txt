@@ -3,6 +3,6 @@ Concentration: 2
 Output dir: /home/jzh/CDs/OUTPUT/RAW/mate20x_model_predictions/by_sample_concentration/chicken/2
 
   exp (conc_pred): n=3, R2=nan, RMSE=9.68747, MAE=9.51524, mean_error=9.51524, median_abs_error=10.7167, max_abs_error=10.8839
-  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=9.13415, MAE=9.1042, mean_error=9.1042, median_abs_error=9.3505, max_abs_error=9.8608
-  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=9.04713, MAE=8.86326, mean_error=8.86326, median_abs_error=9.2512, max_abs_error=10.8663
-  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=34.8214, MAE=26.6261, mean_error=26.6261, median_abs_error=11.5056, max_abs_error=58.3504
+  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=9.74643, MAE=9.74637, mean_error=9.74637, median_abs_error=9.7313, max_abs_error=9.7941
+  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=3.20075, MAE=2.76772, mean_error=2.76772, median_abs_error=1.73812, max_abs_error=5.038
+  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=3.44605, MAE=3.00459, mean_error=3.00459, median_abs_error=1.92384, max_abs_error=5.38767

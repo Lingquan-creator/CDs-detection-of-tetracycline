@@ -1,0 +1,11 @@
+food,step,scan,variant_id,phase,sample_group,alpha,beta,weight_eps,effective_weight_eps,n_features,feature_names,use_ratio_rg,use_ratio_bg,use_ratio_rb,use_delta_rg,use_delta_rb,use_delta_gb,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
+egg,step2,alpha,alpha_1e02_beta_1_weight_eps_30,raw,egg,100,1,30,30,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.965745,6.53636,5.89815,3.1466,5.82431,12.4593
+egg,step2,alpha,alpha_1e03_beta_1_weight_eps_30,raw,egg,1000,1,30,30,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.963831,6.71645,5.83468,4.39406,5.19217,13.0005
+egg,step2,alpha,alpha_1e04_beta_1_weight_eps_30,raw,egg,10000,1,30,30,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.963264,6.76891,5.83655,4.54078,5.19217,13.0826
+egg,step2,alpha,alpha_1e05_beta_1_weight_eps_30,raw,egg,100000,1,30,30,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.963203,6.77456,5.83678,4.55567,5.19217,13.0912
+egg,step2,alpha,alpha_1e06_beta_1_weight_eps_30,raw,egg,1e+06,1,30,30,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.963196,6.77513,5.83681,4.55716,5.19217,13.0921
+egg,step2,alpha,alpha_1e07_beta_1_weight_eps_30,raw,egg,1e+07,1,30,30,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.963196,6.77518,5.83681,4.55731,5.19217,13.0922
+egg,step2,alpha,alpha_1e08_beta_1_weight_eps_30,raw,egg,1e+08,1,30,30,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.963196,6.77519,5.83681,4.55732,5.19217,13.0922
+egg,step2,alpha,alpha_1e01_beta_1_weight_eps_30,raw,egg,10,1,30,30,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.909619,10.6172,8.68459,-3.40381,5.34758,19.1057
+egg,step2,alpha,alpha_0e00_beta_1_weight_eps_30,raw,egg,0,1,30,30,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.443529,26.3447,18.7909,0.291268,12.5691,53.381
+egg,step2,alpha,alpha_1e00_beta_1_weight_eps_30,raw,egg,1,1,30,30,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,True,False,False,True,False,False,12,0.054584,34.3387,23.5208,-22.643,11.295,69.0323

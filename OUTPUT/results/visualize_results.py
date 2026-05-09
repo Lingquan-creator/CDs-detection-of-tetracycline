@@ -53,16 +53,17 @@ def add_recovery_band(ax: plt.Axes) -> None:
     ax.axhline(100, color="#2ca02c", linewidth=1.0, linestyle="--")
 
 
-def save_fig(fig: plt.Figure, name: str) -> None:
+def save_fig(fig: plt.Figure, name: str, *, tight: bool = True) -> None:
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
     path = FIGURE_DIR / name
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            message="This figure includes Axes that are not compatible with tight_layout.*",
-            category=UserWarning,
-        )
-        fig.tight_layout()
+    if tight:
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="This figure includes Axes that are not compatible with tight_layout.*",
+                category=UserWarning,
+            )
+            fig.tight_layout()
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved {path}")
@@ -135,7 +136,13 @@ def plot_signal_recovery(signal_summary: pd.DataFrame) -> None:
     matrices = sorted(signal_summary["matrix"].unique())
     concentrations = _ordered(signal_summary["added_concentration_c3"])
 
-    fig, axes = plt.subplots(len(matrices), 1, figsize=(11, 3.4 * len(matrices)), squeeze=False)
+    fig, axes = plt.subplots(
+        len(matrices),
+        1,
+        figsize=(12.2, 3.4 * len(matrices)),
+        squeeze=False,
+        constrained_layout=True,
+    )
     for ax, matrix in zip(axes[:, 0], matrices):
         sub = signal_summary[signal_summary["matrix"] == matrix]
         table = (
@@ -148,8 +155,8 @@ def plot_signal_recovery(signal_summary: pd.DataFrame) -> None:
             .reindex(columns=concentrations)
         )
         im = draw_heatmap(ax, table, f"Signal Recovery Mean (%) - {matrix}", vmin=0, vmax=220)
-    fig.colorbar(im, ax=axes.ravel().tolist(), label="Recovery mean (%)", fraction=0.025, pad=0.02)
-    save_fig(fig, "signal_recovery_heatmaps.png")
+    fig.colorbar(im, ax=axes.ravel().tolist(), label="Recovery mean (%)", fraction=0.035, pad=0.04)
+    save_fig(fig, "signal_recovery_heatmaps.png", tight=False)
 
     g = signal_summary[signal_summary["signal"] == "G_sig"].copy()
     if g.empty:
@@ -180,7 +187,13 @@ def plot_model_recovery(model_summary: pd.DataFrame) -> None:
     concentrations = _ordered(model_summary["added_concentration_c3"])
     models = list(model_summary["model"].drop_duplicates())
 
-    fig, axes = plt.subplots(len(matrices), 1, figsize=(11, 3.4 * len(matrices)), squeeze=False)
+    fig, axes = plt.subplots(
+        len(matrices),
+        1,
+        figsize=(12.2, 3.4 * len(matrices)),
+        squeeze=False,
+        constrained_layout=True,
+    )
     for ax, matrix in zip(axes[:, 0], matrices):
         sub = model_summary[model_summary["matrix"] == matrix]
         table = (
@@ -193,8 +206,8 @@ def plot_model_recovery(model_summary: pd.DataFrame) -> None:
             .reindex(index=models, columns=concentrations)
         )
         im = draw_heatmap(ax, table, f"Model Recovery Mean (%) - {matrix}", vmin=0, vmax=650)
-    fig.colorbar(im, ax=axes.ravel().tolist(), label="Recovery mean (%)", fraction=0.025, pad=0.02)
-    save_fig(fig, "model_recovery_heatmaps.png")
+    fig.colorbar(im, ax=axes.ravel().tolist(), label="Recovery mean (%)", fraction=0.035, pad=0.04)
+    save_fig(fig, "model_recovery_heatmaps.png", tight=False)
 
     fig, axes = plt.subplots(len(matrices), 1, figsize=(11.5, 4.0 * len(matrices)), sharex=True, squeeze=False)
     for ax, matrix in zip(axes[:, 0], matrices):
