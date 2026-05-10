@@ -1,0 +1,37 @@
+model,sample_group,prediction_column,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
+exp,all,conc_pred,7,-0.418966,63.2857,48.2031,-31.2906,37.0499,127.238
+rgb_ridge,all,conc_pred,7,-0.787455,71.0292,48.7,-45.3031,19.5018,149.502
+gs_posterior_median,all,posterior_median,7,-0.730703,69.8925,46.3673,-46.3673,17.5241,147.368
+gs_posterior_mean,all,posterior_mean,7,-0.727458,69.827,46.3145,-46.3145,17.4011,147.237
+exp,tap water,conc_pred,7,-0.418966,63.2857,48.2031,-31.2906,37.0499,127.238
+rgb_ridge,tap water,conc_pred,7,-0.787455,71.0292,48.7,-45.3031,19.5018,149.502
+gs_posterior_median,tap water,posterior_median,7,-0.730703,69.8925,46.3673,-46.3673,17.5241,147.368
+gs_posterior_mean,tap water,posterior_mean,7,-0.727458,69.827,46.3145,-46.3145,17.4011,147.237
+exp,tap water/0,conc_pred,1,,37.0499,37.0499,37.0499,37.0499,37.0499
+rgb_ridge,tap water/0,conc_pred,1,,11.889,11.889,11.889,11.889,11.889
+gs_posterior_median,tap water/0,posterior_median,1,,4.46835e-06,4.46835e-06,4.46835e-06,4.46835e-06,4.46835e-06
+gs_posterior_mean,tap water/0,posterior_mean,1,,2.23601e-05,2.23601e-05,2.23601e-05,2.23601e-05,2.23601e-05
+exp,tap water/2,conc_pred,1,,22.1439,22.1439,22.1439,22.1439,22.1439
+rgb_ridge,tap water/2,conc_pred,1,,1.50178,1.50178,-1.50178,1.50178,1.50178
+gs_posterior_median,tap water/2,posterior_median,1,,1.99997,1.99997,-1.99997,1.99997,1.99997
+gs_posterior_mean,tap water/2,posterior_mean,1,,1.99986,1.99986,-1.99986,1.99986,1.99986
+exp,tap water/10,conc_pred,1,,4.13943,4.13943,-4.13943,4.13943,4.13943
+rgb_ridge,tap water/10,conc_pred,1,,9.50178,9.50178,-9.50178,9.50178,9.50178
+gs_posterior_median,tap water/10,posterior_median,1,,9.8564,9.8564,-9.8564,9.8564,9.8564
+gs_posterior_mean,tap water/10,posterior_mean,1,,9.84926,9.84926,-9.84926,9.84926,9.84926
+exp,tap water/20,conc_pred,1,,14.8693,14.8693,-14.8693,14.8693,14.8693
+rgb_ridge,tap water/20,conc_pred,1,,19.5018,19.5018,-19.5018,19.5018,19.5018
+gs_posterior_median,tap water/20,posterior_median,1,,17.5241,17.5241,-17.5241,17.5241,17.5241
+gs_posterior_mean,tap water/20,posterior_mean,1,,17.4011,17.4011,-17.4011,17.4011,17.4011
+exp,tap water/50,conc_pred,1,,43.2401,43.2401,-43.2401,43.2401,43.2401
+rgb_ridge,tap water/50,conc_pred,1,,49.5018,49.5018,-49.5018,49.5018,49.5018
+gs_posterior_median,tap water/50,posterior_median,1,,50,50,-50,50,50
+gs_posterior_mean,tap water/50,posterior_mean,1,,50,50,-50,50,50
+exp,tap water/100,conc_pred,1,,88.7414,88.7414,-88.7414,88.7414,88.7414
+rgb_ridge,tap water/100,conc_pred,1,,99.5018,99.5018,-99.5018,99.5018,99.5018
+gs_posterior_median,tap water/100,posterior_median,1,,97.8228,97.8228,-97.8228,97.8228,97.8228
+gs_posterior_mean,tap water/100,posterior_mean,1,,97.7146,97.7146,-97.7146,97.7146,97.7146
+exp,tap water/150,conc_pred,1,,127.238,127.238,-127.238,127.238,127.238
+rgb_ridge,tap water/150,conc_pred,1,,149.502,149.502,-149.502,149.502,149.502
+gs_posterior_median,tap water/150,posterior_median,1,,147.368,147.368,-147.368,147.368,147.368
+gs_posterior_mean,tap water/150,posterior_mean,1,,147.237,147.237,-147.237,147.237,147.237

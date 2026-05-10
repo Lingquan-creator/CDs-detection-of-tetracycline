@@ -128,9 +128,9 @@ def model_linear(x: np.ndarray, a: float, b: float) -> np.ndarray:
     return a * x + b
 
 
-def model_exponential(x: np.ndarray, a: float, b: float, c: float) -> np.ndarray:
-    # Classic exponential form: A * exp(Bx) + C with clipping to avoid overflow
-    return a * np.exp(np.clip(b * x, -700, 50)) + c
+def model_exponential_c0(x: np.ndarray, a: float, b: float) -> np.ndarray:
+    # Exponential with fixed baseline C=0.
+    return a * np.exp(np.clip(b * x, -700, 50))
 
 
 def model_power(x: np.ndarray, a: float, b: float, c: float) -> np.ndarray:
@@ -138,12 +138,31 @@ def model_power(x: np.ndarray, a: float, b: float, c: float) -> np.ndarray:
 
 
 MODEL_FUNCTIONS: Dict[str, Callable[..., np.ndarray]] = {
-    "exponential": model_exponential,
+    "exponential": model_exponential_c0,
 }
 
 MODEL_FORMS: Dict[str, str] = {
-    "exponential": "y = a * exp(b*x) + c",
+    "exponential": "y = a * exp(b*x), c fixed at 0",
 }
+
+
+def summarize_fit(name: str, formula: str, params: np.ndarray, y: np.ndarray, y_pred: np.ndarray) -> Dict:
+    residuals = y - y_pred
+    rss = float(np.sum(residuals ** 2))
+    ss_tot = float(np.sum((y - y.mean()) ** 2))
+    r_squared = 1.0 - rss / ss_tot if ss_tot > 0 else 1.0
+    rmse = float(np.sqrt(rss / len(y)))
+    k = len(params)
+    aic = -math.inf if rss <= 0 else len(y) * math.log(rss / len(y)) + 2 * k
+
+    return {
+        "model": name,
+        "params": params,
+        "r_squared": r_squared,
+        "rmse": rmse,
+        "aic": aic,
+        "formula": formula,
+    }
 
 
 def fit_candidate_models(x: np.ndarray, y: np.ndarray) -> List[Dict]:
@@ -152,8 +171,8 @@ def fit_candidate_models(x: np.ndarray, y: np.ndarray) -> List[Dict]:
     y_range = float(y_range if y_range > 0 else 1.0)
 
     candidates: List[Tuple[str, Callable, List[float], Tuple]] = [
-        # Decaying exponential: enforce B<=0 so intensity decreases toward C
-        ("exponential", model_exponential, [y_range, -0.01, y.min()], ([0, -np.inf, -np.inf], [np.inf, 0, np.inf])),
+        # Decaying exponential with fixed baseline C=0; enforce B<=0.
+        ("exponential", model_exponential_c0, [y.max(), -0.01], ([0, -np.inf], [np.inf, 0])),
     ]
 
     results: List[Dict] = []
@@ -164,27 +183,26 @@ def fit_candidate_models(x: np.ndarray, y: np.ndarray) -> List[Dict]:
         except Exception:
             continue
 
-        residuals = y - y_pred
-        rss = float(np.sum(residuals ** 2))
-        ss_tot = float(np.sum((y - y.mean()) ** 2))
-        r_squared = 1.0 - rss / ss_tot if ss_tot > 0 else 1.0
-        rmse = float(np.sqrt(rss / len(y)))
-        k = len(popt)
-        aic = -math.inf if rss <= 0 else len(y) * math.log(rss / len(y)) + 2 * k
-
-        results.append(
-            {
-                "model": name,
-                "params": popt,
-                "r_squared": r_squared,
-                "rmse": rmse,
-                "aic": aic,
-                "formula": MODEL_FORMS[name],
-            }
-        )
+        results.append(summarize_fit(name, MODEL_FORMS[name], popt, y, y_pred))
 
     results.sort(key=lambda r: (r["aic"], -r["r_squared"]))
     return results
+
+
+def export_model_summary(model_results: List[Dict], output_path: Path) -> None:
+    export_rows = []
+    for res in model_results:
+        export_rows.append(
+            {
+                "model": res["model"],
+                "formula": res["formula"],
+                "params": "; ".join(f"{p:.6g}" for p in res["params"]),
+                "r_squared": res["r_squared"],
+                "rmse": res["rmse"],
+                "aic": res["aic"],
+            }
+        )
+    pd.DataFrame(export_rows).to_csv(output_path, index=False)
 
 
 # -----------------------------------------------------------------------------
@@ -234,19 +252,7 @@ def main() -> None:
         raise RuntimeError("Model fitting failed for all candidate functions.")
 
     best = model_results[0]
-    export_rows = []
-    for res in model_results:
-        export_rows.append(
-            {
-                "model": res["model"],
-                "formula": res["formula"],
-                "params": "; ".join(f"{p:.6g}" for p in res["params"]),
-                "r_squared": res["r_squared"],
-                "rmse": res["rmse"],
-                "aic": res["aic"],
-            }
-        )
-    pd.DataFrame(export_rows).to_csv(MODEL_SUMMARY_CSV, index=False)
+    export_model_summary(model_results, MODEL_SUMMARY_CSV)
 
     plot_intensity_fit(x, y, model_results, FIT_FIG)
 

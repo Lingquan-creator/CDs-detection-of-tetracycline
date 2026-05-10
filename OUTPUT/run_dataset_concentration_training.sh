@@ -10,10 +10,10 @@ TRAIN_DATASET_NAME="${TRAIN_DATASET_NAME:-}"
 ROI_CSV_NAME="${ROI_CSV_NAME:-roi_detailed_statistics.csv}"
 ROI_CSV="${ROI_CSV:-}"
 EXCLUDE_DATASET_NAMES="${EXCLUDE_DATASET_NAMES:-food}"
-OPTIMIZED_FEATURE_SET="${OPTIMIZED_FEATURE_SET:-ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb}"
+OPTIMIZED_FEATURE_SET="${OPTIMIZED_FEATURE_SET:-compact}"
 RIDGE_ALPHA="${RIDGE_ALPHA:-100}"
 WEIGHT_BETA="${WEIGHT_BETA:-1}"
-WEIGHT_EPS="${WEIGHT_EPS:-30}"
+WEIGHT_EPS="${WEIGHT_EPS:-50}"
 
 if [[ ! -d "${DATASET_DIR}" ]]; then
   echo "Dataset directory not found: ${DATASET_DIR}" >&2

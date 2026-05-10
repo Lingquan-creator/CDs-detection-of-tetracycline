@@ -1,0 +1,11 @@
+food,step,scan,variant_id,phase,sample_group,alpha,beta,weight_eps,effective_weight_eps,n_features,feature_names,use_ratio_rg,use_ratio_bg,use_ratio_rb,use_delta_rg,use_delta_rb,use_delta_gb,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
+all,step2,alpha,alpha_1e03_beta_1_weight_eps_50,raw,all,1000,1,50,50,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG;Delta_RB,True,False,False,True,True,False,30,0.997063,1.91387,0.803427,-0.0598939,0,6.31579
+all,step2,alpha,alpha_1e04_beta_1_weight_eps_50,raw,all,10000,1,50,50,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG;Delta_RB,True,False,False,True,True,False,30,0.997063,1.91387,0.803427,-0.0598939,0,6.31579
+all,step2,alpha,alpha_1e05_beta_1_weight_eps_50,raw,all,100000,1,50,50,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG;Delta_RB,True,False,False,True,True,False,30,0.997063,1.91387,0.803427,-0.0598939,0,6.31579
+all,step2,alpha,alpha_1e06_beta_1_weight_eps_50,raw,all,1e+06,1,50,50,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG;Delta_RB,True,False,False,True,True,False,30,0.997063,1.91387,0.803427,-0.0598939,0,6.31579
+all,step2,alpha,alpha_1e07_beta_1_weight_eps_50,raw,all,1e+07,1,50,50,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG;Delta_RB,True,False,False,True,True,False,30,0.997063,1.91387,0.803427,-0.0598939,0,6.31579
+all,step2,alpha,alpha_1e08_beta_1_weight_eps_50,raw,all,1e+08,1,50,50,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG;Delta_RB,True,False,False,True,True,False,30,0.997063,1.91387,0.803427,-0.0598939,0,6.31579
+all,step2,alpha,alpha_1e02_beta_1_weight_eps_50,raw,all,100,1,50,50,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG;Delta_RB,True,False,False,True,True,False,30,0.996841,1.98504,0.867287,-0.0648062,8.88178e-16,7.2
+all,step2,alpha,alpha_1e01_beta_1_weight_eps_50,raw,all,10,1,50,50,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG;Delta_RB,True,False,False,True,True,False,30,0.974704,5.61691,2.13333,-0.390476,7.10543e-15,25
+all,step2,alpha,alpha_1e00_beta_1_weight_eps_50,raw,all,1,1,50,50,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG;Delta_RB,True,False,False,True,True,False,30,0.971622,5.9493,2.46917,-0.414464,1.42109e-14,28.4091
+all,step2,alpha,alpha_0e00_beta_1_weight_eps_50,raw,all,0,1,50,50,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG;Delta_RB,True,False,False,True,True,False,30,0.540831,23.9309,13.3917,-4.59941,4.93355,68.3333

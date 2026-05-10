@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 import warnings
 
 import matplotlib
 import numpy as np
 import pandas as pd
+from pandas.errors import EmptyDataError
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -16,6 +18,12 @@ FIGURE_DIR = RESULTS_DIR / "figures"
 
 PASS_BAND_LOW = 80.0
 PASS_BAND_HIGH = 110.0
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Visualize recovery and RSD result CSVs.")
+    parser.add_argument("--results-dir", type=Path, default=RESULTS_DIR)
+    return parser.parse_args()
 
 
 def _format_number(value: float) -> str:
@@ -67,43 +75,6 @@ def save_fig(fig: plt.Figure, name: str, *, tight: bool = True) -> None:
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved {path}")
-
-
-def plot_lod(lod: pd.DataFrame) -> None:
-    matrices = sorted(lod["matrix"].unique())
-    signals = list(lod["signal"].drop_duplicates())
-    x = np.arange(len(signals))
-    width = 0.8 / max(len(matrices), 1)
-
-    fig, ax = plt.subplots(figsize=(12, 5.5))
-    for i, matrix in enumerate(matrices):
-        y = (
-            lod[lod["matrix"] == matrix]
-            .set_index("signal")
-            .reindex(signals)["lod"]
-            .to_numpy(dtype=float)
-        )
-        offset = (i - (len(matrices) - 1) / 2) * width
-        ax.bar(x + offset, y, width=width, label=matrix)
-
-    ax.set_title("LOD by Matrix and Signal")
-    ax.set_ylabel("LOD")
-    ax.set_xlabel("Signal")
-    ax.set_xticks(x)
-    ax.set_xticklabels(signals, rotation=35, ha="right")
-    ax.legend(title="Matrix")
-    save_fig(fig, "lod_by_signal.png")
-
-    primary = lod[lod["signal"].isin(["G_sig"])].copy()
-    if not primary.empty:
-        fig, ax = plt.subplots(figsize=(6.2, 4.2))
-        ax.bar(primary["matrix"], primary["lod"], color=["#4c78a8", "#f58518", "#54a24b"][: len(primary)])
-        for idx, value in enumerate(primary["lod"].to_numpy(dtype=float)):
-            ax.text(idx, value, _format_number(value), ha="center", va="bottom")
-        ax.set_title("Primary LOD from G_sig")
-        ax.set_ylabel("LOD")
-        ax.set_xlabel("Matrix")
-        save_fig(fig, "lod_primary_g_signal.png")
 
 
 def draw_heatmap(
@@ -232,12 +203,18 @@ def plot_model_recovery(model_summary: pd.DataFrame) -> None:
 def plot_pass_counts(signal_summary: pd.DataFrame, model_summary: pd.DataFrame) -> None:
     rows = []
     for label, df in [("signal", signal_summary), ("model", model_summary)]:
+        if df.empty:
+            continue
         for col, name in [
             ("meets_80_110_recovery", "80-110% recovery"),
             ("meets_rsd_lt_3", "RSD < 3%"),
             ("meets_recovery_and_rsd", "both"),
         ]:
+            if col not in df.columns:
+                continue
             rows.append({"source": label, "criterion": name, "count": int(df[col].sum()), "total": len(df)})
+    if not rows:
+        return
     counts = pd.DataFrame(rows)
 
     fig, ax = plt.subplots(figsize=(7.2, 4.2))
@@ -260,7 +237,11 @@ def plot_pass_counts(signal_summary: pd.DataFrame, model_summary: pd.DataFrame) 
 
 
 def plot_sample_distributions(signal_samples: pd.DataFrame, model_samples: pd.DataFrame) -> None:
-    g = signal_samples[signal_samples["signal"] == "G_sig"].copy()
+    g = (
+        signal_samples[signal_samples["signal"] == "G_sig"].copy()
+        if "signal" in signal_samples.columns
+        else pd.DataFrame()
+    )
     if not g.empty:
         fig, ax = plt.subplots(figsize=(8.5, 4.8))
         groups = []
@@ -293,17 +274,32 @@ def plot_sample_distributions(signal_samples: pd.DataFrame, model_samples: pd.Da
         save_fig(fig, "model_sample_recovery_boxplot.png")
 
 
-def main() -> None:
-    setup_style()
-    lod = pd.read_csv(RESULTS_DIR / "lod_results.csv")
-    signal_summary = pd.read_csv(RESULTS_DIR / "signal_recovery_summary.csv")
-    model_summary = pd.read_csv(RESULTS_DIR / "model_recovery_summary.csv")
-    signal_samples = pd.read_csv(RESULTS_DIR / "signal_recovery_samples.csv")
-    model_samples = pd.read_csv(RESULTS_DIR / "model_recovery_samples.csv")
+def read_csv_or_empty(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    try:
+        return pd.read_csv(path)
+    except EmptyDataError:
+        return pd.DataFrame()
 
-    plot_lod(lod)
-    plot_signal_recovery(signal_summary)
-    plot_model_recovery(model_summary)
+
+def main() -> None:
+    global RESULTS_DIR, FIGURE_DIR
+
+    args = parse_args()
+    RESULTS_DIR = args.results_dir.expanduser().resolve()
+    FIGURE_DIR = RESULTS_DIR / "figures"
+
+    setup_style()
+    signal_summary = read_csv_or_empty(RESULTS_DIR / "signal_recovery_summary.csv")
+    model_summary = read_csv_or_empty(RESULTS_DIR / "model_recovery_summary.csv")
+    signal_samples = read_csv_or_empty(RESULTS_DIR / "signal_recovery_samples.csv")
+    model_samples = read_csv_or_empty(RESULTS_DIR / "model_recovery_samples.csv")
+
+    if not signal_summary.empty:
+        plot_signal_recovery(signal_summary)
+    if not model_summary.empty:
+        plot_model_recovery(model_summary)
     plot_pass_counts(signal_summary, model_summary)
     plot_sample_distributions(signal_samples, model_samples)
 

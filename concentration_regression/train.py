@@ -147,7 +147,12 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
     parser.add_argument("--alpha-grid", nargs="+", type=float, help="Alpha grid for RidgeCV.")
     parser.add_argument(
         "--feature-set",
-        choices=["full", "compact", "compact_exposure", "ln_rgb", "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb"],
+        choices=[
+            "full",
+            "compact",
+            "compact_exposure",
+            "ln_rgb",
+        ],
         default=default_cfg.feature_set,
         help="Feature set: compact=ln RGB + ratios; compact_exposure adds exposure_time.",
     )
@@ -216,7 +221,11 @@ def resolve_use_bg(df: pd.DataFrame, g_mode: str, use_bg_arg: str) -> bool:
 def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: str) -> pd.DataFrame:
     if feature_set == "full":
         return feature_df
-    if feature_set not in {"compact", "compact_exposure", "ln_rgb", "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb"}:
+    if feature_set not in {
+        "compact",
+        "compact_exposure",
+        "ln_rgb",
+    }:
         raise ValueError(f"Unsupported feature set: {feature_set}")
 
     ln_rgb_columns = (
@@ -228,11 +237,6 @@ def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: s
         ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Delta_RG", "Delta_GB")
         if use_bg
         else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Delta_RG", "Delta_GB")
-    )
-    optimized_columns = (
-        ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Ratio_RB", "Delta_RG", "Delta_RB", "Delta_GB")
-        if use_bg
-        else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Ratio_RB", "Delta_RG", "Delta_RB", "Delta_GB")
     )
     exposure_columns = (
         (
@@ -267,8 +271,6 @@ def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: s
     )
     if feature_set == "ln_rgb":
         selected_columns = ln_rgb_columns
-    elif feature_set == "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb":
-        selected_columns = optimized_columns
     else:
         selected_columns = exposure_columns if feature_set == "compact_exposure" else no_exposure_columns
     missing = [column for column in selected_columns if column not in feature_df.columns]

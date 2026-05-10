@@ -1,4 +1,4 @@
 filename,posterior_log_mean,posterior_log_std,posterior_mean,posterior_median,posterior_mode,posterior_std,ci_90_low,ci_90_high,map_bin_concentration,map_bin_probability,conc_true,residual_mean,abs_error_mean,residual_median,abs_error_median,nll,sample_type,batch,sample_group,sample_concentration_group
-chicken-1-50.dng,3.47711,0.311408,33.9742,32.3662,29.3748,10.8416,19.3926,54.0189,40,0.221899,50,-16.0258,16.0258,-17.6338,17.6338,1527.75,chicken,1,chicken,chicken/50
-chicken-2-50.dng,3.09191,0.311408,23.113,22.019,19.984,7.37564,13.193,36.7496,24,0.324493,50,-26.887,26.887,-27.981,27.981,1459.83,chicken,2,chicken,chicken/50
-chicken-3-50.dng,3.53711,0.311408,36.075,34.3675,31.1912,11.512,20.5918,57.3592,40,0.259172,50,-13.925,13.925,-15.6325,15.6325,1538.47,chicken,3,chicken,chicken/50
+chicken-1-50.dng,-7.50468,2,0.00406671,0.000549504,9.08284e-06,0.02978,1.95144e-05,0.0147718,0,0.994552,50,-49.9959,49.9959,-49.9995,49.9995,21.8167,chicken,1,chicken,chicken/50
+chicken-2-50.dng,-7.6809,2,0.00340947,0.000460557,7.45371e-06,0.0249683,1.61998e-05,0.0123849,0,0.995338,50,-49.9966,49.9966,-49.9995,49.9995,22.3236,chicken,2,chicken,chicken/50
+chicken-3-50.dng,-5.18264,2,0.0414749,0.00561216,0.000101809,0.303648,0.000208173,0.150628,0,0.925063,50,-49.9585,49.9585,-49.9944,49.9944,15.8632,chicken,3,chicken,chicken/50

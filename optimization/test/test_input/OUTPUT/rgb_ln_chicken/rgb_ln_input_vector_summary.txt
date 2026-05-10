@@ -1,0 +1,30 @@
+Train CSV: /home/jzh/CDs/dataset/mate20x/roi_detailed_statistics.csv
+Test CSV: /home/jzh/CDs/dataset/chicken/roi_detailed_statistics.csv
+Correction: ROI-BG; model: RidgeCV + log target + isotonic calibration
+
+RGB vector candidates:
+  rgb_raw: R_sig, G_sig, B_sig
+  rgb_sum_ratio: RGB_sum, R_chroma, B_chroma
+
+ln vector candidates:
+  ln_rgb: ln_R_sig, ln_G_sig, ln_B_sig
+  ln_total: ln_RGB_sum
+  ln_total_contrast: ln_RGB_sum, ln_R_over_G, ln_B_over_G
+  ln_pair_sum: ln_RG_sum, ln_RB_sum, ln_GB_sum
+  ln_total_pair_contrast: ln_RGB_sum, ln_RG_over_GB, ln_RB_over_GB
+
+direct vector candidates:
+  ln_rgb_total_delta_ratio: ln_R_sig, ln_G_sig, ln_B_sig, ln_RGB_sum, Delta_RG, Delta_RB, Ratio_RG
+
+[test all]
+  ln_rgb_total_delta_ratio: n_features=7, R2=0.688026, RMSE=9.53899, MAE=5.56273, mean_error=2.23614, features=ln_R_sig;ln_G_sig;ln_B_sig;ln_RGB_sum;Delta_RG;Delta_RB;Ratio_RG
+  rgb_sum_ratio__ln_total_contrast: n_features=6, R2=0.452409, RMSE=12.6378, MAE=10.1057, mean_error=-7.49154, features=RGB_sum;R_chroma;B_chroma;ln_RGB_sum;ln_R_over_G;ln_B_over_G
+  rgb_raw__ln_total_contrast: n_features=6, R2=0.159273, RMSE=15.6592, MAE=11.8143, mean_error=-6.91979, features=R_sig;G_sig;B_sig;ln_RGB_sum;ln_R_over_G;ln_B_over_G
+  rgb_sum_ratio__ln_pair_sum: n_features=6, R2=-0.0216149, RMSE=17.2618, MAE=13.7856, mean_error=-9.51307, features=RGB_sum;R_chroma;B_chroma;ln_RG_sum;ln_RB_sum;ln_GB_sum
+  rgb_sum_ratio__ln_rgb: n_features=6, R2=-0.0339188, RMSE=17.3655, MAE=13.8918, mean_error=-9.63022, features=RGB_sum;R_chroma;B_chroma;ln_R_sig;ln_G_sig;ln_B_sig
+  rgb_sum_ratio__ln_total: n_features=4, R2=-0.045387, RMSE=17.4615, MAE=14.3834, mean_error=-11.3526, features=RGB_sum;R_chroma;B_chroma;ln_RGB_sum
+  rgb_sum_ratio__ln_total_pair_contrast: n_features=6, R2=-0.368069, RMSE=19.9755, MAE=16.007, mean_error=15.3211, features=RGB_sum;R_chroma;B_chroma;ln_RGB_sum;ln_RG_over_GB;ln_RB_over_GB
+  rgb_raw__ln_pair_sum: n_features=6, R2=-0.437637, RMSE=20.4771, MAE=14.4721, mean_error=-6.73339, features=R_sig;G_sig;B_sig;ln_RG_sum;ln_RB_sum;ln_GB_sum
+  rgb_raw__ln_total: n_features=4, R2=-0.442632, RMSE=20.5126, MAE=14.4845, mean_error=-6.71754, features=R_sig;G_sig;B_sig;ln_RGB_sum
+  rgb_raw__ln_rgb: n_features=6, R2=-0.443636, RMSE=20.5198, MAE=14.5294, mean_error=-6.8119, features=R_sig;G_sig;B_sig;ln_R_sig;ln_G_sig;ln_B_sig
+  rgb_raw__ln_total_pair_contrast: n_features=6, R2=-0.475114, RMSE=20.7423, MAE=14.3172, mean_error=10.1478, features=R_sig;G_sig;B_sig;ln_RGB_sum;ln_RG_over_GB;ln_RB_over_GB

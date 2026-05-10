@@ -24,12 +24,16 @@ FILENAME_RE = re.compile(
     r"^(?P<matrix>.+)-(?P<replicate>\d+)-(?P<added_concentration>[-+]?\d+(?:\.\d+)?)\.dng$",
     re.IGNORECASE,
 )
+TRAILING_CONCENTRATION_RE = re.compile(
+    r"^(?P<matrix>.*?)(?P<added_concentration>[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)\.dng$",
+    re.IGNORECASE,
+)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Calculate spike recovery with C2=0 and recovery RSD from ROI statistics and model predictions."
+            "Calculate direct prediction recovery and recovery RSD from model prediction CSVs."
         )
     )
     parser.add_argument("--roi-csv", type=Path, default=DEFAULT_ROI_CSV)
@@ -39,18 +43,29 @@ def parse_args() -> argparse.Namespace:
 
 
 def parse_filename_metadata(filename: object) -> dict[str, object]:
-    match = FILENAME_RE.match(Path(str(filename)).name)
-    if not match:
+    name = Path(str(filename)).name
+    match = FILENAME_RE.match(name)
+    if match:
+        data = match.groupdict()
         return {
-            "matrix": "unknown",
-            "replicate": math.nan,
-            "added_concentration": math.nan,
+            "matrix": data["matrix"],
+            "replicate": int(data["replicate"]),
+            "added_concentration": float(data["added_concentration"]),
         }
-    data = match.groupdict()
+
+    match = TRAILING_CONCENTRATION_RE.match(name)
+    if match and match.group("matrix"):
+        data = match.groupdict()
+        return {
+            "matrix": data["matrix"],
+            "replicate": math.nan,
+            "added_concentration": float(data["added_concentration"]),
+        }
+
     return {
-        "matrix": data["matrix"],
-        "replicate": int(data["replicate"]),
-        "added_concentration": float(data["added_concentration"]),
+        "matrix": "unknown",
+        "replicate": math.nan,
+        "added_concentration": math.nan,
     }
 
 
@@ -71,24 +86,6 @@ def build_signal_columns(df: pd.DataFrame) -> pd.DataFrame:
     out["G_sig_calc"] = (out["G1_sig_calc"] + out["G2_sig_calc"]) / 2.0
     out["B_sig_calc"] = out["roi_B_mean"].astype(float) - out["bg_B_mean"].astype(float)
     return out
-
-
-def finite_xy(df: pd.DataFrame, x_col: str, y_col: str) -> tuple[np.ndarray, np.ndarray]:
-    x = df[x_col].to_numpy(dtype=float)
-    y = df[y_col].to_numpy(dtype=float)
-    valid = np.isfinite(x) & np.isfinite(y)
-    return x[valid], y[valid]
-
-
-def linear_fit(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float]:
-    if x.size < 2:
-        return math.nan, math.nan, math.nan
-    slope, intercept = np.polyfit(x, y, 1)
-    y_fit = slope * x + intercept
-    ss_res = float(np.sum((y - y_fit) ** 2))
-    ss_tot = float(np.sum((y - float(np.mean(y))) ** 2))
-    r2 = math.nan if ss_tot <= 0 else 1.0 - ss_res / ss_tot
-    return float(slope), float(intercept), float(r2)
 
 
 def summarize(values: Iterable[float]) -> dict[str, float | int]:
@@ -140,15 +137,30 @@ def draw_recovery_heatmap(
 
     view = summary.copy()
     view["row_label"] = view[row_cols].astype(str).agg(" / ".join, axis=1)
-    table = view.pivot_table(
+    recovery = view.pivot_table(
         index="row_label",
         columns=col_col,
-        values=["recovery_mean_percent", "recovery_rsd_percent", "n"],
+        values="recovery_mean_percent",
         aggfunc="first",
+        dropna=False,
     )
-    recovery = table["recovery_mean_percent"].copy()
-    rsd = table["recovery_rsd_percent"].reindex_like(recovery)
-    n_table = table["n"].reindex_like(recovery)
+    rsd = view.pivot_table(
+        index="row_label",
+        columns=col_col,
+        values="recovery_rsd_percent",
+        aggfunc="first",
+        dropna=False,
+    ).reindex_like(recovery)
+    n_table = view.pivot_table(
+        index="row_label",
+        columns=col_col,
+        values="n",
+        aggfunc="first",
+        dropna=False,
+    ).reindex_like(recovery)
+    recovery = recovery.dropna(axis=1, how="all")
+    rsd = rsd.reindex_like(recovery)
+    n_table = n_table.reindex_like(recovery)
     recovery.to_csv(table_path, float_format="%.6g")
 
     values = recovery.to_numpy(dtype=float)
@@ -204,104 +216,6 @@ def draw_recovery_heatmaps(signal_summary: pd.DataFrame, model_summary: pd.DataF
         out_path=figures_dir / "model_recovery_heatmap_rsd.png",
         table_path=output_dir / "model_recovery_heatmap_table.csv",
     )
-    draw_recovery_heatmap(
-        signal_summary,
-        row_cols=["matrix", "added_concentration_c3"],
-        col_col="signal",
-        title="Signal-calibration recovery mean with triplicate RSD",
-        out_path=figures_dir / "signal_recovery_heatmap_rsd.png",
-        table_path=output_dir / "signal_recovery_heatmap_table.csv",
-    )
-
-
-def signal_columns(df: pd.DataFrame) -> list[str]:
-    preferred = [
-        "R_sig",
-        "G1_sig_calc",
-        "G2_sig_calc",
-        "G_sig",
-        "G_sig_calc",
-        "B_sig",
-        "Ratio_RG",
-        "Delta_RG",
-        "Delta_GB",
-    ]
-    return [col for col in preferred if col in df.columns]
-
-
-def calculate_signal_recovery(
-    df: pd.DataFrame,
-    output_dir: Path,
-    *,
-    c2: float = 0.0,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    sample_rows: list[dict[str, object]] = []
-    summary_rows: list[dict[str, object]] = []
-
-    for matrix, matrix_df in df.groupby("matrix", sort=True):
-        for signal in signal_columns(matrix_df):
-            x, y = finite_xy(matrix_df, "added_concentration", signal)
-            slope, intercept, _ = linear_fit(x, y)
-
-            nonzero = matrix_df[matrix_df["added_concentration"] > 0].copy()
-            if nonzero.empty or not np.isfinite(slope) or slope == 0:
-                continue
-
-            detected = (nonzero[signal].to_numpy(dtype=float) - intercept) / slope
-            c3 = nonzero["added_concentration"].to_numpy(dtype=float)
-            recovery = (detected - c2) / c3 * 100.0
-
-            for row, c1, rec in zip(nonzero.itertuples(index=False), detected, recovery):
-                sample_rows.append(
-                    {
-                        "source": "signal_linear_calibration",
-                        "matrix": matrix,
-                        "replicate": getattr(row, "replicate"),
-                        "filename": getattr(row, "filename"),
-                        "signal": signal,
-                        "added_concentration_c3": getattr(row, "added_concentration"),
-                        "original_concentration_c2": c2,
-                        "detected_concentration_c1": c1,
-                        "recovery_percent": rec,
-                        "slope_S": slope,
-                        "intercept": intercept,
-                    }
-                )
-
-            sample_df = pd.DataFrame(
-                {
-                    "added_concentration_c3": c3,
-                    "detected_concentration_c1": detected,
-                    "recovery_percent": recovery,
-                }
-            )
-            for c3_value, group_df in sample_df.groupby("added_concentration_c3", sort=True):
-                c1_stats = summarize(group_df["detected_concentration_c1"])
-                rec_stats = summarize(group_df["recovery_percent"])
-                flags = recovery_quality_flags(rec_stats["mean"], rec_stats["rsd_percent"])
-                summary_rows.append(
-                    {
-                        "source": "signal_linear_calibration",
-                        "matrix": matrix,
-                        "signal": signal,
-                        "added_concentration_c3": c3_value,
-                        "original_concentration_c2": c2,
-                        "n": rec_stats["n"],
-                        "detected_c1_mean": c1_stats["mean"],
-                        "detected_c1_sd": c1_stats["sd"],
-                        "recovery_mean_percent": rec_stats["mean"],
-                        "recovery_sd_percent": rec_stats["sd"],
-                        "recovery_rsd_percent": rec_stats["rsd_percent"],
-                        **flags,
-                    }
-                )
-
-    sample_out = pd.DataFrame(sample_rows)
-    summary_out = pd.DataFrame(summary_rows)
-
-    sample_out.to_csv(output_dir / "signal_recovery_samples.csv", index=False, float_format="%.6g")
-    summary_out.to_csv(output_dir / "signal_recovery_summary.csv", index=False, float_format="%.6g")
-    return sample_out, summary_out
 
 
 def load_prediction_sources(prediction_dir: Path) -> list[tuple[str, Path, str]]:
@@ -327,16 +241,21 @@ def calculate_model_recovery(
         pred = add_filename_metadata(pd.read_csv(csv_path))
         if pred_col not in pred.columns:
             continue
-        pred = pred[pred["added_concentration"] > 0].copy()
+        if "conc_true" in pred.columns:
+            pred["added_concentration"] = pd.to_numeric(pred["conc_true"], errors="coerce")
+        pred = pred[pred["added_concentration"] >= 0].copy()
         pred["source"] = "model_prediction"
         pred["model"] = model_name
         pred["prediction_column"] = pred_col
         pred["added_concentration_c3"] = pred["added_concentration"].astype(float)
         pred["original_concentration_c2"] = c2
         pred["detected_concentration_c1"] = pred[pred_col].astype(float)
-        pred["recovery_percent"] = (
-            (pred["detected_concentration_c1"] - c2) / pred["added_concentration_c3"] * 100.0
-        )
+        denominator = pred["added_concentration_c3"].to_numpy(dtype=float)
+        numerator = pred["detected_concentration_c1"].to_numpy(dtype=float) - c2
+        recovery = np.full_like(denominator, np.nan, dtype=float)
+        valid_recovery = denominator > 0
+        recovery[valid_recovery] = numerator[valid_recovery] / denominator[valid_recovery] * 100.0
+        pred["recovery_percent"] = recovery
         sample_rows.append(
             pred[
                 [
@@ -395,7 +314,6 @@ def write_report(
     output_dir: Path,
     roi_csv: Path,
     prediction_dir: Path,
-    signal_summary: pd.DataFrame,
     model_summary: pd.DataFrame,
 ) -> None:
     def markdown_table(df: pd.DataFrame) -> str:
@@ -419,18 +337,15 @@ def write_report(
         f.write(f"ROI CSV: `{roi_csv}`\n\n")
         f.write(f"Prediction directory: `{prediction_dir}`\n\n")
         f.write("Formula:\n\n")
-        f.write("- Recovery: `R(%) = (c1 - c2) / c3 * 100`; this run uses `c2 = 0`.\n")
+        f.write("- Recovery: `R(%) = predicted_concentration / added_concentration * 100`.\n")
+        f.write("- For 0 concentration rows, recovery is undefined and written as blank, while detected concentration is retained.\n")
         f.write("- RSD: standard deviation of replicate recoveries divided by mean recovery.\n\n")
         f.write("Output files:\n\n")
         for name in [
-            "signal_recovery_samples.csv",
-            "signal_recovery_summary.csv",
             "model_recovery_samples.csv",
             "model_recovery_summary.csv",
             "model_recovery_heatmap_table.csv",
-            "signal_recovery_heatmap_table.csv",
             "figures/model_recovery_heatmap_rsd.png",
-            "figures/signal_recovery_heatmap_rsd.png",
         ]:
             f.write(f"- `{name}`\n")
 
@@ -441,13 +356,6 @@ def write_report(
             f.write(markdown_table(model_summary.head(24)))
             f.write("\n")
 
-        f.write("\n## Signal Recovery Summary Head\n\n")
-        if signal_summary.empty:
-            f.write("No signal recovery rows were generated.\n")
-        else:
-            f.write(markdown_table(signal_summary.head(24)))
-            f.write("\n")
-
 
 def main() -> None:
     args = parse_args()
@@ -455,22 +363,27 @@ def main() -> None:
     prediction_dir = args.prediction_dir.expanduser().resolve()
     output_dir = args.output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    for stale_name in ("lod_results.csv", "recovery_lod_report.md"):
+    for stale_name in (
+        "lod_results.csv",
+        "recovery_lod_report.md",
+        "signal_recovery_heatmap_table.csv",
+    ):
         stale_path = output_dir / stale_name
         if stale_path.exists():
             stale_path.unlink()
+    figures_dir = output_dir / "figures"
+    if figures_dir.exists():
+        for stale_path in figures_dir.glob("signal_*"):
+            stale_path.unlink()
 
-    roi_df = pd.read_csv(roi_csv)
-    roi_df = add_filename_metadata(roi_df)
-    roi_df = build_signal_columns(roi_df)
-
-    _, signal_summary = calculate_signal_recovery(roi_df, output_dir, c2=0.0)
+    signal_summary = pd.DataFrame()
+    pd.DataFrame().to_csv(output_dir / "signal_recovery_samples.csv", index=False)
+    pd.DataFrame().to_csv(output_dir / "signal_recovery_summary.csv", index=False)
     _, model_summary = calculate_model_recovery(prediction_dir, output_dir, c2=0.0)
     draw_recovery_heatmaps(signal_summary, model_summary, output_dir)
-    write_report(output_dir, roi_csv, prediction_dir, signal_summary, model_summary)
+    write_report(output_dir, roi_csv, prediction_dir, model_summary)
 
     print(f"Saved results to {output_dir}")
-    print(f"Signal recovery summary rows: {len(signal_summary)}")
     print(f"Model recovery summary rows: {len(model_summary)}")
     print(f"Recovery heatmaps: {output_dir / 'figures'}")
 

@@ -131,18 +131,16 @@ def resolve_use_bg(df: pd.DataFrame, g_mode: str, use_bg_arg: str) -> bool:
 def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: str) -> pd.DataFrame:
     if feature_set == "full":
         return feature_df
-    if feature_set not in {"compact", "compact_exposure", "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb"}:
+    if feature_set not in {
+        "compact",
+        "compact_exposure",
+    }:
         raise ValueError(f"Unsupported feature set: {feature_set}")
 
     no_exposure_columns = (
         ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Delta_RG", "Delta_GB")
         if use_bg
         else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Delta_RG", "Delta_GB")
-    )
-    optimized_columns = (
-        ("ln_R_sig", "ln_G_sig", "ln_B_sig", "Ratio_RG", "Ratio_RB", "Delta_RG", "Delta_RB", "Delta_GB")
-        if use_bg
-        else ("ln_R", "ln_G", "ln_B", "Ratio_RG", "Ratio_RB", "Delta_RG", "Delta_RB", "Delta_GB")
     )
     exposure_columns = (
         (
@@ -175,10 +173,7 @@ def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: s
             "ln_exposure",
         )
     )
-    if feature_set == "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb":
-        selected_columns = optimized_columns
-    else:
-        selected_columns = exposure_columns if feature_set == "compact_exposure" else no_exposure_columns
+    selected_columns = exposure_columns if feature_set == "compact_exposure" else no_exposure_columns
     missing = [column for column in selected_columns if column not in feature_df.columns]
     if missing:
         raise ValueError(f"Cannot build {feature_set} feature set; missing columns: {missing}")
@@ -685,7 +680,16 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
         help="Use background-subtracted features when available.",
     )
     parser.add_argument("--hidden-dim", type=int, default=default_cfg.hidden_dim, help="Hidden layer width.")
-    parser.add_argument("--feature-set", choices=["full", "compact", "compact_exposure", "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb"], default=default_cfg.feature_set, help="Feature set used for training.")
+    parser.add_argument(
+        "--feature-set",
+        choices=[
+            "full",
+            "compact",
+            "compact_exposure",
+        ],
+        default=default_cfg.feature_set,
+        help="Feature set used for training.",
+    )
     parser.add_argument("--dropout", type=float, default=default_cfg.dropout, help="Dropout rate.")
     parser.add_argument("--learning-rate", type=float, default=default_cfg.learning_rate, help="AdamW learning rate.")
     parser.add_argument("--weight-decay", type=float, default=default_cfg.weight_decay, help="AdamW weight decay.")

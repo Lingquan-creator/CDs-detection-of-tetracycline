@@ -1,8 +1,0 @@
-Sample type: milk
-Concentration: 0
-Output dir: /home/jzh/CDs/OUTPUT/RAW/mate20x_model_predictions/by_sample_concentration/milk/0
-
-  exp (conc_pred): n=3, R2=nan, RMSE=25.6152, MAE=20.7391, mean_error=20.7391, median_abs_error=10.1093, max_abs_error=42.0008
-  rgb_ridge (conc_pred): n=3, R2=nan, RMSE=17.5147, MAE=13.3959, mean_error=13.3959, median_abs_error=11.71, max_abs_error=27.9807
-  gs_posterior_median (posterior_median): n=3, R2=nan, RMSE=12.1532, MAE=9.36392, mean_error=9.36392, median_abs_error=9.11001, max_abs_error=18.9765
-  gs_posterior_mean (posterior_mean): n=3, R2=nan, RMSE=81.1435, MAE=49.9401, mean_error=49.9401, median_abs_error=9.56261, max_abs_error=140.219

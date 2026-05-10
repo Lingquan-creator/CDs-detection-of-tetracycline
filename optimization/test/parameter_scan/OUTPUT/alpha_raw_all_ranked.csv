@@ -1,0 +1,11 @@
+scan,variant_id,alpha,beta,weight_eps,effective_weight_eps,phase,sample_group,n_features,feature_names,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
+alpha,alpha_1e03_beta_1,1000,1,50,50,raw,all,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG,30,0.997063,1.91387,0.803427,-0.0598939,0,6.31579
+alpha,alpha_1e04_beta_1,10000,1,50,50,raw,all,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG,30,0.997063,1.91387,0.803427,-0.0598939,0,6.31579
+alpha,alpha_1e05_beta_1,100000,1,50,50,raw,all,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG,30,0.997063,1.91387,0.803427,-0.0598939,0,6.31579
+alpha,alpha_1e06_beta_1,1e+06,1,50,50,raw,all,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG,30,0.997063,1.91387,0.803427,-0.0598939,0,6.31579
+alpha,alpha_1e07_beta_1,1e+07,1,50,50,raw,all,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG,30,0.997063,1.91387,0.803427,-0.0598939,0,6.31579
+alpha,alpha_1e08_beta_1,1e+08,1,50,50,raw,all,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG,30,0.997063,1.91387,0.803427,-0.0598939,0,6.31579
+alpha,alpha_1e02_beta_1,100,1,50,50,raw,all,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG,30,0.996841,1.98504,0.867287,-0.0648062,8.88178e-16,7.2
+alpha,alpha_1e01_beta_1,10,1,50,50,raw,all,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG,30,0.973326,5.76789,2.24186,-0.398228,7.10543e-15,26.7442
+alpha,alpha_1e00_beta_1,1,1,50,50,raw,all,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG,30,0.967853,6.33197,2.87391,-0.489042,1.42109e-14,28.4091
+alpha,alpha_0e00_beta_1,0,1,50,50,raw,all,6,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG,30,0.540831,23.9309,13.3917,-4.59941,4.93355,68.3333

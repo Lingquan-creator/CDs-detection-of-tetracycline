@@ -1,0 +1,8 @@
+Sample type: egg
+Concentration: 120
+Output dir: /home/jzh/CDs/OUTPUT/food/mate20x_model_predictions/by_sample_concentration/egg/120
+
+  exp (conc_pred): n=1, R2=nan, RMSE=78.8427, MAE=78.8427, mean_error=-78.8427, median_abs_error=78.8427, max_abs_error=78.8427
+  rgb_ridge (conc_pred): n=1, R2=nan, RMSE=34.1774, MAE=34.1774, mean_error=-34.1774, median_abs_error=34.1774, max_abs_error=34.1774
+  gs_posterior_median (posterior_median): n=1, R2=nan, RMSE=119.998, MAE=119.998, mean_error=-119.998, median_abs_error=119.998, max_abs_error=119.998
+  gs_posterior_mean (posterior_mean): n=1, R2=nan, RMSE=119.986, MAE=119.986, mean_error=-119.986, median_abs_error=119.986, max_abs_error=119.986

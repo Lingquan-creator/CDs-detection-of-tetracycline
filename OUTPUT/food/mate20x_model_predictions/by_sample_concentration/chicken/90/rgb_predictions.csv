@@ -1,0 +1,2 @@
+filename,conc_pred,conc_true,residual,sample_type,batch,sample_group,abs_error_residual,sample_concentration_group
+chicken90.dng,55.9275,90,-34.0725,chicken,,chicken,34.0725,chicken/90

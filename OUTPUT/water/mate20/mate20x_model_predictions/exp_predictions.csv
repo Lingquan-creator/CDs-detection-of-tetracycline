@@ -1,0 +1,8 @@
+filename,exposure_time,conc_pred,selected_channel,G1_sig_value,R_sig_conc_pred,G1_sig_conc_pred,B_sig_conc_pred,G2_sig_conc_pred,G_sig_conc_pred,conc_true,residual,sample_type,batch,sample_group,abs_error_residual,sample_concentration_group
+tap water-1-0.dng,1,37.0499,G1_sig,554.462,38.1972,37.0499,33.3223,37.1905,37.12,0,37.0499,tap water,1,tap water,37.0499,tap water/0
+tap water-1-10.dng,1,5.86057,G1_sig,1350.82,8.13302,5.86057,5.53179,5.7786,5.8196,10,-4.13943,tap water,1,tap water,4.13943,tap water/10
+tap water-1-100.dng,1,11.2586,G1_sig,1145.09,16.1582,11.2586,15.611,11.2806,11.2695,100,-88.7414,tap water,1,tap water,88.7414,tap water/100
+tap water-1-150.dng,1,22.762,G1_sig,816.389,27.9707,22.762,27.5343,22.7478,22.7548,150,-127.238,tap water,1,tap water,127.238,tap water/150
+tap water-1-2.dng,1,24.1439,G1_sig,785.017,25.3057,24.1439,21.7358,24.2773,24.2103,2,22.1439,tap water,1,tap water,22.1439,tap water/2
+tap water-1-20.dng,1,5.13069,G1_sig,1381.71,9.23799,5.13069,8.27075,5.13442,5.13246,20,-14.8693,tap water,1,tap water,14.8693,tap water/20
+tap water-1-50.dng,1,6.75993,G1_sig,1313.81,7.05429,6.75993,3.83398,6.68636,6.72315,50,-43.2401,tap water,1,tap water,43.2401,tap water/50

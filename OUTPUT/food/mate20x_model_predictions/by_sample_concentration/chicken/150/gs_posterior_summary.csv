@@ -1,0 +1,2 @@
+filename,posterior_log_mean,posterior_log_std,posterior_mean,posterior_median,posterior_mode,posterior_std,ci_90_low,ci_90_high,map_bin_concentration,map_bin_probability,conc_true,residual_mean,abs_error_mean,residual_median,abs_error_median,nll,sample_type,batch,sample_group,sample_concentration_group
+chicken150.dng,-1.78892,0.311439,0.175445,0.16714,0.151689,0.055993,0.100139,0.27897,0.2,0.920281,150,-149.825,149.825,-149.833,149.833,243.096,chicken,,chicken,chicken/150

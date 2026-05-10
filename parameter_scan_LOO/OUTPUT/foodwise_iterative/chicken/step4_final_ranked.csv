@@ -1,2 +1,0 @@
-food,step,scan,variant_id,phase,sample_group,alpha,beta,weight_eps,effective_weight_eps,n_features,feature_names,use_ratio_rg,use_ratio_bg,use_ratio_rb,use_delta_rg,use_delta_rb,use_delta_gb,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
-chicken,step4,final,final_alpha_1e08_beta_0_weight_eps_1,loo,chicken,1e+08,0,1,inf,9,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_BG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB,True,True,True,True,True,True,18,0.966602,6.45405,3.53804,-1.40777,0.912444,18.0907

@@ -1,0 +1,8 @@
+Sample type: chicken
+Concentration: 180
+Output dir: /home/jzh/CDs/OUTPUT/food/mate20x_model_predictions/by_sample_concentration/chicken/180
+
+  exp (conc_pred): n=1, R2=nan, RMSE=123.655, MAE=123.655, mean_error=-123.655, median_abs_error=123.655, max_abs_error=123.655
+  rgb_ridge (conc_pred): n=1, R2=nan, RMSE=36.428, MAE=36.428, mean_error=-36.428, median_abs_error=36.428, max_abs_error=36.428
+  gs_posterior_median (posterior_median): n=1, R2=nan, RMSE=178.117, MAE=178.117, mean_error=-178.117, median_abs_error=178.117, max_abs_error=178.117
+  gs_posterior_mean (posterior_mean): n=1, R2=nan, RMSE=178.023, MAE=178.023, mean_error=-178.023, median_abs_error=178.023, max_abs_error=178.023

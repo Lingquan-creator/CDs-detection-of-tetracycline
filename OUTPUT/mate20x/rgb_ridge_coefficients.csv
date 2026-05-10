@@ -1,9 +1,9 @@
 feature,coefficient
-ln_R_sig,-0.247503
-ln_G_sig,-0.246599
-ln_B_sig,-0.237547
-Ratio_RG,0.199789
-Ratio_RB,0.12349
-Delta_RG,-0.200991
-Delta_RB,-0.127415
-Delta_GB,-0.0818829
+ln_R_sig,-0.246695
+ln_G_sig,-0.246056
+ln_B_sig,-0.237632
+Ratio_RG,0.206296
+Ratio_BG,-0.092012
+Ratio_RB,0.13156
+Delta_RG,-0.207534
+Delta_RB,-0.135976

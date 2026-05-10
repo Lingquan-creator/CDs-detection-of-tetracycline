@@ -1,0 +1,5 @@
+model,sample_group,prediction_column,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
+exp,tap water/2,conc_pred,1,,22.1439,22.1439,22.1439,22.1439,22.1439
+rgb_ridge,tap water/2,conc_pred,1,,1.50178,1.50178,-1.50178,1.50178,1.50178
+gs_posterior_median,tap water/2,posterior_median,1,,1.99997,1.99997,-1.99997,1.99997,1.99997
+gs_posterior_mean,tap water/2,posterior_mean,1,,1.99986,1.99986,-1.99986,1.99986,1.99986

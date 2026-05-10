@@ -1,7 +1,7 @@
 """
 Configuration for exponential fitting concentration pipeline.
 
-Simplified config for exponential model: I = a * exp(b * C) + c
+Simplified config for pure exponential model: I = a * exp(b * C)
 """
 
 from __future__ import annotations

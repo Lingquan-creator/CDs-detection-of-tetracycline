@@ -1,0 +1,52 @@
+Train CSV: /home/jzh/CDs/dataset/RAW/roi_results/roi_detailed_statistics.csv
+Test CSV:  /home/jzh/CDs/dataset/RAW/roi_results/roi_detailed_statistics.csv
+Feature source: /home/jzh/CDs/optimization/test_input/OUTPUT/raw_all_ranked.csv
+Feature names: ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG
+weight formula: w_i = 1 / (beta * C_i + weight_eps), weight_eps=50
+alpha scan beta fixed at 1; beta scan alpha fixed at best alpha from alpha scan: 1000
+weight_eps scan alpha fixed at 1000, beta fixed at 1
+
+[best alpha scan rows: RAW all]
+       variant_id       alpha  beta       r2      rmse       mae  mean_error
+alpha_1e03_beta_1      1000.0   1.0 0.997063  1.913873  0.803427   -0.059894
+alpha_1e04_beta_1     10000.0   1.0 0.997063  1.913873  0.803427   -0.059894
+alpha_1e05_beta_1    100000.0   1.0 0.997063  1.913873  0.803427   -0.059894
+alpha_1e06_beta_1   1000000.0   1.0 0.997063  1.913873  0.803427   -0.059894
+alpha_1e07_beta_1  10000000.0   1.0 0.997063  1.913873  0.803427   -0.059894
+alpha_1e08_beta_1 100000000.0   1.0 0.997063  1.913873  0.803427   -0.059894
+alpha_1e02_beta_1       100.0   1.0 0.996841  1.985038  0.867287   -0.064806
+alpha_1e01_beta_1        10.0   1.0 0.973326  5.767895  2.241860   -0.398228
+alpha_1e00_beta_1         1.0   1.0 0.967853  6.331970  2.873910   -0.489042
+alpha_0e00_beta_1         0.0   1.0 0.540831 23.930852 13.391731   -4.599409
+
+[best beta scan rows: RAW all]
+           variant_id  alpha      beta  effective_weight_eps       r2     rmse      mae    mean_error
+ beta_1e00_alpha_1e03 1000.0    1.0000                 50.00 0.997063 1.913873 0.803427 -5.989392e-02
+ beta_0e00_alpha_1e03 1000.0    0.0000                   inf 0.996668 2.038518 0.955556 -1.953993e-15
+beta_1e-04_alpha_1e03 1000.0    0.0001             500000.00 0.996668 2.038518 0.955555 -8.310944e-06
+beta_1e-03_alpha_1e03 1000.0    0.0010              50000.00 0.996668 2.038518 0.955546 -8.309438e-05
+beta_1e-02_alpha_1e03 1000.0    0.0100               5000.00 0.996668 2.038519 0.955461 -8.294418e-04
+beta_1e-01_alpha_1e03 1000.0    0.1000                500.00 0.996668 2.038592 0.954621 -8.147612e-03
+ beta_1e01_alpha_1e03 1000.0   10.0000                  5.00 0.996370 2.127889 0.965913 -2.799397e-01
+ beta_1e02_alpha_1e03 1000.0  100.0000                  0.50 0.996068 2.214532 1.013645 -4.165458e-01
+ beta_1e03_alpha_1e03 1000.0 1000.0000                  0.05 0.996027 2.226004 1.014229 -4.358369e-01
+
+[best weight_eps scan rows: RAW all]
+                      variant_id  alpha  beta  weight_eps  effective_weight_eps       r2     rmse      mae  mean_error
+weight_eps_120_alpha_1e03_beta_1 1000.0   1.0       120.0                 120.0 0.997378 1.808349 0.727083   -0.024846
+ weight_eps_80_alpha_1e03_beta_1 1000.0   1.0        80.0                  80.0 0.997071 1.911221 0.802508   -0.040095
+ weight_eps_50_alpha_1e03_beta_1 1000.0   1.0        50.0                  50.0 0.997063 1.913873 0.803427   -0.059894
+ weight_eps_30_alpha_1e03_beta_1 1000.0   1.0        30.0                  30.0 0.997045 1.919702 0.804396   -0.089377
+ weight_eps_10_alpha_1e03_beta_1 1000.0   1.0        10.0                  10.0 0.996727 2.020430 0.883761   -0.193162
+  weight_eps_1_alpha_1e03_beta_1 1000.0   1.0         1.0                   1.0 0.996107 2.203468 1.012865   -0.397076
+
+[best overall: RAW all]
+scan                                          weight_eps
+variant_id              weight_eps_120_alpha_1e03_beta_1
+alpha                                             1000.0
+beta                                                 1.0
+effective_weight_eps                               120.0
+r2                                              0.997378
+rmse                                            1.808349
+mae                                             0.727083
+mean_error                                     -0.024846

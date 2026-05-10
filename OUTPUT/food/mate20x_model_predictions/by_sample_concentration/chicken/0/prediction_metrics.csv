@@ -1,0 +1,5 @@
+model,sample_group,prediction_column,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
+exp,chicken/0,conc_pred,1,,11.4194,11.4194,11.4194,11.4194,11.4194
+rgb_ridge,chicken/0,conc_pred,1,,1.55266,1.55266,1.55266,1.55266,1.55266
+gs_posterior_median,chicken/0,posterior_median,1,,0.0022396,0.0022396,0.0022396,0.0022396,0.0022396
+gs_posterior_mean,chicken/0,posterior_mean,1,,0.0165549,0.0165549,0.0165549,0.0165549,0.0165549

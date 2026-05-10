@@ -1,0 +1,8 @@
+Sample type: tap water
+Concentration: 2
+Output dir: /home/jzh/CDs/OUTPUT/water/mate20/mate20x_model_predictions/by_sample_concentration/tap_water/2
+
+  exp (conc_pred): n=1, R2=nan, RMSE=22.1439, MAE=22.1439, mean_error=22.1439, median_abs_error=22.1439, max_abs_error=22.1439
+  rgb_ridge (conc_pred): n=1, R2=nan, RMSE=1.50178, MAE=1.50178, mean_error=-1.50178, median_abs_error=1.50178, max_abs_error=1.50178
+  gs_posterior_median (posterior_median): n=1, R2=nan, RMSE=1.99997, MAE=1.99997, mean_error=-1.99997, median_abs_error=1.99997, max_abs_error=1.99997
+  gs_posterior_mean (posterior_mean): n=1, R2=nan, RMSE=1.99986, MAE=1.99986, mean_error=-1.99986, median_abs_error=1.99986, max_abs_error=1.99986

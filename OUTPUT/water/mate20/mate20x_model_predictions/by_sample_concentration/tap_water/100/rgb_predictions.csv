@@ -1,0 +1,2 @@
+filename,conc_pred,conc_true,residual,sample_type,batch,sample_group,abs_error_residual,sample_concentration_group
+tap water-1-100.dng,0.498218,100,-99.5018,tap water,1,tap water,99.5018,tap water/100

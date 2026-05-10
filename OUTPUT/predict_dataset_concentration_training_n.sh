@@ -111,12 +111,16 @@ import matplotlib.pyplot as plt
 
 
 CONCENTRATION_RE = re.compile(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$")
+TRAILING_CONCENTRATION_RE = re.compile(r"^(?P<sample>.*?)(?P<concentration>[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)$")
 
 
 def parse_raw_filename(filename: object) -> tuple[str, str, float]:
     stem = Path(str(filename)).stem
     parts = stem.rsplit("-", maxsplit=2)
     if len(parts) != 3:
+        match = TRAILING_CONCENTRATION_RE.fullmatch(stem)
+        if match and match.group("sample"):
+            return match.group("sample"), "", float(match.group("concentration"))
         return stem, "", math.nan
     sample_type, batch, concentration_text = parts
     if not CONCENTRATION_RE.fullmatch(concentration_text):

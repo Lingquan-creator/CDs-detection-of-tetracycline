@@ -1,0 +1,2 @@
+filename,posterior_log_mean,posterior_log_std,posterior_mean,posterior_median,posterior_mode,posterior_std,ci_90_low,ci_90_high,map_bin_concentration,map_bin_probability,conc_true,residual_mean,abs_error_mean,residual_median,abs_error_median,nll,sample_type,batch,sample_group,sample_concentration_group
+egg120.dng,-6.24513,2,0.0143329,0.00193888,3.45302e-05,0.10494,7.12892e-05,0.0520558,0,0.975577,120,-119.986,119.986,-119.998,119.998,21.6144,egg,,egg,egg/120

@@ -31,8 +31,11 @@ PREDICT_PLOT_SUFFIX = "_pred_concentration_gs.png"
 
 DEFAULT_G_MODE: Literal["g1", "avg"] = "avg"
 DEFAULT_USE_BG = "true"
-OPTIMIZED_FEATURE_SET = "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb"
-DEFAULT_FEATURE_SET: Literal["full", "compact", "compact_exposure", "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb"] = OPTIMIZED_FEATURE_SET
+DEFAULT_FEATURE_SET: Literal[
+    "full",
+    "compact",
+    "compact_exposure",
+] = "compact"
 TARGET_EPS = 1e-6
 DEFAULT_CONFIDENCE = 0.90
 
@@ -46,7 +49,7 @@ PATIENCE = 250
 MIN_STD = 0.08          # posterior std floor in standardized log-space
 STD_REG_LAMBDA = 0.01   # penalty on predicted posterior std to avoid variance blow-up
 MAX_STD_LOG = 2.0       # posterior std ceiling after converting back to log-concentration space
-WEIGHT_EPS = 30.0       # sample weight = 1 / (WEIGHT_BETA * concentration + WEIGHT_EPS)
+WEIGHT_EPS = 50.0       # sample weight = 1 / (WEIGHT_BETA * concentration + WEIGHT_EPS)
 WEIGHT_BETA = 1.0
 GRAD_CLIP_NORM = 5.0
 SEED = 42
@@ -58,7 +61,11 @@ class TrainConfig:
     output_dir: Path = OUTPUT_DIR
     g_mode: Literal["g1", "avg"] = DEFAULT_G_MODE
     use_bg: str = DEFAULT_USE_BG
-    feature_set: Literal["full", "compact", "compact_exposure", "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb"] = DEFAULT_FEATURE_SET
+    feature_set: Literal[
+        "full",
+        "compact",
+        "compact_exposure",
+    ] = DEFAULT_FEATURE_SET
     weight_beta: float = WEIGHT_BETA
     hidden_dim: int = HIDDEN_DIM
     dropout: float = DROPOUT

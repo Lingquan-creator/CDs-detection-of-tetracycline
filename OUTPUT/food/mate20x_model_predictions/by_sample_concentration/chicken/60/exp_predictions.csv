@@ -1,0 +1,2 @@
+filename,exposure_time,conc_pred,selected_channel,G1_sig_value,R_sig_conc_pred,G1_sig_conc_pred,B_sig_conc_pred,G2_sig_conc_pred,G_sig_conc_pred,conc_true,residual,sample_type,batch,sample_group,abs_error_residual,sample_concentration_group
+chicken60.dng,1,33.1067,G1_sig,614.306,31.9918,33.1067,29.6877,33.1926,33.1495,60,-26.8933,chicken,,chicken,26.8933,chicken/60

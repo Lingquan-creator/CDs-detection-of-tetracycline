@@ -1,0 +1,25 @@
+Train CSV: /home/jzh/CDs/dataset/mate20x/roi_detailed_statistics.csv
+Correction: ROI-BG; model: RidgeCV + log target + isotonic calibration
+
+RGB vector candidates:
+  rgb_raw: R_sig, G_sig, B_sig
+  rgb_sum_ratio: RGB_sum, R_chroma, B_chroma
+
+ln vector candidates:
+  ln_rgb: ln_R_sig, ln_G_sig, ln_B_sig
+  ln_total: ln_RGB_sum
+  ln_total_contrast: ln_RGB_sum, ln_R_over_G, ln_B_over_G
+  ln_pair_sum: ln_RG_sum, ln_RB_sum, ln_GB_sum
+  ln_total_pair_contrast: ln_RGB_sum, ln_RG_over_GB, ln_RB_over_GB
+
+[loo all]
+  rgb_sum_ratio__ln_total: n_features=4, R2=0.984109, RMSE=9.02332, MAE=4.81318, mean_error=-2.22455, features=RGB_sum;R_chroma;B_chroma;ln_RGB_sum
+  rgb_sum_ratio__ln_total_contrast: n_features=6, R2=0.983403, RMSE=9.22163, MAE=4.76876, mean_error=-1.76226, features=RGB_sum;R_chroma;B_chroma;ln_RGB_sum;ln_R_over_G;ln_B_over_G
+  rgb_raw__ln_total_contrast: n_features=6, R2=0.979699, RMSE=10.1989, MAE=6.46414, mean_error=-2.21101, features=R_sig;G_sig;B_sig;ln_RGB_sum;ln_R_over_G;ln_B_over_G
+  rgb_sum_ratio__ln_rgb: n_features=6, R2=0.979219, RMSE=10.3187, MAE=6.79462, mean_error=-2.67295, features=RGB_sum;R_chroma;B_chroma;ln_R_sig;ln_G_sig;ln_B_sig
+  rgb_sum_ratio__ln_pair_sum: n_features=6, R2=0.979141, RMSE=10.3381, MAE=6.81903, mean_error=-2.66392, features=RGB_sum;R_chroma;B_chroma;ln_RG_sum;ln_RB_sum;ln_GB_sum
+  rgb_raw__ln_rgb: n_features=6, R2=0.963698, RMSE=13.6383, MAE=9.53908, mean_error=-1.90359, features=R_sig;G_sig;B_sig;ln_R_sig;ln_G_sig;ln_B_sig
+  rgb_raw__ln_total: n_features=4, R2=0.963626, RMSE=13.6519, MAE=9.51242, mean_error=-1.64356, features=R_sig;G_sig;B_sig;ln_RGB_sum
+  rgb_raw__ln_pair_sum: n_features=6, R2=0.963492, RMSE=13.6769, MAE=9.56605, mean_error=-1.90069, features=R_sig;G_sig;B_sig;ln_RG_sum;ln_RB_sum;ln_GB_sum
+  rgb_raw__ln_total_pair_contrast: n_features=6, R2=0.961441, RMSE=14.0559, MAE=9.7353, mean_error=-1.62556, features=R_sig;G_sig;B_sig;ln_RGB_sum;ln_RG_over_GB;ln_RB_over_GB
+  rgb_sum_ratio__ln_total_pair_contrast: n_features=6, R2=0.955972, RMSE=15.0197, MAE=8.21821, mean_error=-0.729111, features=RGB_sum;R_chroma;B_chroma;ln_RGB_sum;ln_RG_over_GB;ln_RB_over_GB

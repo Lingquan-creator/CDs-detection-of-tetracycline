@@ -1,0 +1,8 @@
+sample_type,concentration,output_dir,n
+tap water,0,/home/jzh/CDs/OUTPUT/water/mate20/mate20x_model_predictions/by_sample_concentration/tap_water/0,1
+tap water,2,/home/jzh/CDs/OUTPUT/water/mate20/mate20x_model_predictions/by_sample_concentration/tap_water/2,1
+tap water,10,/home/jzh/CDs/OUTPUT/water/mate20/mate20x_model_predictions/by_sample_concentration/tap_water/10,1
+tap water,20,/home/jzh/CDs/OUTPUT/water/mate20/mate20x_model_predictions/by_sample_concentration/tap_water/20,1
+tap water,50,/home/jzh/CDs/OUTPUT/water/mate20/mate20x_model_predictions/by_sample_concentration/tap_water/50,1
+tap water,100,/home/jzh/CDs/OUTPUT/water/mate20/mate20x_model_predictions/by_sample_concentration/tap_water/100,1
+tap water,150,/home/jzh/CDs/OUTPUT/water/mate20/mate20x_model_predictions/by_sample_concentration/tap_water/150,1

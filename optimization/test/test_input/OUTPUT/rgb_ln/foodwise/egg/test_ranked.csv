@@ -1,0 +1,12 @@
+variant_id,rgb_vector,ln_vector,phase,sample_group,feature_names,n_features,n,r2,rmse,mae,mean_error,median_abs_error,max_abs_error
+ln_rgb_total_delta_ratio,none,ln_rgb_total_delta_ratio,test,egg,ln_R_sig;ln_G_sig;ln_B_sig;ln_RGB_sum;Delta_RG;Delta_RB;Ratio_RG,7,9,0.974779,12.3016,10.981,5.41501,11.3597,18.9534
+rgb_raw__ln_total_contrast,rgb_raw,ln_total_contrast,test,egg,R_sig;G_sig;B_sig;ln_RGB_sum;ln_R_over_G;ln_B_over_G,6,9,0.814957,33.3206,25.2544,-23.4293,24.2422,72.3799
+rgb_raw__ln_total,rgb_raw,ln_total,test,egg,R_sig;G_sig;B_sig;ln_RGB_sum,4,9,0.753137,38.4861,27.921,-24.9519,17.881,90.7814
+rgb_raw__ln_pair_sum,rgb_raw,ln_pair_sum,test,egg,R_sig;G_sig;B_sig;ln_RG_sum;ln_RB_sum;ln_GB_sum,6,9,0.751746,38.5943,27.9569,-24.9915,17.7997,91.0548
+rgb_raw__ln_rgb,rgb_raw,ln_rgb,test,egg,R_sig;G_sig;B_sig;ln_R_sig;ln_G_sig;ln_B_sig,6,9,0.744599,39.146,28.5801,-25.6679,18.7426,91.5108
+rgb_sum_ratio__ln_total_pair_contrast,rgb_sum_ratio,ln_total_pair_contrast,test,egg,RGB_sum;R_chroma;B_chroma;ln_RGB_sum;ln_RG_over_GB;ln_RB_over_GB,6,9,0.640101,46.4693,39.3149,30.1244,35.6787,84.3213
+rgb_sum_ratio__ln_total_contrast,rgb_sum_ratio,ln_total_contrast,test,egg,RGB_sum;R_chroma;B_chroma;ln_RGB_sum;ln_R_over_G;ln_B_over_G,6,9,0.462218,56.804,47.536,-47.372,57.9504,91.241
+rgb_sum_ratio__ln_pair_sum,rgb_sum_ratio,ln_pair_sum,test,egg,RGB_sum;R_chroma;B_chroma;ln_RG_sum;ln_RB_sum;ln_GB_sum,6,9,0.394945,60.2522,50.0426,-49.0192,58.6808,99.6183
+rgb_sum_ratio__ln_rgb,rgb_sum_ratio,ln_rgb,test,egg,RGB_sum;R_chroma;B_chroma;ln_R_sig;ln_G_sig;ln_B_sig,6,9,0.380542,60.9651,50.6634,-49.6576,59.1204,100.168
+rgb_sum_ratio__ln_total,rgb_sum_ratio,ln_total,test,egg,RGB_sum;R_chroma;B_chroma;ln_RGB_sum,4,9,0.0563092,75.2472,62.7556,-62.5933,71.1901,121.6
+rgb_raw__ln_total_pair_contrast,rgb_raw,ln_total_pair_contrast,test,egg,R_sig;G_sig;B_sig;ln_RGB_sum;ln_RG_over_GB;ln_RB_over_GB,6,9,0.0263043,76.4341,59.4062,59.4062,49.375,150

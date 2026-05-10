@@ -1,4 +1,0 @@
-filename,conc_pred,conc_true,residual,sample_type,batch,sample_group,abs_error_residual,sample_concentration_group
-milk-1-50.dng,55.3923,50,5.3923,milk,1,milk,5.3923,milk/50
-milk-2-50.dng,67.8409,50,17.8409,milk,2,milk,17.8409,milk/50
-milk-3-50.dng,56.3425,50,6.3425,milk,3,milk,6.3425,milk/50

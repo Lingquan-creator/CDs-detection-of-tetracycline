@@ -1,0 +1,10 @@
+variant_id,filename,conc_true,sample_group,rgb_vector,ln_vector,phase,feature_names,n_features,conc_pred_raw,conc_pred,residual
+ln_rgb_total_delta_ratio,egg0.dng,0,egg,none,ln_rgb_total_delta_ratio,test,ln_R_sig;ln_G_sig;ln_B_sig;ln_RGB_sum;Delta_RG;Delta_RB;Ratio_RG,7,1.67062,8.01665,8.01665
+ln_rgb_total_delta_ratio,egg30.dng,30,egg,none,ln_rgb_total_delta_ratio,test,ln_R_sig;ln_G_sig;ln_B_sig;ln_RGB_sum;Delta_RG;Delta_RB;Ratio_RG,7,4.89809,37.9545,7.95455
+ln_rgb_total_delta_ratio,egg60.dng,60,egg,none,ln_rgb_total_delta_ratio,test,ln_R_sig;ln_G_sig;ln_B_sig;ln_RGB_sum;Delta_RG;Delta_RB;Ratio_RG,7,11.147,76.6203,16.6203
+ln_rgb_total_delta_ratio,egg90.dng,90,egg,none,ln_rgb_total_delta_ratio,test,ln_R_sig;ln_G_sig;ln_B_sig;ln_RGB_sum;Delta_RG;Delta_RB;Ratio_RG,7,19.4366,96.9165,6.91648
+ln_rgb_total_delta_ratio,egg120.dng,120,egg,none,ln_rgb_total_delta_ratio,test,ln_R_sig;ln_G_sig;ln_B_sig;ln_RGB_sum;Delta_RG;Delta_RB;Ratio_RG,7,21.8291,106.313,-13.6873
+ln_rgb_total_delta_ratio,egg150.dng,150,egg,none,ln_rgb_total_delta_ratio,test,ln_R_sig;ln_G_sig;ln_B_sig;ln_RGB_sum;Delta_RG;Delta_RB;Ratio_RG,7,44.9325,168.953,18.9534
+ln_rgb_total_delta_ratio,egg180.dng,180,egg,none,ln_rgb_total_delta_ratio,test,ln_R_sig;ln_G_sig;ln_B_sig;ln_RGB_sum;Delta_RG;Delta_RB;Ratio_RG,7,44.7771,168.64,-11.3597
+ln_rgb_total_delta_ratio,egg210.dng,210,egg,none,ln_rgb_total_delta_ratio,test,ln_R_sig;ln_G_sig;ln_B_sig;ln_RGB_sum;Delta_RG;Delta_RB;Ratio_RG,7,103.534,225.321,15.3208
+ln_rgb_total_delta_ratio,egg240.dng,240,egg,none,ln_rgb_total_delta_ratio,test,ln_R_sig;ln_G_sig;ln_B_sig;ln_RGB_sum;Delta_RG;Delta_RB;Ratio_RG,7,132.321,240,2.84217e-14

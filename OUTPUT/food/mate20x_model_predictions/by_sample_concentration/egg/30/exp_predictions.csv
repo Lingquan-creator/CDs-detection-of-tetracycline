@@ -1,0 +1,2 @@
+filename,exposure_time,conc_pred,selected_channel,G1_sig_value,R_sig_conc_pred,G1_sig_conc_pred,B_sig_conc_pred,G2_sig_conc_pred,G_sig_conc_pred,conc_true,residual,sample_type,batch,sample_group,abs_error_residual,sample_concentration_group
+egg30.dng,1,20.2354,G1_sig,877.783,19.2297,20.2354,18.092,20.3531,20.294,30,-9.7646,egg,,egg,9.7646,egg/30

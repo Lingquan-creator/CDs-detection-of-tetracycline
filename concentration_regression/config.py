@@ -19,15 +19,19 @@ TARGET_TRANSFORM = "log"  # log-target regression (see improve2.md)
 TARGET_EPS = 1e-6         # small constant to avoid log(0) and for inverse transform
 DEFAULT_USE_BG = True     # detailed ROI statistics include bg_* columns; use them by default
 DEFAULT_BG_CORRECTION: Literal["subtract", "divide", "relative"] = "subtract"
-OPTIMIZED_FEATURE_SET = "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb"
-DEFAULT_FEATURE_SET: Literal["full", "compact", "compact_exposure", "ln_rgb", "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb"] = OPTIMIZED_FEATURE_SET
+DEFAULT_FEATURE_SET: Literal[
+    "full",
+    "compact",
+    "compact_exposure",
+    "ln_rgb",
+] = "compact"
 # Expanded alpha grid to include large regularization for smoothing low-concentration noise
 # REMOVED small alphas to force smoother models and avoid overfitting noise.
 # FORCED high alphas (starting at 50.0) to combat multicollinearity-induced oscillation.
 ALPHAS: Tuple[float, ...] = (100.0,)
 # Increased epsilon to reduce sensitivity to noise in low concentrations (e.g. <10uM)
 # Higher eps (20 -> 50) means weights are flatter, preventing low-conc noise from dominating.
-WEIGHT_EPS = 30.0         # sample weight denominator: 1/(conc + WEIGHT_EPS)
+WEIGHT_EPS = 50.0         # sample weight denominator: 1/(conc + WEIGHT_EPS)
 WEIGHT_BETA = 1.0         # sample weight denominator: 1/(WEIGHT_BETA * conc + WEIGHT_EPS)
 CLIP_MIN = 0.1            # minimum signal after background subtraction to avoid log of negative/zero
 
@@ -53,7 +57,12 @@ class TrainConfig:
     alpha: float = 0.5
     g_mode: Literal["g1", "avg"] = DEFAULT_G_MODE
     use_bg: bool = DEFAULT_USE_BG
-    feature_set: Literal["full", "compact", "compact_exposure", "ln_rgb", "ratio_rg_ratio_rb_delta_rg_delta_rb_delta_gb"] = DEFAULT_FEATURE_SET
+    feature_set: Literal[
+        "full",
+        "compact",
+        "compact_exposure",
+        "ln_rgb",
+    ] = DEFAULT_FEATURE_SET
     bg_correction: Literal["subtract", "divide", "relative"] = DEFAULT_BG_CORRECTION
 
     @property

@@ -1,4 +1,0 @@
-source_food,alpha,beta,weight_eps,n_features,feature_names,all_r2,all_rmse,all_mae,mean_food_r2,min_food_r2,mean_food_rmse,max_food_rmse,worst_food_by_r2
-chicken,100,1,50,7,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Ratio_RB;Delta_RG;Delta_RB,0.710912,18.9883,11.8417,0.733163,0.34061,15.7597,28.6776,milk
-milk,100,1,30,8,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_BG;Ratio_RB;Delta_RG;Delta_RB;Delta_GB,0.575512,23.0094,14.2904,0.54341,0.286589,22.7898,29.8292,egg
-egg,100,1,30,5,ln_R_sig;ln_G_sig;ln_B_sig;Ratio_RG;Delta_RG,0.0673014,34.1069,21.8434,0.167128,-1.10214,26.3317,51.2039,milk

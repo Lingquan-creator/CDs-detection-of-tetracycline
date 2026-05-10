@@ -60,6 +60,7 @@ _CLIP_MIN = 0.1  # minimum signal after background subtraction to avoid log of n
 _EXPOSURE_MIN = 1e-6
 _DEFAULT_EXPOSURE_TIME = 1.0
 _NUMBER_RE = re.compile(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?")
+_RAW_NAME_RE = re.compile(r"^.+-.+-([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)$")
 _ROI_DISTRIBUTION_CHANNELS: Tuple[str, ...] = ("R", "G1", "G2", "B")
 _GAUSS_MU_EXP_SCALE = 1000.0
 _EXP_CLIP = 50.0
@@ -68,6 +69,9 @@ _EXP_CLIP = 50.0
 def extract_sample_metadata_from_name(name: str) -> Dict[str, Optional[float]]:
     """Parse concentration/exposure metadata from `concentration_exposure.ext` filenames."""
     stem = Path(name).stem
+    raw_match = _RAW_NAME_RE.fullmatch(stem)
+    if raw_match:
+        return {"concentration": float(raw_match.group(1)), "exposure_time": None}
 
     if "_" in stem:
         concentration_text, exposure_text = stem.rsplit("_", maxsplit=1)

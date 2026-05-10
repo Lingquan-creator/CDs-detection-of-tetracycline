@@ -1,7 +1,7 @@
 """
 Exponential Model Concentration Fitting and Inversion.
 
-Fits intensity = a * exp(b * conc) + c for each RGB channel, then inverts to predict concentration.
+Fits intensity = a * exp(b * conc) for each RGB channel, then inverts to predict concentration.
 
 Usage:
     python train.py                    # Use default ROI CSV
@@ -53,23 +53,22 @@ def format_figure_numbers(fig: plt.Figure) -> None:
 plt.rcParams.update({"axes.unicode_minus": False})
 
 
-def model_exponential(x: np.ndarray, a: float, b: float, c0: float) -> np.ndarray:
+def model_exponential(x: np.ndarray, a: float, b: float, c0: float = 0.0) -> np.ndarray:
     """
-    Exponential model: y = a * exp(b * x) + c0
+    Exponential model: y = a * exp(b * x) + c0.
+
+    Fitting fixes c0=0. The argument is kept for saved-parameter compatibility.
     
     With numerical stability clipping.
     """
     return a * np.exp(np.clip(b * x, -700, 50)) + c0
 
 
-def _model_exponential_i0(x: np.ndarray, i0: float, b: float, c0: float) -> np.ndarray:
+def _model_exponential_c0(x: np.ndarray, a: float, b: float) -> np.ndarray:
     """
-    Re-parameterized exponential: y = (i0 - c0) * exp(b*x) + c0
-    
-    This parameterization enforces i0 (intensity at conc=0) >= max(observed intensity),
-    preventing negative concentration predictions during inversion.
+    Pure exponential: y = a * exp(b*x), with baseline fixed at c=0.
     """
-    return (i0 - c0) * np.exp(np.clip(b * x, -700, 50)) + c0
+    return a * np.exp(np.clip(b * x, -700, 50))
 
 
 def fit_exponential(
@@ -79,7 +78,7 @@ def fit_exponential(
     weight_eps: float = 0.0,
 ) -> Tuple[Tuple[float, float, float], float, float]:
     """
-    Fit exponential model: intensity = a * exp(b * conc) + c
+    Fit pure exponential model: intensity = a * exp(b * conc), with c fixed to 0.
     
     Args:
         conc: Concentration values (x-axis)
@@ -88,7 +87,7 @@ def fit_exponential(
                    Lower values emphasize low concentration more.
     
     Returns:
-        ((a, b, c), r2, rmse): Fitted parameters, R2 score, and RMSE
+        ((a, b, c), r2, rmse): Fitted parameters, R2 score, and RMSE. c is always 0.
     
     Raises:
         RuntimeError: If scipy is not installed
@@ -114,12 +113,9 @@ def fit_exponential(
     if math.isclose(y_min, y_max, rel_tol=0.0, abs_tol=1e-12):
         raise ValueError("Feature is nearly constant; cannot fit exponential model.")
 
-    # Re-parameterization: i0 (intensity at conc=0) must be >= max observed intensity
-    # and c0 must be <= min observed intensity. This keeps the decreasing
-    # exponential invertible over the measured range.
-    i0_min = y_max
-    p0 = (y_max, -0.01, y_min)
-    bounds = ([i0_min, -np.inf, -np.inf], [np.inf, 0.0, y_min])
+    # Pure decaying exponential with fixed baseline c=0.
+    p0 = (y_max, -0.01)
+    bounds = ([0.0, -np.inf], [np.inf, 0.0])
 
     # Optional weighting to emphasize low-concentration fitting
     sigma: Optional[np.ndarray] = None
@@ -128,7 +124,7 @@ def fit_exponential(
 
     # Perform curve fitting
     popt, _ = curve_fit(
-        _model_exponential_i0,
+        _model_exponential_c0,
         x,
         y,
         p0=p0,
@@ -138,8 +134,8 @@ def fit_exponential(
         absolute_sigma=False,
     )
 
-    i0, b, c0 = float(popt[0]), float(popt[1]), float(popt[2])
-    a = i0 - c0
+    a, b = float(popt[0]), float(popt[1])
+    c0 = 0.0
 
     # Calculate fit quality metrics
     y_pred = model_exponential(x, a, b, c0)

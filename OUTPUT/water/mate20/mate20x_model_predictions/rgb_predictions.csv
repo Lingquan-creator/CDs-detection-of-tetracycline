@@ -1,0 +1,8 @@
+filename,conc_pred,conc_true,residual,sample_type,batch,sample_group,abs_error_residual,sample_concentration_group
+tap water-1-0.dng,11.889,0,11.889,tap water,1,tap water,11.889,tap water/0
+tap water-1-10.dng,0.498218,10,-9.50178,tap water,1,tap water,9.50178,tap water/10
+tap water-1-100.dng,0.498218,100,-99.5018,tap water,1,tap water,99.5018,tap water/100
+tap water-1-150.dng,0.498218,150,-149.502,tap water,1,tap water,149.502,tap water/150
+tap water-1-2.dng,0.498218,2,-1.50178,tap water,1,tap water,1.50178,tap water/2
+tap water-1-20.dng,0.498218,20,-19.5018,tap water,1,tap water,19.5018,tap water/20
+tap water-1-50.dng,0.498218,50,-49.5018,tap water,1,tap water,49.5018,tap water/50

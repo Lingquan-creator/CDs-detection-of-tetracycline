@@ -1,0 +1,2 @@
+filename,conc_pred,conc_true,residual,sample_type,batch,sample_group,abs_error_residual,sample_concentration_group
+egg240.dng,193.655,240,-46.345,egg,,egg,46.345,egg/240

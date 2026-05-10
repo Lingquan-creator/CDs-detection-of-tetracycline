@@ -1,0 +1,2 @@
+filename,exposure_time,conc_pred,selected_channel,G1_sig_value,R_sig_conc_pred,G1_sig_conc_pred,B_sig_conc_pred,G2_sig_conc_pred,G_sig_conc_pred,conc_true,residual,sample_type,batch,sample_group,abs_error_residual,sample_concentration_group
+tap water-1-0.dng,1,37.0499,G1_sig,554.462,38.1972,37.0499,33.3223,37.1905,37.12,0,37.0499,tap water,1,tap water,37.0499,tap water/0
