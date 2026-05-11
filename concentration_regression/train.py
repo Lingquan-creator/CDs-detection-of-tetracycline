@@ -18,7 +18,6 @@ import matplotlib
 import numpy as np
 import pandas as pd
 from sklearn import __version__ as sklearn_version
-from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import RidgeCV
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import LeaveOneOut
@@ -65,13 +64,6 @@ def inverse_target(pred: np.ndarray, transform: str, eps: float) -> np.ndarray:
     return np.maximum(np.asarray(pred, dtype=float), 0.0)
 
 
-def apply_calibrator(pred: np.ndarray, calibrator: Optional[IsotonicRegression]) -> np.ndarray:
-    if calibrator is None:
-        return np.maximum(np.asarray(pred, dtype=float), 0.0)
-    calibrated = calibrator.predict(np.asarray(pred, dtype=float))
-    return np.maximum(np.asarray(calibrated, dtype=float), 0.0)
-
-
 def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> Tuple[float, float, float]:
     r2 = float(r2_score(y_true, y_pred))
     rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
@@ -101,20 +93,6 @@ def train_model(
     )
     model.fit(X, y_target, regressor__sample_weight=sample_weight)
     return model
-
-
-def fit_calibrator(
-    y_pred_raw: np.ndarray,
-    y_true: np.ndarray,
-    sample_weight: np.ndarray,
-) -> Optional[IsotonicRegression]:
-    if y_pred_raw.size < 2:
-        return None
-    if float(np.max(y_pred_raw) - np.min(y_pred_raw)) <= 1e-12:
-        return None
-    calibrator = IsotonicRegression(out_of_bounds="clip")
-    calibrator.fit(y_pred_raw, y_true, sample_weight=sample_weight)
-    return calibrator
 
 
 def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
@@ -312,8 +290,7 @@ def train_candidate(
     model = train_model(X, y_target, alphas=alphas, sample_weight=sample_weight)
     y_pred_target = model.predict(X)
     y_pred_raw = inverse_target(y_pred_target, target_transform, target_eps)
-    calibrator = fit_calibrator(y_pred_raw, y_true, sample_weight)
-    y_pred = apply_calibrator(y_pred_raw, calibrator)
+    y_pred = y_pred_raw
     score = model_selection_score(model, X, y_target)
 
     return {
@@ -327,7 +304,6 @@ def train_candidate(
         "sample_weight": sample_weight,
         "y_pred_raw": y_pred_raw,
         "y_pred": y_pred,
-        "calibrator": calibrator,
         "score": score,
     }
 
@@ -357,12 +333,7 @@ def run_leave_one_out(
         pred_test_target = model_fold.predict(X_test)
         pred_test_raw = inverse_target(pred_test_target, target_transform, target_eps)
 
-        pred_train_target = model_fold.predict(X_train)
-        pred_train_raw = inverse_target(pred_train_target, target_transform, target_eps)
-        calibrator_fold = fit_calibrator(pred_train_raw, y_train, w_train)
-        pred_test = apply_calibrator(pred_test_raw, calibrator_fold)
-
-        y_pred_loo[test_idx] = pred_test
+        y_pred_loo[test_idx] = pred_test_raw
 
     return y_pred_loo
 
@@ -413,7 +384,6 @@ def save_outputs(
     y_pred_loo: np.ndarray,
     *,
     model: Pipeline,
-    calibrator: Optional[IsotonicRegression],
     model_out: Path,
     pred_out: Path,
     loo_out: Path,
@@ -448,7 +418,7 @@ def save_outputs(
         "bg_correction": bg_correction,
         "weight_eps": weight_eps,
         "weight_beta": weight_beta,
-        "isotonic": calibrator,
+        "monotonic_calibration": False,
         "sklearn_version": sklearn_version,
         "python_version": platform.python_version(),
         "bundle_created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -480,7 +450,7 @@ def save_outputs(
     coef_df.to_csv(coef_out, index=False, float_format=CSV_FLOAT_FORMAT)
 
 
-def load_model_bundle(path: Path, g_mode_override: Optional[str] = None) -> Tuple[object, str, str, float, bool, Optional[object]]:
+def load_model_bundle(path: Path, g_mode_override: Optional[str] = None) -> Tuple[object, str, str, float, bool]:
     """
     Backward-compatible helper for callers that imported inference helpers
     from this module before `predict.py` became the dedicated inference entry.
@@ -488,9 +458,8 @@ def load_model_bundle(path: Path, g_mode_override: Optional[str] = None) -> Tupl
     from predict import load_model_bundle as _load_bundle
 
     loaded = _load_bundle(path, g_mode_override)
-    _, model, g_mode, target_transform, target_eps, use_bg, *rest = loaded
-    calibrator = rest[-1] if rest else None
-    return model, g_mode, target_transform, target_eps, use_bg, calibrator
+    _, model, g_mode, target_transform, target_eps, use_bg, _bg_correction = loaded
+    return model, g_mode, target_transform, target_eps, use_bg
 
 
 def main() -> None:
@@ -555,7 +524,6 @@ def main() -> None:
     X = np.asarray(best_result["X"], dtype=float)
     y_pred_raw = np.asarray(best_result["y_pred_raw"], dtype=float)
     y_pred = np.asarray(best_result["y_pred"], dtype=float)
-    calibrator = best_result["calibrator"]
 
     y_pred_loo = run_leave_one_out(
         X,
@@ -582,7 +550,6 @@ def main() -> None:
         y_pred,
         y_pred_loo,
         model=model,
-        calibrator=calibrator if isinstance(calibrator, IsotonicRegression) else None,
         model_out=args.model_out,
         pred_out=args.pred_out,
         loo_out=loo_out,

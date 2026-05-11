@@ -11,9 +11,9 @@ from typing import Any, Dict, Optional
 # Paths
 # ============================================
 PROJECT_DIR = Path(__file__).resolve().parent
-DATA_DIR = Path(os.environ.get("PIC_RGB_DATA_DIR", str(PROJECT_DIR / "../dataset/RAW"))).expanduser().resolve()
+DATA_DIR = Path(os.environ.get("PIC_RGB_DATA_DIR", str(PROJECT_DIR / "../dataset/mate20x"))).expanduser().resolve()
 OUTPUT_DIR = Path(
-    os.environ.get("PIC_RGB_OUTPUT_DIR", str(PROJECT_DIR / "../dataset/RAW/roi_results"))
+    os.environ.get("PIC_RGB_OUTPUT_DIR", str(PROJECT_DIR / "../dataset/mate20x/roi_results"))
 ).expanduser().resolve()
 
 # ============================================
@@ -22,6 +22,9 @@ OUTPUT_DIR = Path(
 DEFAULT_PARAMS: Dict[str, Any] = {
     "fixed_roi_width": 160,
     "fixed_roi_height": 400,
+    "measurement_roi_width_fraction": 0.4,
+    "measurement_roi_height_fraction": 0.4,
+    "trim_fraction": 0.08,
     "roi_angle_deg": 0.0,
     "bg_ring_inner_x": 80,
     "bg_ring_inner_y": 80,
@@ -45,6 +48,9 @@ class ROISettings:
 
     fixed_roi_width: int = 160
     fixed_roi_height: int = 400
+    measurement_roi_width_fraction: float = 0.4
+    measurement_roi_height_fraction: float = 0.4
+    trim_fraction: float = 0.08
     roi_angle_deg: float = 0.0
     bg_ring_inner_x: int = 80
     bg_ring_inner_y: int = 80
@@ -131,6 +137,12 @@ def print_config():
     print(f"Output path: {OUTPUT_DIR}")
     print(f"\nROI params:")
     print(f"  Fixed ROI size: {settings.fixed_roi_width} x {settings.fixed_roi_height} px")
+    print(
+        "  Measurement ROI: "
+        f"{settings.measurement_roi_width_fraction:.3g} x width, "
+        f"{settings.measurement_roi_height_fraction:.3g} x height"
+    )
+    print(f"  Trimmed mean: drop darkest/brightest {settings.trim_fraction:.1%} pixels")
     print(f"  ROI angle: {settings.roi_angle_deg} deg")
     print(f"  BG ring inner: ({settings.bg_ring_inner_x}, {settings.bg_ring_inner_y}) px")
     print(f"  BG ring outer: ({settings.bg_ring_outer_x}, {settings.bg_ring_outer_y}) px")

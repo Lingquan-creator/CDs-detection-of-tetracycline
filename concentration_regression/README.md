@@ -1,6 +1,6 @@
 # concentration_regression
 
-本目录使用物理特征加 Ridge 回归做浓度反演。代码将 ROI/BG RAW 通道统计转换为对数光强、通道比值和差分特征，再用标准化后的 RidgeCV 预测浓度，并用 isotonic regression 做单调校准。
+本目录使用物理特征加 Ridge 回归做浓度反演。代码将 ROI/BG RAW 通道统计转换为对数光强、通道比值和差分特征，再用标准化后的 RidgeCV 预测浓度。
 
 ## 主要文件
 
@@ -95,7 +95,7 @@ relative: (ROI - BG) / (BG + eps)
    StandardScaler -> RidgeCV(alphas=(10000, 100000))
    ```
 
-6. 将预测反变换回浓度，并用 `IsotonicRegression(out_of_bounds="clip")` 校准。
+6. 将预测反变换回浓度，直接作为最终预测值。
 7. 执行 Leave-One-Out，输出训练集和 LOO 的 R2、RMSE、MAE。
 
 ## 常用命令
@@ -144,7 +144,7 @@ concentration_regression/rgb_fit_output/
 训练输出：
 
 - `concentration_model_v1.pkl`: `joblib` 模型 bundle。
-- `ridge_predictions.csv`: 训练集原始预测、校准预测和残差。
+- `ridge_predictions.csv`: 训练集原始预测、最终预测和残差；当前最终预测等于原始预测。
 - `ridge_predictions_loo.csv`: Leave-One-Out 预测和残差。
 - `ridge_coefficients.csv`: Ridge 特征系数。
 - `concentration_model_v1_evaluation.png`: 训练和 LOO 评估图。

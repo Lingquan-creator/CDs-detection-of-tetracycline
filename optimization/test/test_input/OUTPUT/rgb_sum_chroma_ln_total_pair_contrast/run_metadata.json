@@ -1,0 +1,22 @@
+{
+  "variant_id": "rgb_sum_chroma_ln_total_pair_contrast",
+  "feature_names": [
+    "RGB_sum",
+    "R_chroma",
+    "B_chroma",
+    "ln_RGB_sum",
+    "ln_RG_over_GB",
+    "ln_RB_over_GB"
+  ],
+  "train_csv": "/home/jzh/CDs/dataset/mate20x/roi_results/roi_detailed_statistics.csv",
+  "test_csv": "/home/jzh/CDs/dataset/food_2/roi_results/roi_detailed_statistics.csv",
+  "target_transform": "identity",
+  "selected_alpha": 100.0,
+  "train_metrics": {
+    "n": 24,
+    "r2": 0.998149885929806,
+    "rmse": 3.078897734718746,
+    "mae": 1.4250000000000025,
+    "mean_error": -0.08685717457079367
+  }
+}

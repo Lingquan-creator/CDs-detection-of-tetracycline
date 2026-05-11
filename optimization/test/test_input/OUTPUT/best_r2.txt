@@ -1,0 +1,5 @@
+variant_id=rgb_sum_chroma_ln_total_contrast
+r2=-0.282332
+rmse=39.9919
+mae=28.2189
+feature_names=RGB_sum;R_chroma;B_chroma;ln_RGB_sum;ln_R_over_G;ln_B_over_G

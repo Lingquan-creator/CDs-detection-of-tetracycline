@@ -1,0 +1,19 @@
+{
+  "variant_id": "ln_rgb",
+  "feature_names": [
+    "ln_R_sig",
+    "ln_G_sig",
+    "ln_B_sig"
+  ],
+  "train_csv": "/home/jzh/CDs/dataset/mate20x/roi_results/roi_detailed_statistics.csv",
+  "test_csv": "/home/jzh/CDs/dataset/food_2/roi_results/roi_detailed_statistics.csv",
+  "target_transform": "identity",
+  "selected_alpha": 100.0,
+  "train_metrics": {
+    "n": 24,
+    "r2": 0.9995448444101727,
+    "rmse": 1.5271297983329821,
+    "mae": 0.9387935692581938,
+    "mean_error": -0.038225726735893396
+  }
+}

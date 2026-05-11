@@ -1,7 +1,7 @@
 """
-Configuration for exponential fitting concentration pipeline.
+Configuration for response-function fitting concentration pipeline.
 
-Simplified config for pure exponential model: I = a * exp(b * C)
+The default training script compares exponential, linear, and quadratic RGB responses.
 """
 
 from __future__ import annotations
@@ -14,8 +14,8 @@ BASE_DIR = Path(__file__).resolve().parent
 ROI_STATS_PATH = BASE_DIR.parent / "dataset" / "food" / "roi_detailed_statistics.csv"
 OUTPUT_DIR = BASE_DIR / "exp_fit_output"
 
-# Exponential fitting defaults
-DEFAULT_CHANNEL = "light_best"  # Fit ROI-BG light intensity channels, then invert the best fitted channel
+# Response fitting defaults
+DEFAULT_CHANNEL = "light_best"  # Fit ROI-BG light intensity channels, then invert the best fitted channel/model
 DEFAULT_WEIGHT_EPS = 5.0  # Weighting parameter: weights ~ 1/(conc + eps)
 
 # Output filenames

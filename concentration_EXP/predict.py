@@ -11,14 +11,14 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 import matplotlib
 import numpy as np
 import pandas as pd
 
 from config import ExpConfig
-from train import AUTO_CHANNELS, BEST_CHANNEL_ALIASES, build_corrected_channels, predict_from_fitted_features
+from train import AUTO_CHANNELS, BEST_CHANNEL_ALIASES, build_corrected_channels, fit_id_for, predict_from_fitted_features
 from physics_features import extract_concentration_from_name
 
 matplotlib.use("Agg")
@@ -78,30 +78,54 @@ def load_fit_parameters(params_csv: Path, channel: str) -> Tuple[float, float, f
     return float(row["a"]), float(row["b"]), float(row["c"])
 
 
-def load_all_fit_parameters(params_csv: Path) -> dict[str, Tuple[float, float, float]]:
-    """Load all fitted feature parameters from exp_fit_params.csv."""
+def load_all_fit_parameters(params_csv: Path) -> dict[str, dict[str, Any]]:
+    """Load all fitted response models from exp_fit_params.csv."""
     if not params_csv.exists():
         raise FileNotFoundError(f"Parameters file not found: {params_csv}")
 
     df = pd.read_csv(params_csv)
-    required = {"channel", "a", "b", "c"}
+    required = {"channel"}
     missing = sorted(required - set(df.columns))
     if missing:
         raise ValueError(f"Parameters CSV missing required columns: {missing}")
 
-    params: dict[str, Tuple[float, float, float]] = {}
-    for row in df.itertuples(index=False):
-        channel = str(getattr(row, "channel"))
-        params[channel] = (
-            float(getattr(row, "a")),
-            float(getattr(row, "b")),
-            float(getattr(row, "c")),
-        )
-    return params
+    fitted_models: dict[str, dict[str, Any]] = {}
+    for _, row in df.iterrows():
+        channel = str(row["channel"])
+        model = str(row["model"]) if "model" in df.columns and pd.notna(row.get("model")) else "exponential_c0"
+        fit_id = str(row["fit_id"]) if "fit_id" in df.columns and pd.notna(row.get("fit_id")) else fit_id_for(channel, model)
+
+        if "params" in df.columns and pd.notna(row.get("params")):
+            params = tuple(float(value) for value in str(row["params"]).split(";") if value != "")
+        else:
+            params = tuple(
+                float(row[name])
+                for name in ("a", "b", "c")
+                if name in df.columns and pd.notna(row.get(name))
+            )
+            if model == "exponential_c0" and len(params) >= 2:
+                params = params[:2]
+        if not params:
+            p_cols = sorted([col for col in df.columns if col.startswith("p") and col[1:].isdigit()], key=lambda col: int(col[1:]))
+            params = tuple(float(row[col]) for col in p_cols if pd.notna(row.get(col)))
+        if not params:
+            continue
+
+        fitted_models[fit_id] = {
+            "fit_id": fit_id,
+            "channel": channel,
+            "model": model,
+            "params": params,
+            "conc_min": float(row["conc_min"]) if "conc_min" in df.columns and pd.notna(row.get("conc_min")) else 0.0,
+            "conc_max": float(row["conc_max"]) if "conc_max" in df.columns and pd.notna(row.get("conc_max")) else 500.0,
+            "inv_r2": float(row["inv_r2"]) if "inv_r2" in df.columns and pd.notna(row.get("inv_r2")) else np.nan,
+        }
+    return fitted_models
 
 
 def resolve_selected_feature_from_params(params_csv: Path, selected_channel: str) -> str:
-    if selected_channel not in BEST_CHANNEL_ALIASES:
+    fitted_models = load_all_fit_parameters(params_csv)
+    if selected_channel in fitted_models or selected_channel in (AUTO_CHANNELS - BEST_CHANNEL_ALIASES):
         return selected_channel
 
     df = pd.read_csv(params_csv)
@@ -109,10 +133,16 @@ def resolve_selected_feature_from_params(params_csv: Path, selected_channel: str
     if score_col not in df.columns:
         raise ValueError("Cannot use light_best because parameter CSV has no r2/inv_r2 column.")
     ranked = df[np.isfinite(pd.to_numeric(df[score_col], errors="coerce"))].copy()
+    if selected_channel not in BEST_CHANNEL_ALIASES:
+        ranked = ranked[ranked["channel"].astype(str) == selected_channel]
     if ranked.empty:
-        raise ValueError(f"Cannot use light_best because no fitted light channel has finite {score_col}.")
+        raise ValueError(f"Cannot resolve '{selected_channel}' because no fitted model has finite {score_col}.")
     ranked[score_col] = pd.to_numeric(ranked[score_col], errors="coerce")
-    return str(ranked.sort_values(score_col, ascending=False).iloc[0]["channel"])
+    best = ranked.sort_values(score_col, ascending=False).iloc[0]
+    if "fit_id" in ranked.columns and pd.notna(best.get("fit_id")):
+        return str(best["fit_id"])
+    model = str(best["model"]) if "model" in ranked.columns and pd.notna(best.get("model")) else "exponential_c0"
+    return fit_id_for(str(best["channel"]), model)
 
 
 def parse_args(default_cfg: ExpConfig) -> argparse.Namespace:
@@ -172,16 +202,20 @@ def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
     params_path = params_path.resolve()
 
     print(f"Loading parameters from {params_path}...")
-    params_by_channel = load_all_fit_parameters(params_path)
+    fitted_models = load_all_fit_parameters(params_path)
     selected_channel = resolve_selected_feature_from_params(params_path, args.channel)
-    if selected_channel in params_by_channel:
-        a, b, c = params_by_channel[selected_channel]
-        print(f"Using light channel: {selected_channel} (requested: {args.channel})")
-        print(f"Parameters: a={a:.6g}, b={b:.6g}, c={c:.6g}\n")
+    if selected_channel in fitted_models:
+        spec = fitted_models[selected_channel]
+        params_text = ", ".join(f"{float(value):.6g}" for value in spec["params"])
+        print(
+            f"Using fit: {selected_channel} "
+            f"(channel={spec['channel']}, model={spec['model']}, requested={args.channel})"
+        )
+        print(f"Parameters: {params_text}\n")
     elif selected_channel in AUTO_CHANNELS:
         print(f"Using aggregate light-channel mode: {args.channel}\n")
     else:
-        available = sorted(params_by_channel) + sorted(AUTO_CHANNELS)
+        available = sorted(fitted_models) + sorted(AUTO_CHANNELS)
         raise ValueError(f"Selected channel '{args.channel}' is unavailable. Available: {available}")
     
     # Load ROI data
@@ -193,17 +227,21 @@ def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
     corr = build_corrected_channels(df_raw)
     
     channels = [col for col in corr.columns if col != "exposure_time" and not col.endswith("_per_exp")]
-    conc_pred, feature_conc_pred = predict_from_fitted_features(corr, params_by_channel, channels, selected_channel)
+    conc_pred, feature_conc_pred = predict_from_fitted_features(corr, fitted_models, channels, selected_channel)
     
     # Prepare output
     output_df = pd.DataFrame({
         "filename": df_raw["filename"],
         "exposure_time": corr["exposure_time"],
         "conc_pred": conc_pred,
-        "selected_channel": selected_channel,
+        "selected_fit": selected_channel,
     })
-    if selected_channel in corr.columns:
-        output_df[f"{selected_channel}_value"] = corr[selected_channel]
+    if selected_channel in fitted_models:
+        spec = fitted_models[selected_channel]
+        output_df["selected_channel"] = str(spec["channel"])
+        output_df["selected_model"] = str(spec["model"])
+        if str(spec["channel"]) in corr.columns:
+            output_df[f"{spec['channel']}_value"] = corr[str(spec["channel"])]
     for ch in feature_conc_pred.columns:
         output_df[f"{ch}_conc_pred"] = feature_conc_pred[ch].to_numpy(dtype=float)
     conc_true = df_raw["filename"].apply(extract_concentration_from_name)

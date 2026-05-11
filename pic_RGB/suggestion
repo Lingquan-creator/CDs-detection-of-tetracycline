@@ -1,0 +1,359 @@
+可以直接计算荧光区域的平均 RGB 值，但**不建议只简单取整个发光区域平均值**。因为你的样品在**圆柱形比色皿**里，会有明显的空间不均匀：边缘折射、曲面透镜效应、液面反光、容器壁反射、中心与边缘光程不同。这些都会让 RGB 均值受到几何因素影响。
+
+更稳妥的做法是：
+**选取稳定 ROI → 做背景扣除 → 提取多个统计特征 → 再建模。**
+
+---
+
+## 1. 不要直接取整个比色皿区域
+
+圆柱形比色皿会导致图像中荧光强度分布不均匀。常见情况是：
+
+[
+I_{\text{center}} \neq I_{\text{edge}}
+]
+
+边缘可能更亮，也可能更暗，取决于光源、拍摄角度、容器折射和散射。因此，如果你直接对整个液体区域求平均：
+
+[
+R_{\text{mean}}=\frac{1}{N}\sum_i R_i
+]
+
+[
+G_{\text{mean}}=\frac{1}{N}\sum_i G_i
+]
+
+[
+B_{\text{mean}}=\frac{1}{N}\sum_i B_i
+]
+
+结果可能包含较强的几何误差。
+
+更推荐选择**中间一块稳定区域**，避开边缘、液面、底部和高光反射。
+
+---
+
+## 2. 推荐 ROI 选择方式
+
+对于圆柱形比色皿，建议取液体区域中央的矩形或椭圆 ROI。
+
+例如：
+
+```text
+不要选：
+- 比色皿边缘
+- 液面附近
+- 底部弯月面附近
+- 有反光高光的位置
+- 容器壁附近
+
+优先选：
+- 液体中部
+- 亮度分布较均匀区域
+- 每张图片位置一致的区域
+```
+
+如果图像中比色皿竖直放置，可以选择：
+
+[
+x \in [x_c - 0.2W,\ x_c + 0.2W]
+]
+
+[
+y \in [y_c - 0.2H,\ y_c + 0.2H]
+]
+
+也就是只取比色皿液体区域中间约 40% 宽度和 40% 高度的区域。
+
+这样可以减少边缘折射和液面反光的影响。
+
+---
+
+## 3. 背景区域也要取
+
+除了荧光液体 ROI，还应该取一个背景 ROI。
+
+背景 ROI 可以选在比色皿旁边、没有样品荧光的位置，但要与样品区域处于相似照明环境中。
+
+对每个通道做背景扣除：
+
+[
+R_{\text{corr}}=R_{\text{sample}}-R_{\text{bg}}
+]
+
+[
+G_{\text{corr}}=G_{\text{sample}}-G_{\text{bg}}
+]
+
+[
+B_{\text{corr}}=B_{\text{sample}}-B_{\text{bg}}
+]
+
+为了避免负数，可以写成：
+
+[
+R_{\text{corr}}=\max(R_{\text{sample}}-R_{\text{bg}},\epsilon)
+]
+
+[
+G_{\text{corr}}=\max(G_{\text{sample}}-G_{\text{bg}},\epsilon)
+]
+
+[
+B_{\text{corr}}=\max(B_{\text{sample}}-B_{\text{bg}},\epsilon)
+]
+
+其中 (\epsilon) 是很小的正数，防止后面取对数出错。
+
+---
+
+## 4. RGB 值建议不是只取 mean
+
+对于每张 DNG 图像，建议从 ROI 中提取以下特征：
+
+[
+R_{\text{mean}},G_{\text{mean}},B_{\text{mean}}
+]
+
+[
+R_{\text{median}},G_{\text{median}},B_{\text{median}}
+]
+
+[
+R_{\text{std}},G_{\text{std}},B_{\text{std}}
+]
+
+其中最重要的是 **mean** 和 **median**。
+
+平均值：
+
+[
+R_{\text{mean}}=\frac{1}{N}\sum_i R_i
+]
+
+优点是利用了整个 ROI 的总信号。
+
+中位数：
+
+[
+R_{\text{median}}=\text{median}(R_i)
+]
+
+优点是对局部反光、坏点、噪声点更不敏感。
+
+对于圆柱形比色皿，我更建议优先使用：
+
+[
+\boxed{
+R_{\text{median}},G_{\text{median}},B_{\text{median}}
+}
+]
+
+或者使用去除极端值后的均值：
+
+[
+R_{\text{trimmed mean}}
+]
+
+例如去掉最亮的 5% 和最暗的 5% 像素后再求平均。
+
+---
+
+## 5. 更推荐的 RGB 提取公式
+
+对于每张图片，可以这样计算：
+
+[
+R_s=\text{median}(R_{\text{sample ROI}})
+]
+
+[
+G_s=\text{median}(G_{\text{sample ROI}})
+]
+
+[
+B_s=\text{median}(B_{\text{sample ROI}})
+]
+
+背景：
+
+[
+R_b=\text{median}(R_{\text{background ROI}})
+]
+
+[
+G_b=\text{median}(G_{\text{background ROI}})
+]
+
+[
+B_b=\text{median}(B_{\text{background ROI}})
+]
+
+校正后：
+
+[
+R=R_s-R_b
+]
+
+[
+G=G_s-G_b
+]
+
+[
+B=B_s-B_b
+]
+
+然后再构造浓度预测特征：
+
+[
+r=\frac{R}{R+G+B}
+]
+
+[
+g=\frac{G}{R+G+B}
+]
+
+[
+b=\frac{B}{R+G+B}
+]
+
+以及通道比值：
+
+[
+\frac{R}{G},\quad \frac{B}{G},\quad \frac{R}{B}
+]
+
+如果是荧光猝灭，还可以用空白样归一化：
+
+[
+A_R=-\ln\frac{R}{R_0}
+]
+
+[
+A_G=-\ln\frac{G}{G_0}
+]
+
+[
+A_B=-\ln\frac{B}{B_0}
+]
+
+---
+
+## 6. 对圆柱形比色皿的特别建议
+
+因为圆柱形比色皿会产生透镜效应，所以 ROI 最好固定在**中心窄条区域**，而不是整个圆柱轮廓。
+
+例如取：
+
+[
+\text{ROI width} \approx 30%-50% \text{ of liquid width}
+]
+
+[
+\text{ROI height} \approx 30%-60% \text{ of liquid height}
+]
+
+不要取太靠近两侧的区域。
+
+如果荧光图像中心区域比较均匀，推荐：
+
+[
+\boxed{
+\text{中心矩形 ROI} + \text{median RGB} + \text{背景扣除}
+}
+]
+
+如果荧光分布不均匀但每次拍摄都很稳定，也可以取多个 ROI：
+
+[
+\text{上部 ROI},\quad \text{中部 ROI},\quad \text{下部 ROI}
+]
+
+分别提取 RGB，然后把它们作为模型特征。
+
+例如：
+
+[
+R_{\text{top}},R_{\text{mid}},R_{\text{bottom}}
+]
+
+[
+G_{\text{top}},G_{\text{mid}},G_{\text{bottom}}
+]
+
+[
+B_{\text{top}},B_{\text{mid}},B_{\text{bottom}}
+]
+
+但你只有 24 组数据，特征不能太多。建议最多用 1–3 个 ROI。
+
+---
+
+## 7. DNG/RAW 图像中 RGB 获取注意事项
+
+DNG 不是普通 JPEG。最好获取**线性 RAW 信号**，而不是经过色彩增强的显示 RGB。
+
+处理顺序建议是：
+
+[
+\text{DNG raw}
+\rightarrow
+\text{black level correction}
+\rightarrow
+\text{white level normalization}
+\rightarrow
+\text{demosaic 或 Bayer 通道统计}
+\rightarrow
+\text{ROI RGB}
+]
+
+如果用 Python，可以用 `rawpy` 读取 DNG。不要直接用 OpenCV 读取 DNG 后的普通显示图，因为那可能已经经过 gamma、白平衡、色彩矩阵或压缩处理。
+
+核心思路是：
+**尽量使用线性强度值，而不是视觉增强后的颜色值。**
+
+---
+
+## 8. 最实际的推荐方案
+
+对于你的实验，我建议每张图这样处理：
+
+1. 固定相机参数：曝光时间、ISO、白平衡、焦距、距离、光源强度。
+2. 从 DNG 中读取线性 RAW 数据。
+3. 在液体中央选择一个固定大小的 ROI。
+4. 避开圆柱边缘、液面、底部和反光点。
+5. 对 ROI 分别计算 (R,G,B) 的 median 和 trimmed mean。
+6. 在样品旁边选择背景 ROI，计算背景 RGB。
+7. 用样品 RGB 减去背景 RGB。
+8. 构造 (R,G,B,r,g,b,R/G,B/G,R/B) 和对数特征。
+9. 用 Ridge / PLS / SVR 做浓度回归。
+
+如果只能选一个最稳的 RGB 提取方式，我建议：
+
+[
+\boxed{
+\text{中心 ROI 的 RGB 中位数} - \text{背景 ROI 的 RGB 中位数}
+}
+]
+
+也就是：
+
+[
+\boxed{
+R=\text{median}(R_{\text{sample}})-\text{median}(R_{\text{bg}})
+}
+]
+
+[
+\boxed{
+G=\text{median}(G_{\text{sample}})-\text{median}(G_{\text{bg}})
+}
+]
+
+[
+\boxed{
+B=\text{median}(B_{\text{sample}})-\text{median}(B_{\text{bg}})
+}
+]
+
+这比直接取整个荧光区域平均值更适合圆柱形比色皿。

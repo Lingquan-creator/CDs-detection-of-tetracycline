@@ -1,12 +1,12 @@
 """
 Exponential Model Concentration Fitting and Inversion.
 
-Fits intensity = a * exp(b * conc) for each RGB channel, then inverts to predict concentration.
+Fits multiple response models for each RGB channel, then inverts the selected fit to predict concentration.
 
 Usage:
     python train.py                    # Use default ROI CSV
     python train.py --roi-csv <path>   # Custom ROI CSV
-    python train.py --channel G_sig    # Use averaged green ROI-BG light channel
+    python train.py --channel G_sig    # Use best fitted model for averaged green ROI-BG light channel
     python train.py --weight-eps 10.0  # Adjust low-concentration emphasis
 """
 
@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 import math
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib
 import numpy as np
@@ -34,6 +34,7 @@ EXP_LIGHT_CHANNELS = ("R_sig", "G1_sig", "G2_sig", "G_sig", "B_sig")
 AGGREGATE_CHANNELS = {"light_median", "light_mean", "feature_median", "feature_mean"}
 BEST_CHANNEL_ALIASES = {"light_best", "feature_best"}
 AUTO_CHANNELS = AGGREGATE_CHANNELS | BEST_CHANNEL_ALIASES
+FIT_MODEL_NAMES = ("exponential_c0", "exponential_offset", "linear", "quadratic")
 
 
 def format_plot_number(value: float, _pos: object = None) -> str:
@@ -64,11 +65,57 @@ def model_exponential(x: np.ndarray, a: float, b: float, c0: float = 0.0) -> np.
     return a * np.exp(np.clip(b * x, -700, 50)) + c0
 
 
+def model_linear(x: np.ndarray, slope: float, intercept: float) -> np.ndarray:
+    return slope * x + intercept
+
+
+def model_quadratic(x: np.ndarray, quad: float, slope: float, intercept: float) -> np.ndarray:
+    return quad * x * x + slope * x + intercept
+
+
 def _model_exponential_c0(x: np.ndarray, a: float, b: float) -> np.ndarray:
     """
     Pure exponential: y = a * exp(b*x), with baseline fixed at c=0.
     """
     return a * np.exp(np.clip(b * x, -700, 50))
+
+
+def _model_exponential_offset(x: np.ndarray, a: float, b: float, c0: float) -> np.ndarray:
+    return model_exponential(x, a, b, c0)
+
+
+def predict_response_model(model: str, conc: np.ndarray, params: Tuple[float, ...]) -> np.ndarray:
+    x = np.asarray(conc, dtype=float)
+    if model == "exponential_c0":
+        return model_exponential(x, float(params[0]), float(params[1]), 0.0)
+    if model == "exponential_offset":
+        return model_exponential(x, float(params[0]), float(params[1]), float(params[2]))
+    if model == "linear":
+        return model_linear(x, float(params[0]), float(params[1]))
+    if model == "quadratic":
+        return model_quadratic(x, float(params[0]), float(params[1]), float(params[2]))
+    raise ValueError(f"Unsupported response model: {model}")
+
+
+def fit_quality(y_true: np.ndarray, y_pred: np.ndarray) -> Tuple[float, float]:
+    y = np.asarray(y_true, dtype=float)
+    pred = np.asarray(y_pred, dtype=float)
+    valid = np.isfinite(y) & np.isfinite(pred)
+    if not np.any(valid):
+        return float("nan"), float("nan")
+    y = y[valid]
+    pred = pred[valid]
+    residuals = y - pred
+    rss = float(np.sum(residuals**2))
+    ss_tot = float(np.sum((y - float(np.mean(y))) ** 2))
+    r2 = 1.0 - rss / ss_tot if ss_tot > 0 else 1.0
+    rmse = float(math.sqrt(rss / len(y)))
+    return r2, rmse
+
+
+def _polyfit_weights(x: np.ndarray, weight_eps: float) -> np.ndarray:
+    sigma = np.sqrt(np.maximum(x + float(weight_eps), 1e-12))
+    return 1.0 / sigma
 
 
 def fit_exponential(
@@ -148,6 +195,75 @@ def fit_exponential(
     return (a, b, c0), float(r2), rmse
 
 
+def fit_response_model(
+    model: str,
+    conc: np.ndarray,
+    intensity: np.ndarray,
+    *,
+    weight_eps: float = 0.0,
+) -> Tuple[Tuple[float, ...], float, float, str]:
+    """
+    Fit one response model I=f(C) and return params, R2, RMSE, and equation text.
+    """
+    x = np.asarray(conc, dtype=float)
+    y = np.asarray(intensity, dtype=float)
+    if x.size < 3:
+        raise ValueError("Need at least 3 points to fit response model.")
+    if not np.isfinite(x).all() or not np.isfinite(y).all():
+        raise ValueError("Non-finite values found in data for response fit.")
+    if math.isclose(float(np.min(y)), float(np.max(y)), rel_tol=0.0, abs_tol=1e-12):
+        raise ValueError("Feature is nearly constant; cannot fit response model.")
+
+    if model == "exponential_c0":
+        params3, r2, rmse = fit_exponential(x, y, weight_eps=weight_eps)
+        a, b, _c0 = params3
+        return (a, b), r2, rmse, "I = a * exp(b*C), c fixed at 0"
+
+    if model == "exponential_offset":
+        try:
+            from scipy.optimize import curve_fit  # type: ignore[import-not-found]
+        except Exception as e:
+            raise RuntimeError(
+                "scipy is required for exponential fitting. Install it via `pip install scipy`."
+            ) from e
+
+        y_min = float(np.min(y))
+        y_max = float(np.max(y))
+        p0 = (max(y_max - y_min, 1e-6), -0.01, y_min)
+        bounds = ([0.0, -np.inf, -np.inf], [np.inf, 0.0, np.inf])
+        sigma = np.sqrt(np.maximum(x + float(weight_eps), 1e-12))
+        popt, _ = curve_fit(
+            _model_exponential_offset,
+            x,
+            y,
+            p0=p0,
+            bounds=bounds,
+            maxfev=30000,
+            sigma=sigma,
+            absolute_sigma=False,
+        )
+        params = tuple(float(v) for v in popt)
+        y_pred = predict_response_model(model, x, params)
+        r2, rmse = fit_quality(y, y_pred)
+        return params, r2, rmse, "I = a * exp(b*C) + c"
+
+    if model == "linear":
+        slope, intercept = np.polyfit(x, y, deg=1, w=_polyfit_weights(x, weight_eps))
+        params = (float(slope), float(intercept))
+        y_pred = predict_response_model(model, x, params)
+        r2, rmse = fit_quality(y, y_pred)
+        return params, r2, rmse, "I = m*C + k"
+
+    if model == "quadratic":
+        quad, slope, intercept = np.polyfit(x, y, deg=2, w=_polyfit_weights(x, weight_eps))
+        params = (float(quad), float(slope), float(intercept))
+        y_pred = predict_response_model(model, x, params)
+        r2, rmse = fit_quality(y, y_pred)
+        return params, r2, rmse, "I = q*C^2 + m*C + k"
+
+    raise ValueError(f"Unsupported response model: {model}")
+
+
 def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Tuple[float, float]:
     valid = np.isfinite(y_true) & np.isfinite(y_pred)
     if not np.any(valid):
@@ -222,37 +338,73 @@ def build_corrected_channels(df: pd.DataFrame) -> pd.DataFrame:
     return corr
 
 
+def invert_response_by_grid(
+    intensity: np.ndarray,
+    *,
+    model: str,
+    params: Tuple[float, ...],
+    conc_min: float,
+    conc_max: float,
+    grid_size: int = 5000,
+) -> np.ndarray:
+    """Numerically invert I=f(C) by nearest fitted intensity on the training concentration range."""
+    y = np.asarray(intensity, dtype=float)
+    if not np.isfinite(conc_min) or not np.isfinite(conc_max) or conc_max <= conc_min:
+        return np.full_like(y, np.nan, dtype=float)
+
+    x_grid = np.linspace(float(conc_min), float(conc_max), int(grid_size))
+    y_grid = predict_response_model(model, x_grid, params)
+    valid_grid = np.isfinite(y_grid)
+    if not np.any(valid_grid):
+        return np.full_like(y, np.nan, dtype=float)
+    x_grid = x_grid[valid_grid]
+    y_grid = y_grid[valid_grid]
+
+    out = np.full_like(y, np.nan, dtype=float)
+    for idx, value in enumerate(y):
+        if not np.isfinite(value):
+            continue
+        nearest = int(np.argmin(np.abs(y_grid - value)))
+        out[idx] = x_grid[nearest]
+    return out
+
+
+def fit_id_for(channel: str, model: str) -> str:
+    return f"{channel}__{model}"
+
+
 def predict_from_fitted_features(
     corrected_channels: pd.DataFrame,
-    params_by_channel: Dict[str, Tuple[float, float, float]],
+    fitted_models: Dict[str, Dict[str, Any]],
     channels: List[str],
     selected_channel: str,
 ) -> Tuple[np.ndarray, pd.DataFrame]:
-    """Invert one feature or aggregate all fitted feature inversions."""
+    """Invert one fitted response model or aggregate fitted model inversions."""
     pred_by_feature: Dict[str, np.ndarray] = {}
-    for ch in channels:
-        if ch not in params_by_channel:
+    for fit_id, spec in fitted_models.items():
+        ch = str(spec["channel"])
+        if ch not in channels or ch not in corrected_channels.columns:
             continue
-        a, b, c0 = params_by_channel[ch]
-        pred_by_feature[ch] = invert_exponential_intensity(
+        pred_by_feature[fit_id] = invert_response_by_grid(
             corrected_channels[ch].to_numpy(dtype=float),
-            a=a,
-            b=b,
-            c0=c0,
+            model=str(spec["model"]),
+            params=tuple(float(v) for v in spec["params"]),
+            conc_min=float(spec["conc_min"]),
+            conc_max=float(spec["conc_max"]),
         )
 
-    if selected_channel in params_by_channel:
+    if selected_channel in fitted_models:
         conc_pred = pred_by_feature[selected_channel]
     elif selected_channel in AGGREGATE_CHANNELS:
         if not pred_by_feature:
-            raise RuntimeError("No fitted feature channels are available for aggregate prediction.")
-        stacked = np.vstack([pred_by_feature[ch] for ch in channels if ch in pred_by_feature])
+            raise RuntimeError("No fitted response models are available for aggregate prediction.")
+        stacked = np.vstack([pred_by_feature[key] for key in pred_by_feature])
         if selected_channel in {"feature_mean", "light_mean"}:
             conc_pred = np.nanmean(stacked, axis=0)
         else:
             conc_pred = np.nanmedian(stacked, axis=0)
     else:
-        available = sorted(params_by_channel) + sorted(AUTO_CHANNELS)
+        available = sorted(fitted_models) + sorted(channels) + sorted(AUTO_CHANNELS)
         raise ValueError(f"Selected channel '{selected_channel}' is unavailable. Available: {available}")
 
     return np.maximum(np.asarray(conc_pred, dtype=float), 0.0), pd.DataFrame(pred_by_feature)
@@ -261,14 +413,23 @@ def predict_from_fitted_features(
 def resolve_selected_feature(
     selected_channel: str,
     fit_results: List[Dict[str, object]],
-    params_by_channel: Dict[str, Tuple[float, float, float]],
+    fitted_models: Dict[str, Dict[str, Any]],
 ) -> str:
-    if selected_channel not in BEST_CHANNEL_ALIASES:
+    if selected_channel in fitted_models or selected_channel in AGGREGATE_CHANNELS:
         return selected_channel
-    valid_results = [row for row in fit_results if str(row["channel"]) in params_by_channel and np.isfinite(float(row["inv_r2"]))]
+    valid_results = [
+        row
+        for row in fit_results
+        if str(row["fit_id"]) in fitted_models and np.isfinite(float(row["inv_r2"]))
+    ]
+    if selected_channel not in BEST_CHANNEL_ALIASES:
+        channel_results = [row for row in valid_results if str(row["channel"]) == selected_channel]
+        if not channel_results:
+            return selected_channel
+        return str(max(channel_results, key=lambda row: float(row["inv_r2"]))["fit_id"])
     if not valid_results:
-        raise RuntimeError("Cannot select best light channel because no fitted channel has finite inverse R2.")
-    return str(max(valid_results, key=lambda row: float(row["inv_r2"]))["channel"])
+        raise RuntimeError("Cannot select best light model because no fitted model has finite inverse R2.")
+    return str(max(valid_results, key=lambda row: float(row["inv_r2"]))["fit_id"])
 
 
 def parse_args(default_cfg: ExpConfig) -> argparse.Namespace:
@@ -364,9 +525,9 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
         if col != "exposure_time" and not col.endswith("_per_exp")
     ]
     results: List[Dict[str, object]] = []
-    params_by_channel: Dict[str, Tuple[float, float, float]] = {}
+    fitted_models: Dict[str, Dict[str, Any]] = {}
 
-    print(f"\nFitting exponential model to {len(df)} samples...")
+    print(f"\nFitting response models to {len(df)} samples...")
     print(f"Concentration range: {conc.min():.6g} - {conc.max():.6g} uM")
     print(f"Weight epsilon: {float(args.weight_eps):.6g}\n")
 
@@ -376,34 +537,66 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
             print(f"[SKIP] {ch}: all NaN values")
             continue
 
-        try:
-            (a, b, c0), r2, rmse = fit_exponential(
-                conc, y, weight_eps=float(args.weight_eps)
-            )
-            conc_fit_pred = np.maximum(invert_exponential_intensity(y, a=a, b=b, c0=c0), 0.0)
-            inv_r2, inv_rmse = regression_metrics(conc, conc_fit_pred)
-            params_by_channel[ch] = (a, b, c0)
-            results.append({
-                "channel": ch,
-                "fit_signal": ch,
-                "a": a,
-                "b": b,
-                "c": c0,
-                "r2": r2,
-                "rmse": rmse,
-                "inv_r2": inv_r2,
-                "inv_rmse": inv_rmse,
-            })
-            print(
-                f"[FIT] {ch:8s}: a={a:9.6g}, b={b:9.6g}, c={c0:9.6g}  "
-                f"R2={r2:.6g}  RMSE={rmse:.6g}  inv_R2={inv_r2:.6g}  inv_RMSE={inv_rmse:.6g}"
-            )
-        except Exception as e:
-            print(f"[FAIL] {ch}: {e}")
-            continue
+        for model_name in FIT_MODEL_NAMES:
+            try:
+                params, r2, rmse, equation = fit_response_model(
+                    model_name,
+                    conc,
+                    y,
+                    weight_eps=float(args.weight_eps),
+                )
+                fit_id = fit_id_for(ch, model_name)
+                spec = {
+                    "fit_id": fit_id,
+                    "channel": ch,
+                    "model": model_name,
+                    "params": params,
+                    "conc_min": float(np.min(conc)),
+                    "conc_max": float(np.max(conc)),
+                }
+                conc_fit_pred = np.maximum(
+                    invert_response_by_grid(
+                        y,
+                        model=model_name,
+                        params=params,
+                        conc_min=float(np.min(conc)),
+                        conc_max=float(np.max(conc)),
+                    ),
+                    0.0,
+                )
+                inv_r2, inv_rmse = regression_metrics(conc, conc_fit_pred)
+                fitted_models[fit_id] = spec
+                row: Dict[str, object] = {
+                    "fit_id": fit_id,
+                    "channel": ch,
+                    "fit_signal": ch,
+                    "model": model_name,
+                    "equation": equation,
+                    "params": ";".join(f"{value:.12g}" for value in params),
+                    "r2": r2,
+                    "rmse": rmse,
+                    "inv_r2": inv_r2,
+                    "inv_rmse": inv_rmse,
+                    "conc_min": float(np.min(conc)),
+                    "conc_max": float(np.max(conc)),
+                }
+                for idx, value in enumerate(params):
+                    row[f"p{idx}"] = float(value)
+                # Legacy columns keep old exponential scripts readable where possible.
+                row["a"] = float(params[0]) if len(params) > 0 else np.nan
+                row["b"] = float(params[1]) if len(params) > 1 else np.nan
+                row["c"] = float(params[2]) if len(params) > 2 else 0.0
+                results.append(row)
+                print(
+                    f"[FIT] {fit_id:28s}: R2={r2:.6g}  RMSE={rmse:.6g}  "
+                    f"inv_R2={inv_r2:.6g}  inv_RMSE={inv_rmse:.6g}"
+                )
+            except Exception as e:
+                print(f"[FAIL] {ch} / {model_name}: {e}")
+                continue
 
     if not results:
-        raise RuntimeError("Exponential fit failed for all channels.")
+        raise RuntimeError("Response model fitting failed for all channels.")
 
     # Ensure output directories exist
     params_out.parent.mkdir(parents=True, exist_ok=True)
@@ -423,20 +616,26 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     for ch in channels:
         pred_df[ch] = corr[ch]
         pred_df[f"{ch}_per_exp"] = corr[f"{ch}_per_exp"]
-        if ch in params_by_channel:
-            a, b, c0 = params_by_channel[ch]
-            pred_df[f"{ch}_pred"] = model_exponential(conc, a, b, c0)
-        else:
-            pred_df[f"{ch}_pred"] = np.nan
+        for model_name in FIT_MODEL_NAMES:
+            fit_id = fit_id_for(ch, model_name)
+            if fit_id in fitted_models:
+                spec = fitted_models[fit_id]
+                pred_df[f"{fit_id}_pred"] = predict_response_model(
+                    model_name,
+                    conc,
+                    tuple(float(v) for v in spec["params"]),
+                )
+            else:
+                pred_df[f"{fit_id}_pred"] = np.nan
 
     pred_df.to_csv(pred_out, index=False, float_format=CSV_FLOAT_FORMAT)
     print(f"Saved intensity predictions -> {pred_out}")
 
     # Invert selected feature, or aggregate all fitted feature inversions.
-    selected_channel = resolve_selected_feature(args.channel, results, params_by_channel)
+    selected_channel = resolve_selected_feature(args.channel, results, fitted_models)
     if selected_channel != args.channel:
         print(f"\nResolved channel '{args.channel}' -> '{selected_channel}'")
-    conc_pred, feature_conc_pred = predict_from_fitted_features(corr, params_by_channel, channels, selected_channel)
+    conc_pred, feature_conc_pred = predict_from_fitted_features(corr, fitted_models, channels, selected_channel)
 
     # Save concentration predictions
     conc_out = resolve_output_path(args.conc_out, cfg.concentration_path_for(args.roi_csv), cfg.output_dir)
@@ -447,11 +646,14 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
         "exposure_time": corr["exposure_time"],
         "conc_pred": conc_pred,
         "conc_true": conc,
-        "selected_channel": selected_channel,
+        "selected_fit": selected_channel,
         "residual": conc_pred - conc,
     })
-    if selected_channel in corr.columns:
-        out_df[f"{selected_channel}_value"] = corr[selected_channel]
+    if selected_channel in fitted_models:
+        selected_spec = fitted_models[selected_channel]
+        out_df["selected_channel"] = str(selected_spec["channel"])
+        out_df["selected_model"] = str(selected_spec["model"])
+        out_df[f"{selected_spec['channel']}_value"] = corr[str(selected_spec["channel"])]
     for ch in feature_conc_pred.columns:
         out_df[f"{ch}_conc_pred"] = feature_conc_pred[ch].to_numpy(dtype=float)
     out_df.to_csv(conc_out, index=False, float_format=CSV_FLOAT_FORMAT)
@@ -462,7 +664,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
         r2_final = 1 - np.sum((conc[valid_mask] - conc_pred[valid_mask])**2) / np.sum((conc[valid_mask] - conc[valid_mask].mean())**2)
         rmse_final = np.sqrt(np.mean((conc[valid_mask] - conc_pred[valid_mask])**2))
         print(f"\nSaved concentration predictions -> {conc_out}")
-        print(f"\nFinal Evaluation (channel={selected_channel}, requested={args.channel}):")
+        print(f"\nFinal Evaluation (selected={selected_channel}, requested={args.channel}):")
         print(f"  R2 = {r2_final:.6g}")
         print(f"  RMSE = {rmse_final:.6g} uM")
     else:
@@ -473,7 +675,7 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     draw_fit_visualization(
         conc=conc,
         corrected_channels=corr,
-        params_by_channel=params_by_channel,
+        fitted_models=fitted_models,
         selected_channel=selected_channel,
         conc_pred=conc_pred,
         out_path=plot_out,
@@ -485,7 +687,7 @@ def draw_fit_visualization(
     *,
     conc: np.ndarray,
     corrected_channels: pd.DataFrame,
-    params_by_channel: Dict[str, Tuple[float, float, float]],
+    fitted_models: Dict[str, Dict[str, Any]],
     selected_channel: str,
     conc_pred: np.ndarray,
     out_path: Path,
@@ -504,11 +706,18 @@ def draw_fit_visualization(
         ax = axes[idx]
         y = corrected_channels[ch].to_numpy(dtype=float)
         ax.scatter(conc, y, s=20, alpha=0.7, label="Measured")
-        if ch in params_by_channel:
-            a, b, c0 = params_by_channel[ch]
-            y_curve = model_exponential(x_curve, a, b, c0)
-            ax.plot(x_curve, y_curve, "r-", linewidth=1.5, label="Fit")
-            ax.set_title(f"{ch}: fit")
+        channel_specs = [spec for spec in fitted_models.values() if str(spec["channel"]) == ch]
+        if channel_specs:
+            for spec in channel_specs:
+                model_name = str(spec["model"])
+                y_curve = predict_response_model(
+                    model_name,
+                    x_curve,
+                    tuple(float(v) for v in spec["params"]),
+                )
+                linewidth = 2.0 if str(spec["fit_id"]) == selected_channel else 1.2
+                ax.plot(x_curve, y_curve, linewidth=linewidth, label=model_name)
+            ax.set_title(f"{ch}: response fits")
         else:
             ax.set_title(f"{ch}: skipped")
         ax.set_xlabel("Concentration (uM)")

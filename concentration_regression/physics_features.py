@@ -256,15 +256,34 @@ def build_feature_frame(
     r_sig_per_exp = r_sig / exposure
     g_sig_per_exp = g_sig / exposure
     b_sig_per_exp = b_sig / exposure
+    rgb_sum = np.maximum(r_sig + g_sig + b_sig, _EPS)
+    rg_sum = np.maximum(r_sig + g_sig, _EPS)
+    rb_sum = np.maximum(r_sig + b_sig, _EPS)
+    gb_sum = np.maximum(g_sig + b_sig, _EPS)
 
     features = pd.DataFrame(
         {
+            "R_sig" if use_bg else "R": r_sig,
+            "G_sig" if use_bg else "G": g_sig,
+            "B_sig" if use_bg else "B": b_sig,
+            "RGB_sum": rgb_sum,
+            "R_chroma": r_sig / rgb_sum,
+            "G_chroma": g_sig / rgb_sum,
+            "B_chroma": b_sig / rgb_sum,
             "ln_R_sig" if use_bg else "ln_R": np.log(r_sig + _EPS),
             "ln_G_sig" if use_bg else "ln_G": np.log(g_sig + _EPS),
             "ln_B_sig" if use_bg else "ln_B": np.log(b_sig + _EPS),
+            "ln_RGB_sum": np.log(rgb_sum + _EPS),
+            "ln_RG_sum": np.log(rg_sum + _EPS),
+            "ln_RB_sum": np.log(rb_sum + _EPS),
+            "ln_GB_sum": np.log(gb_sum + _EPS),
             "ln_R_sig_per_exp" if use_bg else "ln_R_per_exp": np.log(r_sig_per_exp + _EPS),
             "ln_G_sig_per_exp" if use_bg else "ln_G_per_exp": np.log(g_sig_per_exp + _EPS),
             "ln_B_sig_per_exp" if use_bg else "ln_B_per_exp": np.log(b_sig_per_exp + _EPS),
+            "ln_R_over_G": np.log(r_sig + _EPS) - np.log(g_sig + _EPS),
+            "ln_B_over_G": np.log(b_sig + _EPS) - np.log(g_sig + _EPS),
+            "ln_RG_over_GB": np.log(rg_sum + _EPS) - np.log(gb_sum + _EPS),
+            "ln_RB_over_GB": np.log(rb_sum + _EPS) - np.log(gb_sum + _EPS),
             "Ratio_RG": r_sig / (g_sig + _EPS),
             "Delta_RG": (g_sig - r_sig) / (g_sig + r_sig + _EPS),
             "Ratio_BG": b_sig / (g_sig + _EPS),

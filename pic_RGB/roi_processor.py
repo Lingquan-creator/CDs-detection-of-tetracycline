@@ -49,6 +49,11 @@ class ROIResult:
     width: float
     height: float
     angle_deg: float
+    measurement_center_x: float
+    measurement_center_y: float
+    measurement_width: float
+    measurement_height: float
+    measurement_angle_deg: float
     bg_center_x: float
     bg_center_y: float
     bg_inner_center_x: float
@@ -224,6 +229,32 @@ class ROIProcessor:
         except (TypeError, ValueError):
             return default
 
+    @staticmethod
+    def _convert_roi_csv_to_json(csv_path: Path, json_path: Path) -> bool:
+        """Convert roi_detailed_statistics.csv into roi_results.json for selection reuse."""
+        if not csv_path.exists():
+            return False
+        try:
+            with open(csv_path, "r", encoding="utf-8-sig", newline="") as f:
+                rows = [dict(row) for row in csv.DictReader(f) if row.get("filename")]
+        except Exception as exc:
+            print(f"  警告: 无法读取 ROI CSV 复用文件 {csv_path}: {exc}")
+            return False
+
+        if not rows:
+            print(f"  警告: ROI CSV 复用文件为空: {csv_path}")
+            return False
+
+        try:
+            json_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(rows, f, indent=2, ensure_ascii=False)
+            print(f"  未找到 {json_path.name}，已由 {csv_path.name} 转换生成")
+            return True
+        except Exception as exc:
+            print(f"  警告: 无法写入由 CSV 转换的 ROI JSON {json_path}: {exc}")
+            return False
+
     def _load_selection_cache(self) -> Dict[str, Tuple[ROISelection, BackgroundSelection]]:
         """Load previous selections from roi_results.json and optional cache file."""
         cache: Dict[str, Tuple[ROISelection, BackgroundSelection]] = {}
@@ -300,8 +331,12 @@ class ROIProcessor:
                     except Exception:
                         continue
 
-        # 1) load from previous roi_results.json as baseline
-        load_from_path(OUTPUT_DIR / "roi_results.json", "roi_results.json")
+        # 1) load from previous roi_results.json as baseline. If the JSON is missing,
+        # fall back to roi_detailed_statistics.csv and convert it once.
+        roi_results_json = OUTPUT_DIR / "roi_results.json"
+        if not roi_results_json.exists():
+            self._convert_roi_csv_to_json(OUTPUT_DIR / "roi_detailed_statistics.csv", roi_results_json)
+        load_from_path(roi_results_json, "roi_results.json")
         # 2) overlay with dedicated selection cache (latest GUI choices in单张处理)
         if self.selection_cache_path:
             load_from_path(self.selection_cache_path, str(self.selection_cache_path))
@@ -422,14 +457,29 @@ class ROIProcessor:
             raw_channels = np.stack([R, G1, G2, B], axis=-1)
             return raw_channels, metadata
 
+    def _trimmed_mean(self, values: np.ndarray) -> float:
+        trim_fraction = float(np.clip(self.settings.trim_fraction, 0.0, 0.49))
+        finite_values = np.asarray(values, dtype=float)
+        finite_values = finite_values[np.isfinite(finite_values)]
+        if finite_values.size == 0:
+            return 0.0
+        if trim_fraction <= 0.0:
+            return float(np.mean(finite_values))
+
+        low, high = np.quantile(finite_values, [trim_fraction, 1.0 - trim_fraction])
+        trimmed = finite_values[(finite_values >= low) & (finite_values <= high)]
+        if trimmed.size == 0:
+            trimmed = finite_values
+        return float(np.mean(trimmed))
+
     def compute_roi_statistics(self, raw_channels: np.ndarray, roi_mask: np.ndarray, metadata: Optional[Dict] = None) -> Dict[str, float]:
-        """计算当前输入向量所需的四通道均值。"""
+        """计算当前输入向量所需的四通道截尾均值。"""
         stats: Dict[str, float] = {}
         for i, name in enumerate(RAW_CHANNELS):
             channel_data = raw_channels[:, :, i]
             roi_values = channel_data[roi_mask > 0]
             if len(roi_values) > 0:
-                stats[f"{name}_mean"] = float(np.mean(roi_values))
+                stats[f"{name}_mean"] = self._trimmed_mean(roi_values)
             else:
                 stats[f"{name}_mean"] = 0.0
 
@@ -553,6 +603,14 @@ class ROIProcessor:
             )
         return roi_sel, bg_sel
 
+    def _measurement_roi_geometry(self, roi_sel: ROISelection) -> Tuple[Tuple[float, float], float, float, float]:
+        """Return the central measurement ROI inside the user-selected luminous region."""
+        width_fraction = float(np.clip(self.settings.measurement_roi_width_fraction, 0.0, 1.0))
+        height_fraction = float(np.clip(self.settings.measurement_roi_height_fraction, 0.0, 1.0))
+        measurement_width = max(1.0, float(roi_sel.width) * width_fraction)
+        measurement_height = max(1.0, float(roi_sel.height) * height_fraction)
+        return roi_sel.center, measurement_width, measurement_height, float(roi_sel.angle_deg)
+
     def _process_loaded_image(
         self,
         filepath: Path,
@@ -564,8 +622,18 @@ class ROIProcessor:
         output_dir: Optional[Path],
     ) -> ROIResult:
         H, W = raw_channels.shape[:2]
-        roi_mask = self.manual.create_fixed_roi(
+        selected_roi_mask = self.manual.create_fixed_roi(
             roi_sel.center, (H, W), roi_sel.width, roi_sel.height, roi_sel.angle_deg
+        )
+        measurement_center, measurement_width, measurement_height, measurement_angle = (
+            self._measurement_roi_geometry(roi_sel)
+        )
+        roi_mask = self.manual.create_fixed_roi(
+            measurement_center,
+            (H, W),
+            measurement_width,
+            measurement_height,
+            measurement_angle,
         )
         bg_mask = self.manual.create_background_roi(
             bg_sel.outer_center,
@@ -577,7 +645,7 @@ class ROIProcessor:
             inner_height=bg_sel.inner_y,
             outer_width=bg_sel.outer_x,
             outer_height=bg_sel.outer_y,
-            exclude_mask=roi_mask,
+            exclude_mask=selected_roi_mask,
         )
 
         roi_stats = self.compute_roi_statistics(raw_channels, roi_mask, metadata)
@@ -614,14 +682,14 @@ class ROIProcessor:
             B_display = min(B_display, saturability)
 
         area = int(np.sum(roi_mask))
-        roi_box = self.manual.get_rotated_box(
-            roi_sel.center, roi_sel.width, roi_sel.height, roi_sel.angle_deg
+        measurement_box = self.manual.get_rotated_box(
+            measurement_center, measurement_width, measurement_height, measurement_angle
         )
         bbox = (
-            int(np.clip(np.min(roi_box[:, 0]), 0, W - 1)),
-            int(np.clip(np.min(roi_box[:, 1]), 0, H - 1)),
-            int(np.clip(np.max(roi_box[:, 0]), 0, W - 1)),
-            int(np.clip(np.max(roi_box[:, 1]), 0, H - 1)),
+            int(np.clip(np.min(measurement_box[:, 0]), 0, W - 1)),
+            int(np.clip(np.min(measurement_box[:, 1]), 0, H - 1)),
+            int(np.clip(np.max(measurement_box[:, 0]), 0, W - 1)),
+            int(np.clip(np.max(measurement_box[:, 1]), 0, H - 1)),
         )
 
         result = ROIResult(
@@ -632,6 +700,11 @@ class ROIProcessor:
             width=float(roi_sel.width),
             height=float(roi_sel.height),
             angle_deg=float(roi_sel.angle_deg),
+            measurement_center_x=measurement_center[0],
+            measurement_center_y=measurement_center[1],
+            measurement_width=float(measurement_width),
+            measurement_height=float(measurement_height),
+            measurement_angle_deg=float(measurement_angle),
             bg_center_x=bg_sel.outer_center[0],
             bg_center_y=bg_sel.outer_center[1],
             bg_inner_center_x=bg_sel.inner_center[0],
@@ -668,6 +741,12 @@ class ROIProcessor:
         print(
             f"  特征向量: R={R_corrected:.1f}, G1={G1_corrected:.1f}, G2={G2_corrected:.1f}, B={B_corrected:.1f}"
         )
+        print(
+            "  统计ROI: "
+            f"center=({measurement_center[0]:.1f}, {measurement_center[1]:.1f}), "
+            f"size={measurement_width:.1f}x{measurement_height:.1f}, "
+            f"angle={measurement_angle:.1f}°"
+        )
 
         if save_visualization and output_dir is not None:
             self._save_visualization(
@@ -697,7 +776,7 @@ class ROIProcessor:
 
         ax = axes[0, 1]
         ax.imshow(roi_mask, cmap="Reds")
-        ax.set_title("ROI mask")
+        ax.set_title("统计 ROI mask")
         ax.axis("off")
 
         ax = axes[0, 2]
@@ -716,8 +795,14 @@ class ROIProcessor:
         )
         rgb_image = np.clip(rgb_image / np.percentile(rgb_image, 99.5), 0, 1)
         ax.imshow(rgb_image)
-        roi_box = self.manual.get_rotated_box(
+        selected_roi_box = self.manual.get_rotated_box(
             (result.center_x, result.center_y), result.width, result.height, result.angle_deg
+        )
+        measurement_roi_box = self.manual.get_rotated_box(
+            (result.measurement_center_x, result.measurement_center_y),
+            result.measurement_width,
+            result.measurement_height,
+            result.measurement_angle_deg,
         )
         bg_outer_box = self.manual.get_rotated_box(
             (result.bg_outer_center_x, result.bg_outer_center_y),
@@ -733,11 +818,21 @@ class ROIProcessor:
         )
         ax.add_patch(plt.Polygon(bg_outer_box, closed=True, fill=False, edgecolor="orange", linewidth=2))
         ax.add_patch(plt.Polygon(bg_inner_box, closed=True, fill=False, edgecolor="orange", linewidth=1.5, linestyle="--"))
-        ax.add_patch(plt.Polygon(roi_box, closed=True, fill=False, edgecolor="red", linewidth=2))
+        ax.add_patch(
+            plt.Polygon(
+                selected_roi_box,
+                closed=True,
+                fill=False,
+                edgecolor="red",
+                linewidth=1.5,
+                linestyle="--",
+            )
+        )
+        ax.add_patch(plt.Polygon(measurement_roi_box, closed=True, fill=False, edgecolor="red", linewidth=2))
         ax.plot(result.center_x, result.center_y, "r+", markersize=12, markeredgewidth=2)
         ax.plot(result.bg_inner_center_x, result.bg_inner_center_y, "yx", markersize=10, markeredgewidth=2)
         ax.plot(result.bg_outer_center_x, result.bg_outer_center_y, "yx", markersize=10, markeredgewidth=2)
-        ax.set_title("RGB 伪彩 + ROI/BG")
+        ax.set_title("RGB 伪彩 + 选区/统计ROI/BG")
         ax.axis("off")
 
         ax = axes[1, 1]
@@ -850,6 +945,11 @@ class ROIProcessor:
             "width",
             "height",
             "angle_deg",
+            "measurement_center_x",
+            "measurement_center_y",
+            "measurement_width",
+            "measurement_height",
+            "measurement_angle_deg",
             "bg_inner_center_x",
             "bg_inner_center_y",
             "bg_outer_center_x",
@@ -907,6 +1007,11 @@ class ROIProcessor:
             "width": f"{r.width:.6f}",
             "height": f"{r.height:.6f}",
             "angle_deg": f"{r.angle_deg:.6f}",
+            "measurement_center_x": f"{r.measurement_center_x:.6f}",
+            "measurement_center_y": f"{r.measurement_center_y:.6f}",
+            "measurement_width": f"{r.measurement_width:.6f}",
+            "measurement_height": f"{r.measurement_height:.6f}",
+            "measurement_angle_deg": f"{r.measurement_angle_deg:.6f}",
             "bg_inner_center_x": f"{r.bg_inner_center_x:.6f}",
             "bg_inner_center_y": f"{r.bg_inner_center_y:.6f}",
             "bg_outer_center_x": f"{r.bg_outer_center_x:.6f}",

@@ -6,7 +6,7 @@
 DNG 图像 -> ROI/BG 选择 -> RAW Bayer 四通道统计 -> 物理特征构造 -> 岭回归浓度预测
 ```
 
-项目重点使用 DNG 原始图像而不是 JPEG/PNG 等压缩图像。DNG 保留更接近传感器线性响应的 Bayer RAW 数据，适合做定量分析。当前建模主线为 `concentration_regression` 中的岭回归；`concentration_EXP` 作为指数拟合基线，`concentration_GS` 作为概率后验模型实验。
+项目重点使用 DNG 原始图像而不是 JPEG/PNG 等压缩图像。DNG 保留更接近传感器线性响应的 Bayer RAW 数据，适合做定量分析。当前建模主线为 `concentration_regression` 中的岭回归；`concentration_EXP` 作为通道响应函数拟合基线，`concentration_GS` 作为概率后验模型实验。
 
 ## 目录结构
 
@@ -14,7 +14,7 @@ DNG 图像 -> ROI/BG 选择 -> RAW Bayer 四通道统计 -> 物理特征构造 -
 application/                 桌面应用，集成 DNG 打开、ROI/BG 选择和浓度预测
 article/                     项目说明、论文式文档和参考文献材料
 concentration_regression/    当前主线：物理特征 + Ridge 回归 + 单调校准
-concentration_EXP/           指数拟合浓度反演基线
+concentration_EXP/           通道响应函数拟合浓度反演基线
 concentration_GS/            PyTorch 摊销后验浓度模型
 dataset/                     DNG 图像、ROI 缓存和 ROI 统计输出
 fit_data/                    光谱 CSV 的峰拟合、积分拟合和参数趋势分析
@@ -137,7 +137,7 @@ parameter_scan/OUTPUT/
 
 ## 其他模型和分析模块
 
-### 指数拟合基线
+### 响应函数拟合基线
 
 ```bash
 python concentration_EXP/train.py
@@ -146,7 +146,7 @@ python concentration_EXP/predict.py \
   --roi-csv dataset/food/roi_detailed_statistics.csv
 ```
 
-该模块用于把单通道背景扣除光强拟合为指数模型，主要作为岭回归方法的基线对比。
+该模块用于把单通道背景扣除光强拟合为指数、线性、二次等响应函数，主要作为岭回归方法的基线对比。
 
 ### GS 后验模型
 
@@ -183,7 +183,7 @@ python fit_data/plot_fit_results.py
 ```text
 Regression    Ridge 回归模型
 GS posterior  摊销后验模型
-EXP           指数拟合基线模型
+EXP           响应函数拟合基线模型
 ```
 
 打包脚本：
@@ -219,7 +219,7 @@ Delta_GB
 
 - `pic_RGB/README.md`: DNG 解析、ROI/BG 选择和特征输出。
 - `concentration_regression/README.md`: Ridge 训练、预测、特征和输出。
-- `concentration_EXP/README.md`: 指数拟合基线。
+- `concentration_EXP/README.md`: 响应函数拟合基线。
 - `concentration_GS/README.md`: 后验模型训练和预测。
 - `fit_data/README.md`: 光谱 CSV 拟合分析。
 - `application/README.md`: 桌面应用运行和打包。

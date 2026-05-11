@@ -6,7 +6,7 @@
 
 - `config.py`: 定义默认路径、输出文件名、目标变换、背景校正方式、特征集合和 Ridge 正则网格。
 - `physics_features.py`: 从 ROI CSV 构造物理特征，支持背景扣除、背景相除、相对背景校正和曝光时间特征。
-- `train.py`: 训练入口。训练 RidgeCV，拟合 isotonic 单调校准器，执行 Leave-One-Out，保存模型、预测、系数和评估图。
+- `train.py`: 训练入口。训练 RidgeCV，执行 Leave-One-Out，保存模型、预测、系数和评估图。
 - `predict.py`: 预测入口。加载 `joblib` 模型 bundle，对新的 ROI CSV 构造同名特征并输出浓度预测。
 - `rgb_fit_output/plot_comparison.py`, `rgb_fit_output/plot_ridge_results.py`: 历史结果可视化辅助脚本。
 
@@ -102,8 +102,8 @@ exposure_time, ln_exposure
    C_raw = exp(y_pred) - eps
    ```
 
-9. 用训练预测和真实浓度拟合 `IsotonicRegression(out_of_bounds="clip")`，得到单调校准后的 `conc_pred`。
-10. 执行 Leave-One-Out。每折在训练子集上重新训练 RidgeCV，并在该折训练预测上拟合 isotonic 校准器。
+9. 将反变换后的 `C_raw` 直接作为 `conc_pred`。
+10. 执行 Leave-One-Out。每折在训练子集上重新训练 RidgeCV，并直接输出该折预测。
 11. 输出训练集和 LOO 的 R2、RMSE、MAE。
 
 ## 预测流程
@@ -117,7 +117,7 @@ exposure_time, ln_exposure
 - `target_eps`
 - `use_bg`
 - `bg_correction`
-- `isotonic`
+- `monotonic_calibration`
 
 预测时按模型保存的特征名从新 CSV 中重建特征。如果模型需要背景列但新 CSV 缺失，代码会退回非背景特征并打印警告；但如果保存的 `feature_names` 仍要求背景特征，最终会报缺失特征错误。
 
@@ -134,7 +134,7 @@ concentration_regression/rgb_fit_output/
 训练输出：
 
 - `concentration_model_v1.pkl`: `joblib` 模型 bundle。
-- `ridge_predictions.csv`: 训练集 `conc_pred_raw`、校准后 `conc_pred` 和残差。
+- `ridge_predictions.csv`: 训练集 `conc_pred_raw`、最终 `conc_pred` 和残差；当前二者相同。
 - `ridge_predictions_loo.csv`: Leave-One-Out 预测和残差。
 - `ridge_coefficients.csv`: Ridge 系数，列名为保存的特征名。
 - `concentration_model_v1_evaluation.png`: 训练集和 LOO 预测散点图。
