@@ -135,6 +135,13 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
         help="Feature set: compact=ln RGB + ratios; compact_exposure adds exposure_time.",
     )
     parser.add_argument(
+        "--feature-list",
+        help=(
+            "Comma/whitespace separated custom feature columns, or a text file containing them. "
+            "When set, --feature-set is ignored."
+        ),
+    )
+    parser.add_argument(
         "--bg-correction",
         choices=["subtract", "divide", "relative"],
         default=getattr(default_cfg, "bg_correction", DEFAULT_BG_CORRECTION),
@@ -257,6 +264,34 @@ def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: s
     return feature_df.loc[:, list(selected_columns)]
 
 
+def resolve_feature_list(feature_list_arg: Optional[str]) -> Optional[Tuple[str, ...]]:
+    if not feature_list_arg:
+        return None
+    value = str(feature_list_arg).strip()
+    maybe_path = Path(value).expanduser()
+    if maybe_path.exists():
+        value = maybe_path.read_text(encoding="utf-8")
+    for sep in (";", ",", "\n", "\t"):
+        value = value.replace(sep, " ")
+    features: list[str] = []
+    seen: set[str] = set()
+    for item in value.split():
+        name = item.strip()
+        if name and name not in seen:
+            features.append(name)
+            seen.add(name)
+    if not features:
+        raise ValueError("--feature-list did not contain any feature names.")
+    return tuple(features)
+
+
+def select_custom_features(feature_df: pd.DataFrame, feature_list: Tuple[str, ...]) -> pd.DataFrame:
+    missing = [column for column in feature_list if column not in feature_df.columns]
+    if missing:
+        raise ValueError(f"Custom feature list contains unavailable columns: {missing}")
+    return feature_df.loc[:, list(feature_list)]
+
+
 def model_selection_score(model: Pipeline, X: np.ndarray, y_target: np.ndarray) -> float:
     regressor = model.named_steps["regressor"]
     best_score = getattr(regressor, "best_score_", None)
@@ -279,10 +314,16 @@ def train_candidate(
     weight_beta: float,
     clip_min: float,
     feature_set: str,
+    feature_list: Optional[Tuple[str, ...]],
     bg_correction: str,
 ) -> Dict[str, object]:
     feature_df = build_feature_frame(df, g_mode=g_mode, use_bg=use_bg, clip_min=clip_min, bg_correction=bg_correction)
-    feature_df = select_feature_set(feature_df, use_bg=use_bg, feature_set=feature_set)
+    if feature_list is not None:
+        feature_df = select_custom_features(feature_df, feature_list)
+        effective_feature_set = "custom"
+    else:
+        feature_df = select_feature_set(feature_df, use_bg=use_bg, feature_set=feature_set)
+        effective_feature_set = feature_set
     X = feature_df.to_numpy(dtype=float)
     y_target = transform_target(y_true, target_transform, target_eps)
     sample_weight = make_sample_weights(y_true, weight_eps, weight_beta)
@@ -297,7 +338,7 @@ def train_candidate(
         "model": model,
         "g_mode": g_mode,
         "use_bg": use_bg,
-        "feature_set": feature_set,
+        "feature_set": effective_feature_set,
         "bg_correction": bg_correction,
         "feature_names": tuple(feature_df.columns),
         "X": X,
@@ -472,6 +513,7 @@ def main() -> None:
 
     df, y_true = load_training_dataframe(args.roi_csv)
     alphas = resolve_alphas(args)
+    feature_list = resolve_feature_list(args.feature_list)
     target_transform = str(args.target_transform)
 
     g_modes = ["g1", "avg"] if args.g_mode == "auto" else [args.g_mode]
@@ -486,6 +528,8 @@ def main() -> None:
         f"Evaluating g_modes={g_modes}, use_bg={args.use_bg}, bg_correction={bg_correction}, "
         f"feature_set={args.feature_set}, target_transform={target_transform}"
     )
+    if feature_list is not None:
+        print(f"Custom feature list ({len(feature_list)}): {', '.join(feature_list)}")
 
     for g_mode in g_modes:
         use_bg = resolve_use_bg(df, g_mode, args.use_bg)
@@ -501,12 +545,13 @@ def main() -> None:
             weight_beta=float(args.weight_beta),
             clip_min=float(args.clip_min),
             feature_set=str(args.feature_set),
+            feature_list=feature_list,
             bg_correction=bg_correction,
         )
         score = float(result["score"])
         print(
             f"  candidate g_mode={g_mode}, use_bg={use_bg}, bg_correction={bg_correction}, "
-            f"feature_set={args.feature_set}, cv_score={score:.6g}"
+            f"feature_set={result['feature_set']}, cv_score={score:.6g}"
         )
         if score > best_score:
             best_score = score

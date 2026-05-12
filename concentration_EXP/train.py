@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -35,6 +36,7 @@ AGGREGATE_CHANNELS = {"light_median", "light_mean", "feature_median", "feature_m
 BEST_CHANNEL_ALIASES = {"light_best", "feature_best"}
 AUTO_CHANNELS = AGGREGATE_CHANNELS | BEST_CHANNEL_ALIASES
 FIT_MODEL_NAMES = ("exponential_c0", "exponential_offset", "linear", "quadratic")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def format_plot_number(value: float, _pos: object = None) -> str:
@@ -338,6 +340,74 @@ def build_corrected_channels(df: pd.DataFrame) -> pd.DataFrame:
     return corr
 
 
+def resolve_feature_list(feature_list_arg: Optional[str]) -> Optional[Tuple[str, ...]]:
+    if not feature_list_arg:
+        return None
+    value = str(feature_list_arg).strip()
+    maybe_path = Path(value).expanduser()
+    if maybe_path.exists():
+        value = maybe_path.read_text(encoding="utf-8")
+    for sep in (";", ",", "\n", "\t"):
+        value = value.replace(sep, " ")
+    features: list[str] = []
+    seen: set[str] = set()
+    for item in value.split():
+        name = item.strip()
+        if name and name not in seen:
+            features.append(name)
+            seen.add(name)
+    if not features:
+        raise ValueError("--feature-list did not contain any feature names.")
+    return tuple(features)
+
+
+def _load_regression_feature_builder() -> Any:
+    module_path = PROJECT_ROOT / "concentration_regression" / "physics_features.py"
+    spec = importlib.util.spec_from_file_location("concentration_regression_physics_features", module_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load feature builder from {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.build_feature_frame
+
+
+def build_response_feature_table(
+    df: pd.DataFrame,
+    feature_names: Optional[Tuple[str, ...] | List[str]] = None,
+) -> pd.DataFrame:
+    """
+    Build the response values fitted by concentration_EXP.
+
+    Without ``feature_names`` this preserves the original RGB signal channels.
+    With custom names it reuses concentration_regression's feature builder so
+    EXP and Ridge consume the same input-vector terms.
+    """
+    corr = build_corrected_channels(df)
+    if feature_names is None:
+        return corr
+
+    requested = tuple(str(name) for name in feature_names)
+    missing_from_corr = [name for name in requested if name not in corr.columns]
+    if missing_from_corr:
+        build_feature_frame = _load_regression_feature_builder()
+        feature_df = build_feature_frame(
+            df,
+            g_mode="avg",
+            use_bg=True,
+            clip_min=0.1,
+            bg_correction="subtract",
+        )
+        missing = [name for name in missing_from_corr if name not in feature_df.columns]
+        if missing:
+            raise ValueError(f"Custom feature list contains unavailable columns: {missing}")
+        for name in missing_from_corr:
+            corr[name] = feature_df[name].to_numpy(dtype=float)
+
+    columns = ["exposure_time", *requested]
+    per_exp_columns = [f"{name}_per_exp" for name in requested if f"{name}_per_exp" in corr.columns]
+    return corr.loc[:, columns + per_exp_columns]
+
+
 def invert_response_by_grid(
     intensity: np.ndarray,
     *,
@@ -485,6 +555,13 @@ def parse_args(default_cfg: ExpConfig) -> argparse.Namespace:
         type=Path,
         help="Output PNG for fitting/prediction visualization (default: exp_fit_output/exp_fit_evaluation.png)",
     )
+    parser.add_argument(
+        "--feature-list",
+        help=(
+            "Comma/whitespace separated custom feature columns, or a text file containing them. "
+            "When set, EXP fits those feature values instead of only RGB signal channels."
+        ),
+    )
     
     return parser.parse_args()
 
@@ -516,10 +593,11 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
         )
 
     conc = df["conc_true"].to_numpy(dtype=float)
-    corr = build_corrected_channels(df)
+    feature_list = resolve_feature_list(args.feature_list)
+    corr = build_response_feature_table(df, feature_list)
 
     # Fit ROI-BG light intensity channels directly.
-    channels = [
+    channels = list(feature_list) if feature_list is not None else [
         col
         for col in corr.columns
         if col != "exposure_time" and not col.endswith("_per_exp")
@@ -530,6 +608,8 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
     print(f"\nFitting response models to {len(df)} samples...")
     print(f"Concentration range: {conc.min():.6g} - {conc.max():.6g} uM")
     print(f"Weight epsilon: {float(args.weight_eps):.6g}\n")
+    if feature_list is not None:
+        print(f"Custom feature list ({len(feature_list)}): {', '.join(feature_list)}\n")
 
     for ch in channels:
         y = corr[ch].to_numpy(dtype=float)
@@ -615,7 +695,9 @@ def run_exponential_fitting(args: argparse.Namespace, cfg: ExpConfig) -> None:
 
     for ch in channels:
         pred_df[ch] = corr[ch]
-        pred_df[f"{ch}_per_exp"] = corr[f"{ch}_per_exp"]
+        per_exp_col = f"{ch}_per_exp"
+        if per_exp_col in corr.columns:
+            pred_df[per_exp_col] = corr[per_exp_col]
         for model_name in FIT_MODEL_NAMES:
             fit_id = fit_id_for(ch, model_name)
             if fit_id in fitted_models:

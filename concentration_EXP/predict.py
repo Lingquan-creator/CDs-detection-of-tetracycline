@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 from config import ExpConfig
-from train import AUTO_CHANNELS, BEST_CHANNEL_ALIASES, build_corrected_channels, fit_id_for, predict_from_fitted_features
+from train import AUTO_CHANNELS, BEST_CHANNEL_ALIASES, build_response_feature_table, fit_id_for, predict_from_fitted_features
 from physics_features import extract_concentration_from_name
 
 matplotlib.use("Agg")
@@ -223,8 +223,11 @@ def predict_concentration(args: argparse.Namespace, cfg: ExpConfig) -> None:
     if df_raw.empty:
         raise ValueError("ROI CSV is empty.")
     
-    # Build corrected channels
-    corr = build_corrected_channels(df_raw)
+    # Build the same response features that were fitted during training.
+    fitted_feature_names = tuple(
+        dict.fromkeys(str(spec["channel"]) for spec in fitted_models.values())
+    )
+    corr = build_response_feature_table(df_raw, fitted_feature_names)
     
     channels = [col for col in corr.columns if col != "exposure_time" and not col.endswith("_per_exp")]
     conc_pred, feature_conc_pred = predict_from_fitted_features(corr, fitted_models, channels, selected_channel)
