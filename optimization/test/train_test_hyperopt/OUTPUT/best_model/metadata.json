@@ -1,0 +1,33 @@
+{
+  "best_trial": {
+    "trial_id": "greedy_06",
+    "stage": "greedy",
+    "bg_correction": "subtract",
+    "target_transform": "log",
+    "alpha": 0.3,
+    "weight_eps": 10.0,
+    "weight_beta": 0.25,
+    "n_features": 6,
+    "feature_names": "B_sig;ln_RGB_sum;RGB_sum;ln_R_sig;G_sig;ln_RB_sum",
+    "train_r2": 0.6820771545669518,
+    "train_rmse": 41.410655183215646,
+    "train_mae": 27.883136456451826,
+    "test_r2": 0.9514669476572138,
+    "test_rmse": 16.11964186082711,
+    "test_mae": 12.575799987898176,
+    "test_mean_error": -7.195280113288361,
+    "test_n": 22,
+    "added_feature": "ln_RB_sum"
+  },
+  "feature_names": [
+    "B_sig",
+    "ln_RGB_sum",
+    "RGB_sum",
+    "ln_R_sig",
+    "G_sig",
+    "ln_RB_sum"
+  ],
+  "train_csv": "/home/jzh/CDs/dataset/train/roi_results/roi_detailed_statistics.csv",
+  "test_csv": "/home/jzh/CDs/dataset/test/roi_results/roi_detailed_statistics.csv",
+  "created_utc": "2026-05-13T14:39:51+00:00"
+}

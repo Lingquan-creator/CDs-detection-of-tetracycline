@@ -25,14 +25,18 @@ DEFAULT_FEATURE_SET: Literal[
     "compact_exposure",
     "ln_rgb",
 ] = "compact"
-# Expanded alpha grid to include large regularization for smoothing low-concentration noise
-# REMOVED small alphas to force smoother models and avoid overfitting noise.
-# FORCED high alphas (starting at 50.0) to combat multicollinearity-induced oscillation.
-ALPHAS: Tuple[float, ...] = (100.0,)
-# Increased epsilon to reduce sensitivity to noise in low concentrations (e.g. <10uM)
-# Higher eps (20 -> 50) means weights are flatter, preventing low-conc noise from dominating.
-WEIGHT_EPS = 50.0         # sample weight denominator: 1/(conc + WEIGHT_EPS)
-WEIGHT_BETA = 1.0         # sample weight denominator: 1/(WEIGHT_BETA * conc + WEIGHT_EPS)
+DEFAULT_FEATURE_LIST: Tuple[str, ...] = (
+    "B_sig",
+    "ln_RGB_sum",
+    "RGB_sum",
+    "ln_R_sig",
+    "G_sig",
+    "ln_RB_sum",
+)
+# Current train->test optimized Ridge defaults.
+ALPHAS: Tuple[float, ...] = (0.3,)
+WEIGHT_EPS = 10.0         # sample weight denominator: 1/(weight_beta * conc + WEIGHT_EPS)
+WEIGHT_BETA = 0.25        # sample weight denominator: 1/(WEIGHT_BETA * conc + WEIGHT_EPS)
 CLIP_MIN = 0.1            # minimum signal after background subtraction to avoid log of negative/zero
 
 # Base paths
@@ -63,6 +67,7 @@ class TrainConfig:
         "compact_exposure",
         "ln_rgb",
     ] = DEFAULT_FEATURE_SET
+    feature_list: Tuple[str, ...] = DEFAULT_FEATURE_LIST
     bg_correction: Literal["subtract", "divide", "relative"] = DEFAULT_BG_CORRECTION
 
     @property

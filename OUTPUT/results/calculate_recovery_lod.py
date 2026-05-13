@@ -24,6 +24,10 @@ FILENAME_RE = re.compile(
     r"^(?P<matrix>.+)-(?P<replicate>\d+)-(?P<added_concentration>[-+]?\d+(?:\.\d+)?)\.dng$",
     re.IGNORECASE,
 )
+FOOD_CONCENTRATION_RE = re.compile(
+    r"^(?P<matrix>.+)-(?P<added_concentration>\d+(?:\.\d+)?)\.dng$",
+    re.IGNORECASE,
+)
 TRAILING_CONCENTRATION_RE = re.compile(
     r"^(?P<matrix>.*?)(?P<added_concentration>[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)\.dng$",
     re.IGNORECASE,
@@ -53,11 +57,20 @@ def parse_filename_metadata(filename: object) -> dict[str, object]:
             "added_concentration": float(data["added_concentration"]),
         }
 
+    match = FOOD_CONCENTRATION_RE.match(name)
+    if match:
+        data = match.groupdict()
+        return {
+            "matrix": data["matrix"],
+            "replicate": math.nan,
+            "added_concentration": float(data["added_concentration"]),
+        }
+
     match = TRAILING_CONCENTRATION_RE.match(name)
     if match and match.group("matrix"):
         data = match.groupdict()
         return {
-            "matrix": data["matrix"],
+            "matrix": data["matrix"].rstrip("-_ "),
             "replicate": math.nan,
             "added_concentration": float(data["added_concentration"]),
         }

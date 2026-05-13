@@ -138,7 +138,7 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
         "--feature-list",
         help=(
             "Comma/whitespace separated custom feature columns, or a text file containing them. "
-            "When set, --feature-set is ignored."
+            "When set, --feature-set is ignored. Default comes from TrainConfig.feature_list when configured."
         ),
     )
     parser.add_argument(
@@ -514,6 +514,9 @@ def main() -> None:
     df, y_true = load_training_dataframe(args.roi_csv)
     alphas = resolve_alphas(args)
     feature_list = resolve_feature_list(args.feature_list)
+    if feature_list is None:
+        configured_feature_list = tuple(str(name) for name in getattr(cfg, "feature_list", ()) or ())
+        feature_list = configured_feature_list or None
     target_transform = str(args.target_transform)
 
     g_modes = ["g1", "avg"] if args.g_mode == "auto" else [args.g_mode]

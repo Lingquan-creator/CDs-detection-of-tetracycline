@@ -1,0 +1,4 @@
+model,r2,rmse,n,prediction_csv
+concentration_regression_train,0.727021,38.3721,19,dataset/train/model_fit/concentration_regression/ridge_train_predictions.csv
+concentration_regression_loo,0.678719,41.6288,19,dataset/train/model_fit/concentration_regression/ridge_loo_predictions.csv
+concentration_EXP_train,0.990451,7.17685,19,dataset/train/model_fit/concentration_EXP/exp_train_concentration_predictions.csv
