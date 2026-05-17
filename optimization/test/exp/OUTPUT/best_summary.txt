@@ -1,0 +1,8 @@
+model_family: exp
+eval_mode: test
+r2: 0.8851106859225315
+rmse: 24.793598530361773
+mae: 14.754650930186038
+vector_id: ln_rgb
+feature_names: ln_R_sig;ln_G_sig;ln_B_sig
+hyperparams: {"response_model":"exponential_offset","selected_channel":"ln_G_sig","weight_eps":0.0}

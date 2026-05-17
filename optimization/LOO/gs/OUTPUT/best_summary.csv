@@ -1,0 +1,2 @@
+model_family,eval_mode,stage,iteration,vector_id,feature_names,n_features,hyperparams,r2,rmse,mae,mean_error,n_train,n_eval,error
+gs,loo,parameter_scan,1,ln_rgb,ln_R_sig;ln_G_sig;ln_B_sig,3,"{""dropout"":0.05,""epochs"":80,""grad_clip_norm"":5.0,""hidden_dim"":16,""learning_rate"":0.01,""max_std_log"":2.0,""min_std"":0.08,""patience"":20,""seed"":42,""std_reg_lambda"":0.01,""weight_beta"":1.0,""weight_decay"":0.001,""weight_eps"":50.0}",0.983093,9.54959,7.70769,-1.74494,19,19,

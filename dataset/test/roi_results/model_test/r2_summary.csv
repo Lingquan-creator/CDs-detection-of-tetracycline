@@ -1,0 +1,3 @@
+model,r2,rmse,mae,n,prediction_csv
+concentration_regression_ridge,0.88538218,24.764287,16.763874,66,dataset/test/roi_results/model_test/ridge_predictions.csv
+concentration_EXP,0.76652027,35.344703,22.079685,66,dataset/test/roi_results/model_test/exp_predictions.csv

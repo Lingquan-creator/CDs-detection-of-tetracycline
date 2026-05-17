@@ -1,0 +1,8 @@
+model_family: ridge
+eval_mode: loo
+r2: 0.9510256546611991
+rmse: 16.25307551090702
+mae: 11.164788375190287
+vector_id: ln_total_rgb_contrast
+feature_names: ln_RGB_sum;ln_R_over_G;ln_B_over_G
+hyperparams: {"alpha":1.0,"target_transform":"identity","weight_beta":0.0,"weight_eps":50.0}

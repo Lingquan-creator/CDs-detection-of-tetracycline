@@ -231,25 +231,41 @@ class BackgroundSelection:
 
 def _build_preview_image(raw_channels: np.ndarray) -> np.ndarray:
     """Convert 4-channel RAW array into an 8-bit RGB preview for GUI."""
-    # Assuming channels are R, G1, G2, B or similar Bayer split.
-    # Stack them to form an RGB image.
-    rgb = np.stack(
-        [
-            raw_channels[:, :, 0],
-            (raw_channels[:, :, 1] + raw_channels[:, :, 2]) / 2,
-            raw_channels[:, :, 3],
-        ],
-        axis=-1,
-    ).astype(np.float32)
+    H, W = raw_channels.shape[:2]
+    sample_step = max(1, int(np.ceil(np.sqrt((H * W) / 1_000_000))))
+    sample = raw_channels[::sample_step, ::sample_step, :]
+    green_sample = (sample[:, :, 1] + sample[:, :, 2]) * 0.5
+    level_sample = np.concatenate(
+        (
+            sample[:, :, 0].ravel(),
+            green_sample.ravel(),
+            sample[:, :, 3].ravel(),
+        )
+    )
 
-    # Simple auto-level
-    rgb = np.clip(rgb - np.percentile(rgb, 1), 0, None)
-    scale = np.percentile(rgb, 99.5)
-    scale = scale if scale > 0 else 1.0
-    rgb = np.clip(rgb / scale, 0, 1)
-    
-    # Return as uint8, range [0, 255]
-    return (rgb * 255).astype(np.uint8)
+    low = float(np.percentile(level_sample, 1))
+    high = float(np.percentile(level_sample, 99.5))
+    scale = high - low
+    if scale <= 0:
+        scale = 1.0
+
+    preview = np.empty((H, W, 3), dtype=np.uint8)
+    work = np.empty((H, W), dtype=np.float32)
+
+    def write_channel(channel: np.ndarray, target_index: int) -> None:
+        nonlocal work
+        np.subtract(channel, low, out=work)
+        np.clip(work, 0, scale, out=work)
+        work *= 255.0 / scale
+        preview[:, :, target_index] = work.astype(np.uint8)
+
+    write_channel(raw_channels[:, :, 0], 0)
+    np.add(raw_channels[:, :, 1], raw_channels[:, :, 2], out=work)
+    work *= 0.5
+    write_channel(work, 1)
+    write_channel(raw_channels[:, :, 3], 2)
+
+    return np.ascontiguousarray(preview)
 
 
 class ImageWidget(QWidget):

@@ -1,10 +1,16 @@
 from __future__ import annotations
 
-import json
 import csv
+import gc
+import json
+import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+_MPLCONFIGDIR = Path(os.environ.get("MPLCONFIGDIR", Path(__file__).resolve().parents[1] / ".matplotlib"))
+_MPLCONFIGDIR.mkdir(parents=True, exist_ok=True)
+os.environ["MPLCONFIGDIR"] = str(_MPLCONFIGDIR)
 
 import cv2
 import matplotlib
@@ -18,6 +24,7 @@ from roi_config import (
     SAVE_VISUALIZATION,
     VISUALIZATION_DPI,
     VISUALIZATION_FIGSIZE,
+    VISUALIZATION_MAX_SIDE,
     ROISettings,
     get_settings,
     print_config,
@@ -28,13 +35,9 @@ from roi_gui import BackgroundSelection, ROISelection, select_roi_with_gui
 from roi_manual import ManualROITools
 RAW_CHANNELS = ("R", "G1", "G2", "B")
 
-# 字体设置：尽量兼容中英文
-matplotlib.rcParams["font.sans-serif"] = [
-    "SimHei",
-    "Microsoft YaHei",
-    "Arial Unicode MS",
-    "DejaVu Sans",
-]
+# Use an always-bundled matplotlib font; PNG labels below are ASCII-only.
+matplotlib.rcParams["font.family"] = "DejaVu Sans"
+matplotlib.rcParams["font.sans-serif"] = ["DejaVu Sans"]
 matplotlib.rcParams["axes.unicode_minus"] = False
 
 
@@ -417,8 +420,6 @@ class ROIProcessor:
             except Exception:
                 pass
 
-            raw_data = raw.raw_image.copy().astype(np.float32)
-
             black_levels = [0, 0, 0, 0]
             try:
                 if (
@@ -444,17 +445,21 @@ class ROIProcessor:
             except Exception as exc:
                 print(f"  警告: 无法获取黑电平，使用默认值0: {exc}")
 
-            R = raw_data[0::2, 0::2] - black_levels[0]
-            G1 = raw_data[0::2, 1::2] - black_levels[1]
-            G2 = raw_data[1::2, 0::2] - black_levels[2]
-            B = raw_data[1::2, 1::2] - black_levels[3]
-
-            R = np.maximum(R, 0)
-            G1 = np.maximum(G1, 0)
-            G2 = np.maximum(G2, 0)
-            B = np.maximum(B, 0)
-
-            raw_channels = np.stack([R, G1, G2, B], axis=-1)
+            raw_data = raw.raw_image
+            H = raw_data.shape[0] // 2
+            W = raw_data.shape[1] // 2
+            raw_channels = np.empty((H, W, 4), dtype=np.float32)
+            channel_slices = (
+                raw_data[0 : H * 2 : 2, 0 : W * 2 : 2],
+                raw_data[0 : H * 2 : 2, 1 : W * 2 : 2],
+                raw_data[1 : H * 2 : 2, 0 : W * 2 : 2],
+                raw_data[1 : H * 2 : 2, 1 : W * 2 : 2],
+            )
+            for channel_index, source in enumerate(channel_slices):
+                out = raw_channels[:, :, channel_index]
+                out[...] = source
+                out -= float(black_levels[channel_index])
+                np.maximum(out, 0, out=out)
             return raw_channels, metadata
 
     def _trimmed_mean(self, values: np.ndarray) -> float:
@@ -475,9 +480,10 @@ class ROIProcessor:
     def compute_roi_statistics(self, raw_channels: np.ndarray, roi_mask: np.ndarray, metadata: Optional[Dict] = None) -> Dict[str, float]:
         """计算当前输入向量所需的四通道截尾均值。"""
         stats: Dict[str, float] = {}
+        mask = roi_mask if roi_mask.dtype == bool else roi_mask > 0
         for i, name in enumerate(RAW_CHANNELS):
             channel_data = raw_channels[:, :, i]
-            roi_values = channel_data[roi_mask > 0]
+            roi_values = channel_data[mask]
             if len(roi_values) > 0:
                 stats[f"{name}_mean"] = self._trimmed_mean(roi_values)
             else:
@@ -500,37 +506,41 @@ class ROIProcessor:
 
         print(f"\n处理图像: {filepath.name}")
 
-        raw_channels, metadata = self.load_raw_image(filepath)
-        H, W = raw_channels.shape[:2]
-        print(f"  图像尺寸: {W}x{H}")
+        raw_channels = None
+        try:
+            raw_channels, metadata = self.load_raw_image(filepath)
+            H, W = raw_channels.shape[:2]
+            print(f"  图像尺寸: {W}x{H}")
 
-        roi_sel, bg_sel = self._resolve_selections(
-            raw_channels=raw_channels,
-            roi_selection=roi_selection,
-            bg_selection=bg_selection,
-            interactive=interactive,
-            filename=filepath.name,
-        )
+            roi_sel, bg_sel = self._resolve_selections(
+                raw_channels=raw_channels,
+                roi_selection=roi_selection,
+                bg_selection=bg_selection,
+                interactive=interactive,
+                filename=filepath.name,
+            )
 
-        print(
-            f"  ROI: center=({roi_sel.center[0]:.1f}, {roi_sel.center[1]:.1f}), size={roi_sel.width:.1f}x{roi_sel.height:.1f}, angle={roi_sel.angle_deg:.1f}°"
-        )
-        print(
-            f"  BG : inner center=({bg_sel.inner_center[0]:.1f}, {bg_sel.inner_center[1]:.1f}), size={bg_sel.inner_x:.1f}x{bg_sel.inner_y:.1f}; "
-            f"outer center=({bg_sel.outer_center[0]:.1f}, {bg_sel.outer_center[1]:.1f}), size={bg_sel.outer_x:.1f}x{bg_sel.outer_y:.1f}"
-        )
+            print(
+                f"  ROI: center=({roi_sel.center[0]:.1f}, {roi_sel.center[1]:.1f}), size={roi_sel.width:.1f}x{roi_sel.height:.1f}, angle={roi_sel.angle_deg:.1f}°"
+            )
+            print(
+                f"  BG : inner center=({bg_sel.inner_center[0]:.1f}, {bg_sel.inner_center[1]:.1f}), size={bg_sel.inner_x:.1f}x{bg_sel.inner_y:.1f}; "
+                f"outer center=({bg_sel.outer_center[0]:.1f}, {bg_sel.outer_center[1]:.1f}), size={bg_sel.outer_x:.1f}x{bg_sel.outer_y:.1f}"
+            )
 
-        result = self._process_loaded_image(
-            filepath=filepath,
-            raw_channels=raw_channels,
-            metadata=metadata,
-            roi_sel=roi_sel,
-            bg_sel=bg_sel,
-            save_visualization=save_visualization,
-            output_dir=output_dir,
-        )
-        self._persist_selection(filepath.name, roi_sel, bg_sel)
-        return result
+            result = self._process_loaded_image(
+                filepath=filepath,
+                raw_channels=raw_channels,
+                metadata=metadata,
+                roi_sel=roi_sel,
+                bg_sel=bg_sel,
+                save_visualization=save_visualization,
+                output_dir=output_dir,
+            )
+            self._persist_selection(filepath.name, roi_sel, bg_sel)
+            return result
+        finally:
+            del raw_channels
 
     def _resolve_selections(
         self,
@@ -622,138 +632,144 @@ class ROIProcessor:
         output_dir: Optional[Path],
     ) -> ROIResult:
         H, W = raw_channels.shape[:2]
-        selected_roi_mask = self.manual.create_fixed_roi(
-            roi_sel.center, (H, W), roi_sel.width, roi_sel.height, roi_sel.angle_deg
-        )
-        measurement_center, measurement_width, measurement_height, measurement_angle = (
-            self._measurement_roi_geometry(roi_sel)
-        )
-        roi_mask = self.manual.create_fixed_roi(
-            measurement_center,
-            (H, W),
-            measurement_width,
-            measurement_height,
-            measurement_angle,
-        )
-        bg_mask = self.manual.create_background_roi(
-            bg_sel.outer_center,
-            (H, W),
-            roi_angle=bg_sel.angle_deg,
-            inner_center=bg_sel.inner_center,
-            outer_center=bg_sel.outer_center,
-            inner_width=bg_sel.inner_x,
-            inner_height=bg_sel.inner_y,
-            outer_width=bg_sel.outer_x,
-            outer_height=bg_sel.outer_y,
-            exclude_mask=selected_roi_mask,
-        )
-
-        roi_stats = self.compute_roi_statistics(raw_channels, roi_mask, metadata)
-        bg_stats = self.compute_roi_statistics(raw_channels, bg_mask, metadata)
-
-        R_corrected = roi_stats["R_mean"] - bg_stats["R_mean"]
-        G1_corrected = roi_stats["G1_mean"] - bg_stats["G1_mean"]
-        G2_corrected = roi_stats["G2_mean"] - bg_stats["G2_mean"]
-        B_corrected = roi_stats["B_mean"] - bg_stats["B_mean"]
-        G_corrected = (G1_corrected + G2_corrected) / 2
-
-        directory_meta = metadata.get("directory_metadata", {})
-        if not isinstance(directory_meta, dict):
-            directory_meta = {}
-        r_gain = max(0.0, self._to_float(self._lookup_metadata_value(directory_meta, "R_gain"), 1.0))
-        g_gain = max(0.0, self._to_float(self._lookup_metadata_value(directory_meta, "G_gain"), 1.0))
-        b_gain = max(0.0, self._to_float(self._lookup_metadata_value(directory_meta, "B_gain"), 1.0))
-        gamma = self._to_float(self._lookup_metadata_value(directory_meta, "gama", "gamma"), 1.0)
-        saturability = self._to_float(self._lookup_metadata_value(directory_meta, "saturability"), 0.0)
-
-        R_display = max(0.0, R_corrected) * r_gain
-        G_display = max(0.0, G_corrected) * g_gain
-        B_display = max(0.0, B_corrected) * b_gain
-
-        if gamma > 0 and gamma != 1.0:
-            inv_gamma = 1.0 / gamma
-            R_display = R_display ** inv_gamma
-            G_display = G_display ** inv_gamma
-            B_display = B_display ** inv_gamma
-
-        if saturability > 0:
-            R_display = min(R_display, saturability)
-            G_display = min(G_display, saturability)
-            B_display = min(B_display, saturability)
-
-        area = int(np.sum(roi_mask))
-        measurement_box = self.manual.get_rotated_box(
-            measurement_center, measurement_width, measurement_height, measurement_angle
-        )
-        bbox = (
-            int(np.clip(np.min(measurement_box[:, 0]), 0, W - 1)),
-            int(np.clip(np.min(measurement_box[:, 1]), 0, H - 1)),
-            int(np.clip(np.max(measurement_box[:, 0]), 0, W - 1)),
-            int(np.clip(np.max(measurement_box[:, 1]), 0, H - 1)),
-        )
-
-        result = ROIResult(
-            filename=filepath.name,
-            concentration=metadata.get("concentration"),
-            center_x=roi_sel.center[0],
-            center_y=roi_sel.center[1],
-            width=float(roi_sel.width),
-            height=float(roi_sel.height),
-            angle_deg=float(roi_sel.angle_deg),
-            measurement_center_x=measurement_center[0],
-            measurement_center_y=measurement_center[1],
-            measurement_width=float(measurement_width),
-            measurement_height=float(measurement_height),
-            measurement_angle_deg=float(measurement_angle),
-            bg_center_x=bg_sel.outer_center[0],
-            bg_center_y=bg_sel.outer_center[1],
-            bg_inner_center_x=bg_sel.inner_center[0],
-            bg_inner_center_y=bg_sel.inner_center[1],
-            bg_outer_center_x=bg_sel.outer_center[0],
-            bg_outer_center_y=bg_sel.outer_center[1],
-            bg_inner_x=float(bg_sel.inner_x),
-            bg_inner_y=float(bg_sel.inner_y),
-            bg_outer_x=float(bg_sel.outer_x),
-            bg_outer_y=float(bg_sel.outer_y),
-            bg_angle_deg=float(bg_sel.angle_deg),
-            bbox=bbox,
-            area=area,
-            R_mean=roi_stats["R_mean"],
-            G1_mean=roi_stats["G1_mean"],
-            G2_mean=roi_stats["G2_mean"],
-            B_mean=roi_stats["B_mean"],
-            R_bg=bg_stats["R_mean"],
-            G1_bg=bg_stats["G1_mean"],
-            G2_bg=bg_stats["G2_mean"],
-            B_bg=bg_stats["B_mean"],
-            R_corrected=max(0, R_corrected),
-            G1_corrected=max(0, G1_corrected),
-            G2_corrected=max(0, G2_corrected),
-            B_corrected=max(0, B_corrected),
-            R_display=max(0, R_display),
-            G_display=max(0, G_display),
-            B_display=max(0, B_display),
-            exposure_time=metadata.get("exposure_time"),
-            iso=metadata.get("iso"),
-            source_path=str(filepath),
-        )
-
-        print(
-            f"  特征向量: R={R_corrected:.1f}, G1={G1_corrected:.1f}, G2={G2_corrected:.1f}, B={B_corrected:.1f}"
-        )
-        print(
-            "  统计ROI: "
-            f"center=({measurement_center[0]:.1f}, {measurement_center[1]:.1f}), "
-            f"size={measurement_width:.1f}x{measurement_height:.1f}, "
-            f"angle={measurement_angle:.1f}°"
-        )
-
-        if save_visualization and output_dir is not None:
-            self._save_visualization(
-                filepath, raw_channels, roi_mask, bg_mask, result, output_dir
+        selected_roi_mask = None
+        roi_mask = None
+        bg_mask = None
+        try:
+            selected_roi_mask = self.manual.create_fixed_roi(
+                roi_sel.center, (H, W), roi_sel.width, roi_sel.height, roi_sel.angle_deg
+            )
+            measurement_center, measurement_width, measurement_height, measurement_angle = (
+                self._measurement_roi_geometry(roi_sel)
+            )
+            roi_mask = self.manual.create_fixed_roi(
+                measurement_center,
+                (H, W),
+                measurement_width,
+                measurement_height,
+                measurement_angle,
+            )
+            bg_mask = self.manual.create_background_roi(
+                bg_sel.outer_center,
+                (H, W),
+                roi_angle=bg_sel.angle_deg,
+                inner_center=bg_sel.inner_center,
+                outer_center=bg_sel.outer_center,
+                inner_width=bg_sel.inner_x,
+                inner_height=bg_sel.inner_y,
+                outer_width=bg_sel.outer_x,
+                outer_height=bg_sel.outer_y,
+                exclude_mask=selected_roi_mask,
             )
 
-        return result
+            roi_stats = self.compute_roi_statistics(raw_channels, roi_mask, metadata)
+            bg_stats = self.compute_roi_statistics(raw_channels, bg_mask, metadata)
+
+            R_corrected = roi_stats["R_mean"] - bg_stats["R_mean"]
+            G1_corrected = roi_stats["G1_mean"] - bg_stats["G1_mean"]
+            G2_corrected = roi_stats["G2_mean"] - bg_stats["G2_mean"]
+            B_corrected = roi_stats["B_mean"] - bg_stats["B_mean"]
+            G_corrected = (G1_corrected + G2_corrected) / 2
+
+            directory_meta = metadata.get("directory_metadata", {})
+            if not isinstance(directory_meta, dict):
+                directory_meta = {}
+            r_gain = max(0.0, self._to_float(self._lookup_metadata_value(directory_meta, "R_gain"), 1.0))
+            g_gain = max(0.0, self._to_float(self._lookup_metadata_value(directory_meta, "G_gain"), 1.0))
+            b_gain = max(0.0, self._to_float(self._lookup_metadata_value(directory_meta, "B_gain"), 1.0))
+            gamma = self._to_float(self._lookup_metadata_value(directory_meta, "gama", "gamma"), 1.0)
+            saturability = self._to_float(self._lookup_metadata_value(directory_meta, "saturability"), 0.0)
+
+            R_display = max(0.0, R_corrected) * r_gain
+            G_display = max(0.0, G_corrected) * g_gain
+            B_display = max(0.0, B_corrected) * b_gain
+
+            if gamma > 0 and gamma != 1.0:
+                inv_gamma = 1.0 / gamma
+                R_display = R_display ** inv_gamma
+                G_display = G_display ** inv_gamma
+                B_display = B_display ** inv_gamma
+
+            if saturability > 0:
+                R_display = min(R_display, saturability)
+                G_display = min(G_display, saturability)
+                B_display = min(B_display, saturability)
+
+            area = int(np.sum(roi_mask))
+            measurement_box = self.manual.get_rotated_box(
+                measurement_center, measurement_width, measurement_height, measurement_angle
+            )
+            bbox = (
+                int(np.clip(np.min(measurement_box[:, 0]), 0, W - 1)),
+                int(np.clip(np.min(measurement_box[:, 1]), 0, H - 1)),
+                int(np.clip(np.max(measurement_box[:, 0]), 0, W - 1)),
+                int(np.clip(np.max(measurement_box[:, 1]), 0, H - 1)),
+            )
+
+            result = ROIResult(
+                filename=filepath.name,
+                concentration=metadata.get("concentration"),
+                center_x=roi_sel.center[0],
+                center_y=roi_sel.center[1],
+                width=float(roi_sel.width),
+                height=float(roi_sel.height),
+                angle_deg=float(roi_sel.angle_deg),
+                measurement_center_x=measurement_center[0],
+                measurement_center_y=measurement_center[1],
+                measurement_width=float(measurement_width),
+                measurement_height=float(measurement_height),
+                measurement_angle_deg=float(measurement_angle),
+                bg_center_x=bg_sel.outer_center[0],
+                bg_center_y=bg_sel.outer_center[1],
+                bg_inner_center_x=bg_sel.inner_center[0],
+                bg_inner_center_y=bg_sel.inner_center[1],
+                bg_outer_center_x=bg_sel.outer_center[0],
+                bg_outer_center_y=bg_sel.outer_center[1],
+                bg_inner_x=float(bg_sel.inner_x),
+                bg_inner_y=float(bg_sel.inner_y),
+                bg_outer_x=float(bg_sel.outer_x),
+                bg_outer_y=float(bg_sel.outer_y),
+                bg_angle_deg=float(bg_sel.angle_deg),
+                bbox=bbox,
+                area=area,
+                R_mean=roi_stats["R_mean"],
+                G1_mean=roi_stats["G1_mean"],
+                G2_mean=roi_stats["G2_mean"],
+                B_mean=roi_stats["B_mean"],
+                R_bg=bg_stats["R_mean"],
+                G1_bg=bg_stats["G1_mean"],
+                G2_bg=bg_stats["G2_mean"],
+                B_bg=bg_stats["B_mean"],
+                R_corrected=max(0, R_corrected),
+                G1_corrected=max(0, G1_corrected),
+                G2_corrected=max(0, G2_corrected),
+                B_corrected=max(0, B_corrected),
+                R_display=max(0, R_display),
+                G_display=max(0, G_display),
+                B_display=max(0, B_display),
+                exposure_time=metadata.get("exposure_time"),
+                iso=metadata.get("iso"),
+                source_path=str(filepath),
+            )
+
+            print(
+                f"  特征向量: R={R_corrected:.1f}, G1={G1_corrected:.1f}, G2={G2_corrected:.1f}, B={B_corrected:.1f}"
+            )
+            print(
+                "  统计ROI: "
+                f"center=({measurement_center[0]:.1f}, {measurement_center[1]:.1f}), "
+                f"size={measurement_width:.1f}x{measurement_height:.1f}, "
+                f"angle={measurement_angle:.1f}°"
+            )
+
+            if save_visualization and output_dir is not None:
+                self._save_visualization(
+                    filepath, raw_channels, roi_mask, bg_mask, result, output_dir
+                )
+
+            return result
+        finally:
+            del selected_roi_mask, roi_mask, bg_mask
 
     def _save_visualization(
         self,
@@ -765,108 +781,119 @@ class ROIProcessor:
         output_dir: Path,
     ):
         """保存可视化结果。"""
-        Y = np.max(raw_channels, axis=-1)
+        H, W = raw_channels.shape[:2]
+        max_side = max(1, int(VISUALIZATION_MAX_SIDE))
+        step = max(1, int(np.ceil(max(H, W) / max_side)))
+        scale = 1.0 / step
+
+        raw_small = raw_channels[::step, ::step, :]
+        roi_mask_small = roi_mask[::step, ::step]
+        bg_mask_small = bg_mask[::step, ::step]
+        Y = np.max(raw_small, axis=-1)
+
         fig, axes = plt.subplots(2, 3, figsize=VISUALIZATION_FIGSIZE)
+        try:
+            ax = axes[0, 0]
+            im = ax.imshow(Y, cmap="gray")
+            ax.set_title("Intensity Y = max(R,G1,G2,B)")
+            ax.axis("off")
+            fig.colorbar(im, ax=ax)
 
-        ax = axes[0, 0]
-        im = ax.imshow(Y, cmap="gray")
-        ax.set_title("强度图 Y = max(R,G1,G2,B)")
-        ax.axis("off")
-        plt.colorbar(im, ax=ax)
+            ax = axes[0, 1]
+            ax.imshow(roi_mask_small, cmap="Reds")
+            ax.set_title("Measurement ROI mask")
+            ax.axis("off")
 
-        ax = axes[0, 1]
-        ax.imshow(roi_mask, cmap="Reds")
-        ax.set_title("统计 ROI mask")
-        ax.axis("off")
+            ax = axes[0, 2]
+            ax.imshow(bg_mask_small, cmap="Blues")
+            ax.set_title("Background ring mask")
+            ax.axis("off")
 
-        ax = axes[0, 2]
-        ax.imshow(bg_mask, cmap="Blues")
-        ax.set_title("背景环 mask")
-        ax.axis("off")
-
-        ax = axes[1, 0]
-        rgb_image = np.stack(
-            [
-                raw_channels[:, :, 0],
-                (raw_channels[:, :, 1] + raw_channels[:, :, 2]) / 2,
-                raw_channels[:, :, 3],
-            ],
-            axis=-1,
-        )
-        rgb_image = np.clip(rgb_image / np.percentile(rgb_image, 99.5), 0, 1)
-        ax.imshow(rgb_image)
-        selected_roi_box = self.manual.get_rotated_box(
-            (result.center_x, result.center_y), result.width, result.height, result.angle_deg
-        )
-        measurement_roi_box = self.manual.get_rotated_box(
-            (result.measurement_center_x, result.measurement_center_y),
-            result.measurement_width,
-            result.measurement_height,
-            result.measurement_angle_deg,
-        )
-        bg_outer_box = self.manual.get_rotated_box(
-            (result.bg_outer_center_x, result.bg_outer_center_y),
-            result.bg_outer_x,
-            result.bg_outer_y,
-            result.bg_angle_deg,
-        )
-        bg_inner_box = self.manual.get_rotated_box(
-            (result.bg_inner_center_x, result.bg_inner_center_y),
-            result.bg_inner_x,
-            result.bg_inner_y,
-            result.bg_angle_deg,
-        )
-        ax.add_patch(plt.Polygon(bg_outer_box, closed=True, fill=False, edgecolor="orange", linewidth=2))
-        ax.add_patch(plt.Polygon(bg_inner_box, closed=True, fill=False, edgecolor="orange", linewidth=1.5, linestyle="--"))
-        ax.add_patch(
-            plt.Polygon(
-                selected_roi_box,
-                closed=True,
-                fill=False,
-                edgecolor="red",
-                linewidth=1.5,
-                linestyle="--",
+            ax = axes[1, 0]
+            rgb_image = np.empty(raw_small.shape[:2] + (3,), dtype=np.float32)
+            rgb_image[:, :, 0] = raw_small[:, :, 0]
+            np.add(raw_small[:, :, 1], raw_small[:, :, 2], out=rgb_image[:, :, 1])
+            rgb_image[:, :, 1] *= 0.5
+            rgb_image[:, :, 2] = raw_small[:, :, 3]
+            scale_value = float(np.percentile(rgb_image, 99.5))
+            if scale_value <= 0:
+                scale_value = 1.0
+            rgb_image /= scale_value
+            np.clip(rgb_image, 0, 1, out=rgb_image)
+            ax.imshow(rgb_image)
+            selected_roi_box = self.manual.get_rotated_box(
+                (result.center_x, result.center_y), result.width, result.height, result.angle_deg
+            ) * scale
+            measurement_roi_box = self.manual.get_rotated_box(
+                (result.measurement_center_x, result.measurement_center_y),
+                result.measurement_width,
+                result.measurement_height,
+                result.measurement_angle_deg,
+            ) * scale
+            bg_outer_box = self.manual.get_rotated_box(
+                (result.bg_outer_center_x, result.bg_outer_center_y),
+                result.bg_outer_x,
+                result.bg_outer_y,
+                result.bg_angle_deg,
+            ) * scale
+            bg_inner_box = self.manual.get_rotated_box(
+                (result.bg_inner_center_x, result.bg_inner_center_y),
+                result.bg_inner_x,
+                result.bg_inner_y,
+                result.bg_angle_deg,
+            ) * scale
+            ax.add_patch(plt.Polygon(bg_outer_box, closed=True, fill=False, edgecolor="orange", linewidth=2))
+            ax.add_patch(plt.Polygon(bg_inner_box, closed=True, fill=False, edgecolor="orange", linewidth=1.5, linestyle="--"))
+            ax.add_patch(
+                plt.Polygon(
+                    selected_roi_box,
+                    closed=True,
+                    fill=False,
+                    edgecolor="red",
+                    linewidth=1.5,
+                    linestyle="--",
+                )
             )
-        )
-        ax.add_patch(plt.Polygon(measurement_roi_box, closed=True, fill=False, edgecolor="red", linewidth=2))
-        ax.plot(result.center_x, result.center_y, "r+", markersize=12, markeredgewidth=2)
-        ax.plot(result.bg_inner_center_x, result.bg_inner_center_y, "yx", markersize=10, markeredgewidth=2)
-        ax.plot(result.bg_outer_center_x, result.bg_outer_center_y, "yx", markersize=10, markeredgewidth=2)
-        ax.set_title("RGB 伪彩 + 选区/统计ROI/BG")
-        ax.axis("off")
+            ax.add_patch(plt.Polygon(measurement_roi_box, closed=True, fill=False, edgecolor="red", linewidth=2))
+            ax.plot(result.center_x * scale, result.center_y * scale, "r+", markersize=12, markeredgewidth=2)
+            ax.plot(result.bg_inner_center_x * scale, result.bg_inner_center_y * scale, "yx", markersize=10, markeredgewidth=2)
+            ax.plot(result.bg_outer_center_x * scale, result.bg_outer_center_y * scale, "yx", markersize=10, markeredgewidth=2)
+            ax.set_title("RGB pseudo-color + ROI/BG boxes")
+            ax.axis("off")
 
-        ax = axes[1, 1]
-        ax.imshow(Y, cmap="gray")
-        ax.imshow(roi_mask, cmap="Reds", alpha=0.35)
-        ax.imshow(bg_mask, cmap="Blues", alpha=0.25)
-        ax.set_title("ROI + 背景叠加")
-        ax.axis("off")
+            ax = axes[1, 1]
+            ax.imshow(Y, cmap="gray")
+            ax.imshow(roi_mask_small, cmap="Reds", alpha=0.35)
+            ax.imshow(bg_mask_small, cmap="Blues", alpha=0.25)
+            ax.set_title("ROI + background overlay")
+            ax.axis("off")
 
-        ax = axes[1, 2]
-        channels = ["R", "G1", "G2", "B"]
-        corrected_values = [
-            result.R_corrected,
-            result.G1_corrected,
-            result.G2_corrected,
-            result.B_corrected,
-        ]
-        colors = ["red", "green", "green", "blue"]
-        bars = ax.bar(channels, corrected_values, color=colors, alpha=0.7)
-        ax.set_title("背景校正后的通道值")
-        ax.set_ylabel("强度 (ADU)")
-        ax.grid(axis="y", alpha=0.3)
-        for bar, val in zip(bars, corrected_values):
-            height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width() / 2.0, height, f"{val:.0f}", ha="center", va="bottom", fontsize=9)
+            ax = axes[1, 2]
+            channels = ["R", "G1", "G2", "B"]
+            corrected_values = [
+                result.R_corrected,
+                result.G1_corrected,
+                result.G2_corrected,
+                result.B_corrected,
+            ]
+            colors = ["red", "green", "green", "blue"]
+            bars = ax.bar(channels, corrected_values, color=colors, alpha=0.7)
+            ax.set_title("Background-corrected channels")
+            ax.set_ylabel("Intensity (ADU)")
+            ax.grid(axis="y", alpha=0.3)
+            for bar, val in zip(bars, corrected_values):
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width() / 2.0, height, f"{val:.0f}", ha="center", va="bottom", fontsize=9)
 
-        plt.suptitle(f"ROI 提取结果: {filepath.name}", fontsize=14, fontweight="bold")
-        plt.tight_layout()
+            plt.suptitle(f"ROI extraction: {filepath.name}", fontsize=14, fontweight="bold")
+            plt.tight_layout()
 
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / f"{filepath.stem}_roi.png"
-        plt.savefig(output_path, dpi=VISUALIZATION_DPI, bbox_inches="tight")
-        plt.close()
-        print(f"  可视化已保存: {output_path}")
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / f"{filepath.stem}_roi.png"
+            fig.savefig(output_path, dpi=VISUALIZATION_DPI, bbox_inches="tight")
+            print(f"  可视化已保存: {output_path}")
+        finally:
+            plt.close(fig)
 
     def batch_process(
         self,
@@ -913,6 +940,8 @@ class ROIProcessor:
             except Exception as exc:
                 print(f"  错误: {exc}")
                 failed_files.append(filepath.name)
+            finally:
+                gc.collect()
 
         print(f"\n处理完成: 成功 {len(results)}/{len(image_files)}")
         if failed_files:

@@ -1,0 +1,8 @@
+model_family: ridge
+eval_mode: test
+r2: 0.9169613765129763
+rmse: 21.07850557569634
+mae: 14.569616839883315
+vector_id: current_best_ln_g_rbovergb
+feature_names: ln_G_sig;ln_RB_over_GB
+hyperparams: {"alpha":0.03,"target_transform":"identity","weight_beta":0.0,"weight_eps":5.0}

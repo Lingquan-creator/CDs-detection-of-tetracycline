@@ -11,9 +11,9 @@ from typing import Any, Dict, Optional
 # Paths
 # ============================================
 PROJECT_DIR = Path(__file__).resolve().parent
-DATA_DIR = Path(os.environ.get("PIC_RGB_DATA_DIR", str(PROJECT_DIR / "../dataset/mate20x"))).expanduser().resolve()
+DATA_DIR = Path(os.environ.get("PIC_RGB_DATA_DIR", str(PROJECT_DIR / "../dataset/test"))).expanduser().resolve()
 OUTPUT_DIR = Path(
-    os.environ.get("PIC_RGB_OUTPUT_DIR", str(PROJECT_DIR / "../dataset/mate20x/roi_results"))
+    os.environ.get("PIC_RGB_OUTPUT_DIR", str(PROJECT_DIR / "../dataset/test/roi_results"))
 ).expanduser().resolve()
 
 # ============================================
@@ -83,9 +83,10 @@ class ROISettings:
 # ============================================
 # Output control
 # ============================================
-SAVE_VISUALIZATION = False
+SAVE_VISUALIZATION = True
 VISUALIZATION_DPI = 150
 VISUALIZATION_FIGSIZE = (15, 10)
+VISUALIZATION_MAX_SIDE = 1600
 
 # ============================================
 # Selection persistence
@@ -157,6 +158,7 @@ def print_config():
     print(f"\nOutput:")
     print(f"  Save visualization: {SAVE_VISUALIZATION}")
     print(f"  DPI: {VISUALIZATION_DPI}")
+    print(f"  Visualization max side: {VISUALIZATION_MAX_SIDE}px")
     print("=" * 50)
 
 

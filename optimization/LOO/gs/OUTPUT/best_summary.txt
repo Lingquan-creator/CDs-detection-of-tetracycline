@@ -1,0 +1,8 @@
+model_family: gs
+eval_mode: loo
+r2: 0.9830929687697001
+rmse: 9.549594063034295
+mae: 7.707693959570128
+vector_id: ln_rgb
+feature_names: ln_R_sig;ln_G_sig;ln_B_sig
+hyperparams: {"dropout":0.05,"epochs":80,"grad_clip_norm":5.0,"hidden_dim":16,"learning_rate":0.01,"max_std_log":2.0,"min_std":0.08,"patience":20,"seed":42,"std_reg_lambda":0.01,"weight_beta":1.0,"weight_decay":0.001,"weight_eps":50.0}
