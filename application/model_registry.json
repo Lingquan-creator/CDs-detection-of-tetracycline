@@ -22,5 +22,11 @@
     "exp_params": "models/vivo100x/exp_fit_params.csv",
     "regression_model": "models/vivo100x/rgb_concentration_model.pkl",
     "gs_model": "models/vivo100x/gs_amortized_posterior_model.pt"
+  },
+  "current_work": {
+    "display_name": "Current Work Optimized",
+    "exp_params": "models/current_work/exp_fit_params.csv",
+    "regression_model": "models/current_work/rgb_concentration_model.pkl",
+    "gs_model": "models/current_work/gs_amortized_posterior_model.pt"
   }
 }

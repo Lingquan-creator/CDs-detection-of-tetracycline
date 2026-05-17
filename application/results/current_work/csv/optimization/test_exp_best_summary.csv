@@ -1,0 +1,2 @@
+model_family,eval_mode,stage,iteration,vector_id,feature_names,n_features,hyperparams,r2,rmse,mae,mean_error,n_train,n_eval,error
+exp,test,parameter_scan,1,ln_rgb,ln_R_sig;ln_G_sig;ln_B_sig,3,"{""response_model"":""exponential_offset"",""selected_channel"":""ln_G_sig"",""weight_eps"":0.0}",0.885111,24.7936,14.7547,-10.0635,19,66,

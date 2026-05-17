@@ -1,0 +1,2 @@
+model_family,eval_mode,stage,iteration,vector_id,feature_names,n_features,hyperparams,r2,rmse,mae,mean_error,n_train,n_eval,error
+ridge,test,parameter_scan,1,current_best_ln_g_rbovergb,ln_G_sig;ln_RB_over_GB,2,"{""alpha"":0.03,""target_transform"":""identity"",""weight_beta"":0.0,""weight_eps"":5.0}",0.916961,21.0785,14.5696,2.12758,19,66,

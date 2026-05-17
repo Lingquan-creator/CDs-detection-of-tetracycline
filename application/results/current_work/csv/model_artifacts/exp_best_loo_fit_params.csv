@@ -1,0 +1,4 @@
+fit_id,channel,model,params,conc_min,conc_max,inv_r2,inv_rmse,selected_for_mode
+ln_R_sig__exponential_offset,ln_R_sig,exponential_offset,2.33838770674;-0.00585488816804;4.12864918913,0,240,0.986925,8.3978,False
+ln_G_sig__exponential_offset,ln_G_sig,exponential_offset,2.52468108455;-0.00538105785749;4.71749105669,0,240,0.984794,9.05633,False
+ln_B_sig__exponential_offset,ln_B_sig,exponential_offset,2.43990258789;-0.00598541477108;4.01791217733,0,240,0.989008,7.69997,True

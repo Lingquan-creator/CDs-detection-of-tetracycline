@@ -213,14 +213,33 @@ def build_feature_dict(record: Dict[str, Any], *, g_mode: str, use_bg: bool, bg_
         if g_mode == "avg"
         else float(record.get("roi_G1_var", 0.0))
     )
+    rgb_sum = max(r + g + b, EPS)
+    rg_sum = max(r + g, EPS)
+    rb_sum = max(r + b, EPS)
+    gb_sum = max(g + b, EPS)
+    ln_r = math.log(r + EPS)
+    ln_g = math.log(g + EPS)
+    ln_b = math.log(b + EPS)
+    ln_rgb_sum = math.log(rgb_sum + EPS)
+    ln_rg_sum = math.log(rg_sum + EPS)
+    ln_rb_sum = math.log(rb_sum + EPS)
+    ln_gb_sum = math.log(gb_sum + EPS)
 
     features = {
-        f"ln_R{prefix}": math.log(r + EPS),
-        f"ln_G{prefix}": math.log(g + EPS),
-        f"ln_B{prefix}": math.log(b + EPS),
+        f"ln_R{prefix}": ln_r,
+        f"ln_G{prefix}": ln_g,
+        f"ln_B{prefix}": ln_b,
         f"ln_R{prefix}_per_exp": math.log(r / exposure + EPS),
         f"ln_G{prefix}_per_exp": math.log(g / exposure + EPS),
         f"ln_B{prefix}_per_exp": math.log(b / exposure + EPS),
+        "ln_RGB_sum": ln_rgb_sum,
+        "ln_RG_sum": ln_rg_sum,
+        "ln_RB_sum": ln_rb_sum,
+        "ln_GB_sum": ln_gb_sum,
+        "ln_R_over_G": ln_r - ln_g,
+        "ln_B_over_G": ln_b - ln_g,
+        "ln_RG_over_GB": ln_rg_sum - ln_gb_sum,
+        "ln_RB_over_GB": ln_rb_sum - ln_gb_sum,
         "Ratio_RG": r / (g + EPS),
         "Delta_RG": (g - r) / (g + r + EPS),
         "Ratio_BG": b / (g + EPS),
@@ -242,6 +261,32 @@ def inverse_exp_model(value: float, a: float, b: float, c0: float) -> float:
         return math.nan
     ratio = np.clip((value - c0) / a, 1e-12, 1.0)
     return max(float(math.log(float(ratio)) / b), 0.0)
+
+
+def predict_exp_response(concentration: np.ndarray, model_name: str, params: list[float]) -> np.ndarray:
+    x = np.asarray(concentration, dtype=float)
+    if model_name == "exponential_c0":
+        return params[0] * np.exp(np.clip(params[1] * x, -700, 50))
+    if model_name == "exponential_offset":
+        return params[0] * np.exp(np.clip(params[1] * x, -700, 50)) + params[2]
+    if model_name == "linear":
+        return params[0] * x + params[1]
+    if model_name == "quadratic":
+        return params[0] * x * x + params[1] * x + params[2]
+    raise ValueError(f"Unsupported EXP model: {model_name}")
+
+
+def predict_exp_value(value: float, model_name: str, params: list[float]) -> float:
+    if model_name in {"exponential_c0", "exponential_offset"}:
+        c0 = params[2] if model_name == "exponential_offset" and len(params) >= 3 else 0.0
+        return inverse_exp_model(value, params[0], params[1], c0)
+    grid = np.linspace(0.0, 500.0, 5001)
+    response = predict_exp_response(grid, model_name, params)
+    valid = np.isfinite(response)
+    if not np.any(valid):
+        return math.nan
+    nearest = int(np.argmin(np.abs(response[valid] - value)))
+    return max(float(grid[valid][nearest]), 0.0)
 
 
 class AmortizedPosteriorNet(nn.Module):
@@ -334,9 +379,15 @@ class ModelStore:
 
         _, selected = self._cache[cache_key]
         channel = str(selected["channel"])
-        a = float(selected["a"])
-        b = float(selected["b"])
-        c0 = float(selected["c"])
+        model_name = str(selected["model"]) if "model" in selected.index and pd.notna(selected.get("model")) else "exponential_c0"
+        if "params" in selected.index and pd.notna(selected.get("params")):
+            params = [float(value) for value in str(selected["params"]).split(";") if value != ""]
+        else:
+            params = [
+                float(selected[name])
+                for name in ("a", "b", "c")
+                if name in selected.index and pd.notna(selected.get(name))
+            ]
         features = build_feature_dict(record, g_mode="avg", use_bg=True, bg_correction="subtract")
         if channel in features:
             value = float(features[channel])
@@ -346,7 +397,7 @@ class ModelStore:
         else:
             raise ValueError(f"Cannot build EXP channel '{channel}' from current ROI result.")
         return {
-            "prediction": inverse_exp_model(value, a, b, c0),
+            "prediction": predict_exp_value(value, model_name, params),
             "model": "EXP",
             "channel": channel,
             "value": value,

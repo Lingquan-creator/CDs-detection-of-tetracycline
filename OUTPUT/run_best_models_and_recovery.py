@@ -217,7 +217,12 @@ def save_prediction_outputs(mode: str, model: str, pred_df: pd.DataFrame, pred_c
     out_dir.mkdir(parents=True, exist_ok=True)
     pred_df.to_csv(out_dir / csv_name, index=False, float_format=CSV_FLOAT_FORMAT)
     save_metrics(pred_df, pred_col, out_dir / metrics_name)
-    legacy_metrics = "test_prediction_metrics.csv" if mode == "test" else "loo_prediction_metrics.csv"
+    if mode == "test":
+        legacy_metrics = "test_prediction_metrics.csv"
+    elif mode == "LOO":
+        legacy_metrics = "loo_prediction_metrics.csv"
+    else:
+        legacy_metrics = "train_prediction_metrics.csv"
     save_metrics(pred_df, pred_col, out_dir / legacy_metrics)
 
 
@@ -415,13 +420,90 @@ def run_mode(mode: str, train_csv: Path, test_csv: Path) -> None:
     summarize_recovery(mode)
 
 
+def run_train_outputs(train_csv: Path, test_csv: Path) -> None:
+    data = load_datasets(train_csv, test_csv, "test")
+    exp_train = load_exp_train_module()
+    gs_train = load_gs_train_module()
+
+    ridge_vector_id, ridge_features, ridge_params = read_best("test", "ridge")
+    exp_vector_id, exp_features, exp_params = read_best("test", "exp")
+    gs_vector_id, gs_features, gs_params = read_best("test", "gs")
+
+    save_ridge_model(data, ridge_features, ridge_params, PROJECT_ROOT / "concentration_regression/rgb_fit_output/best_train")
+    save_exp_params(exp_train, data, exp_features, exp_params, PROJECT_ROOT / "concentration_EXP/exp_fit_output/best_train")
+    save_gs_model(gs_train, data, gs_features, gs_params, PROJECT_ROOT / "concentration_GS/amortized_output/best_train")
+
+    X_train = data.train_features.loc[:, list(ridge_features)].to_numpy(dtype=float)
+    ridge_model = fit_ridge_model(X_train, data.y_train, ridge_params)
+    from optimization.ln_hyperopt import inverse_target
+
+    ridge_pred_values = inverse_target(ridge_model.predict(X_train), str(ridge_params["target_transform"]))
+    ridge_pred = prediction_df(data.train_df, data.y_train, ridge_pred_values, pred_col="conc_pred")
+    ridge_pred["vector_id"] = ridge_vector_id
+    ridge_pred["feature_names"] = ";".join(ridge_features)
+    ridge_pred["hyperparams"] = json.dumps(ridge_params, sort_keys=True)
+    save_prediction_outputs("train", "ridge", ridge_pred, "conc_pred")
+
+    corr = exp_train.build_response_feature_table(data.train_df, exp_features)
+    fitted, best_id = fit_exp_bundle(exp_train, data.y_train, corr, exp_features, exp_params)
+    from optimization.ln_hyperopt import predict_exp_bundle
+
+    exp_pred_values = predict_exp_bundle(
+        exp_train,
+        corr,
+        exp_features,
+        fitted,
+        str(exp_params["selected_channel"]),
+        best_id,
+    )
+    exp_pred = prediction_df(data.train_df, data.y_train, exp_pred_values, pred_col="conc_pred")
+    exp_pred["vector_id"] = exp_vector_id
+    exp_pred["feature_names"] = ";".join(exp_features)
+    exp_pred["hyperparams"] = json.dumps(exp_params, sort_keys=True)
+    save_prediction_outputs("train", "exp", exp_pred, "conc_pred")
+
+    X_gs = data.train_features.loc[:, list(gs_features)].to_numpy(dtype=np.float64)
+    gs_bundle = gs_train.fit_model(
+        X_gs,
+        data.y_train,
+        hidden_dim=int(gs_params["hidden_dim"]),
+        dropout=float(gs_params["dropout"]),
+        learning_rate=float(gs_params["learning_rate"]),
+        weight_decay=float(gs_params["weight_decay"]),
+        epochs=int(gs_params["epochs"]),
+        patience=int(gs_params["patience"]),
+        min_std=float(gs_params["min_std"]),
+        std_reg_lambda=float(gs_params["std_reg_lambda"]),
+        max_std_log=float(gs_params["max_std_log"]),
+        weight_eps=float(gs_params["weight_eps"]),
+        weight_beta=float(gs_params["weight_beta"]),
+        grad_clip_norm=float(gs_params["grad_clip_norm"]),
+        seed=int(gs_params["seed"]),
+        g_mode="avg",
+        use_bg=True,
+        active_feature_names=gs_features,
+        reference_concentrations=np.sort(np.unique(data.y_train)),
+    )
+    mu_log, _std_log = gs_train.posterior_from_bundle(gs_bundle, X_gs)
+    gs_pred_values = np.maximum(np.exp(mu_log) - float(gs_train.TARGET_EPS), 0.0)
+    gs_pred = prediction_df(data.train_df, data.y_train, gs_pred_values, pred_col="posterior_median")
+    gs_pred["posterior_mean"] = gs_pred["posterior_median"]
+    gs_pred["vector_id"] = gs_vector_id
+    gs_pred["feature_names"] = ";".join(gs_features)
+    gs_pred["hyperparams"] = json.dumps(gs_params, sort_keys=True)
+    save_prediction_outputs("train", "gs", gs_pred, "posterior_median")
+
+    summarize_recovery("train")
+
+
 def main() -> None:
     args = parse_args()
     train_csv = args.train_csv.resolve()
     test_csv = args.test_csv.resolve()
+    run_train_outputs(train_csv, test_csv)
     run_mode("test", train_csv, test_csv)
     run_mode("LOO", train_csv, test_csv)
-    print("Saved optimized predictions and recovery summaries under OUTPUT/test and OUTPUT/LOO.")
+    print("Saved optimized predictions and recovery summaries under OUTPUT/train, OUTPUT/test, and OUTPUT/LOO.")
 
 
 if __name__ == "__main__":

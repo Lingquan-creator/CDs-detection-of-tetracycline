@@ -1,3 +1,0 @@
-model,train_dataset,test_dataset,r2,rmse,n_test,prediction_csv
-concentration_regression_ridge,dataset/mate20x,dataset/food_2,0.750631,17.6357,30,/home/jzh/CDs/try_pic_RGB/model_outputs/available_features/concentration_regression/food_2_ridge_predictions.csv
-concentration_EXP_feature_response,dataset/mate20x,dataset/food_2,0.595421,22.4633,30,/home/jzh/CDs/try_pic_RGB/model_outputs/available_features/concentration_EXP/food_2_exp_predictions.csv

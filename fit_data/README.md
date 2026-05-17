@@ -2,6 +2,8 @@
 
 本目录处理光谱 CSV 数据，包含多峰光谱拟合、光谱积分拟合，以及峰参数随浓度变化的趋势分析。
 
+该目录面向光谱仪导出的 CSV 数据，和当前手机 DNG 主流程相互独立。DNG 图像的 ROI 统计、ln 特征优化、最终预测和回收率输出分别位于 `pic_RGB`、`optimization` 和 `OUTPUT`。
+
 ## 主要文件
 
 - `data.csv`: 原始光谱数据。首列为波长，后续列为不同浓度的光谱强度。
@@ -135,6 +137,8 @@ python fit_data/integrate_and_fit.py
 python fit_data/fit_parameters.py
 python fit_data/plot_fit_results.py
 ```
+
+当前工作区中用于文章整理的光谱或模型结果副本可在 `article/csv/current_work/` 和 `article/fig/current_work/` 中查看。
 
 ## 依赖
 

@@ -1,8 +1,8 @@
 # pic_RGB
 
-本目录从 DNG/RAW 图像中选择样品 ROI 和背景区域，提取后续浓度模型需要的 Bayer 四通道均值、背景扣除信号和 6 维输入特征。
+本目录从 DNG/RAW 图像中选择样品 ROI 和背景区域，提取后续浓度模型需要的 Bayer 四通道均值、背景扣除信号和基础 ln 特征。
 
-当前主流程是 GUI 辅助的手动 ROI/BG 选择，选择结果可缓存复用。代码只保存当前浓度反演需要的 JSON/CSV，默认不再输出 NPY、分布特征 CSV 或每张图的 PNG。
+当前主流程是 GUI 辅助的手动 ROI/BG 选择，选择结果可缓存复用。代码默认保存 JSON、CSV 和 ROI 可视化 PNG。
 
 ## 主要文件
 
@@ -15,15 +15,16 @@
 - `analyze_statistics.py`: 历史统计 CSV 分析示例。
 - `algorithm.md`: 更完整的代码和算法说明。
 
-## 默认配置
+## 当前默认配置
 
-当前 `roi_config.py` 默认：
+`roi_config.py` 当前默认：
 
 ```text
-DATA_DIR = dataset/food
-OUTPUT_DIR = dataset/food
+DATA_DIR = dataset/test
+OUTPUT_DIR = dataset/test/roi_results
 IMAGE_EXTENSION = *.dng
-SAVE_VISUALIZATION = False
+SAVE_VISUALIZATION = True
+VISUALIZATION_MAX_SIDE = 1600
 REUSE_LAST_SELECTION = False
 SELECTION_CACHE_PATH = OUTPUT_DIR / roi_selection_cache.json
 ```
@@ -33,6 +34,9 @@ SELECTION_CACHE_PATH = OUTPUT_DIR / roi_selection_cache.json
 ```text
 fixed_roi_width = 160
 fixed_roi_height = 400
+measurement_roi_width_fraction = 0.4
+measurement_roi_height_fraction = 0.4
+trim_fraction = 0.08
 roi_angle_deg = 0.0
 bg_ring_inner_x = 80
 bg_ring_inner_y = 80
@@ -40,14 +44,7 @@ bg_ring_outer_x = 240
 bg_ring_outer_y = 240
 move_step = 1
 size_step = 1
-spin_repeat_interval_ms = 100
 angle_step_deg = 0.5
-```
-
-## 安装依赖
-
-```bash
-pip install numpy opencv-python matplotlib rawpy pyside6
 ```
 
 ## 运行
@@ -61,8 +58,14 @@ python pic_RGB/roi_processor.py
 指定输入输出目录：
 
 ```bash
-PIC_RGB_DATA_DIR=dataset/mate3_2 \
-PIC_RGB_OUTPUT_DIR=dataset/mate3_2 \
+PIC_RGB_DATA_DIR=dataset/train \
+PIC_RGB_OUTPUT_DIR=dataset/train/roi_results \
+python pic_RGB/roi_processor.py
+```
+
+```bash
+PIC_RGB_DATA_DIR=dataset/test \
+PIC_RGB_OUTPUT_DIR=dataset/test/roi_results \
 python pic_RGB/roi_processor.py
 ```
 
@@ -70,7 +73,7 @@ python pic_RGB/roi_processor.py
 
 主流程读取 `DATA_DIR` 下的 `.dng` 文件。元数据可来自：
 
-- 文件名：支持 `浓度_曝光时间.dng`，兼容 `浓度.曝光时间.dng`。
+- 文件名：支持 `食品-批次-浓度.dng`、`浓度_曝光时间.dng` 等形式。
 - 同目录 `metadata.txt`: 支持 `key=value`，可提供 `exposure_time`, `iso`, `R_gain`, `G_gain`, `B_gain`, `gamma/gama`, `saturability` 等。
 - DNG 元数据：尝试读取 shutter、ISO、黑电平和白电平。
 
@@ -85,7 +88,7 @@ G2 = raw[1::2, 0::2] - black_level[2]
 B  = raw[1::2, 1::2] - black_level[3]
 ```
 
-扣黑电平后会裁剪到非负。
+当前实现会直接创建最终四通道数组，逐通道扣黑电平并裁剪到非负，避免先复制整张 RAW 再转 float32 带来的内存峰值。
 
 ## GUI 操作
 
@@ -114,8 +117,9 @@ B  = raw[1::2, 1::2] - black_level[3]
 - `roi_results.json`: 每张图的 ROI/BG 几何、通道均值、背景扣除值、显示值、元数据和源文件路径。
 - `roi_selection_cache.json`: ROI/BG 选择缓存。
 - `roi_detailed_statistics.csv`: 后续浓度模型的主要输入表。
+- `<stem>_roi.png`: ROI/BG 可视化图。
 
-`roi_detailed_statistics.csv` 当前列：
+`roi_detailed_statistics.csv` 当前核心列：
 
 ```text
 filename, concentration, exposure_time, iso
@@ -130,16 +134,12 @@ ln_R_sig, ln_G_sig, ln_B_sig
 Ratio_RG, Delta_RG, Delta_GB
 ```
 
-当前保存的 6 维输入特征：
+下游 `concentration_regression.physics_features` 会在此基础上继续构造 `ln_RGB_sum`、`ln_RG_sum`、`ln_RB_sum`、`ln_GB_sum` 和 ln 比值项。
 
-```text
-ln_R_sig, ln_G_sig, ln_B_sig, Ratio_RG, Delta_RG, Delta_GB
-```
+## 可视化和内存
 
-## 可视化
-
-默认 `SAVE_VISUALIZATION=False`，不保存每张图的可视化 PNG。若改为 `True`，会输出 `<stem>_roi.png`，包含强度图、ROI/BG mask、伪彩预览和背景校正通道柱状图。
+`SAVE_VISUALIZATION=True` 时会输出 `<stem>_roi.png`。当前可视化会先按 `VISUALIZATION_MAX_SIDE=1600` 生成缩略图，再缩放 ROI/BG 框坐标，降低 matplotlib 渲染阶段的内存峰值。保存后会关闭 figure，批处理每张图结束后会释放主要数组引用。
 
 ## 方法细节
 
-更详细的实现说明见 `pic_RGB/algorithm.md`。如果需要历史方法说明，可参考 `pic_RGB/METHODOLOGY.md`。
+更详细的实现说明见 `pic_RGB/algorithm.md`。历史方法说明可参考 `pic_RGB/METHODOLOGY.md`。

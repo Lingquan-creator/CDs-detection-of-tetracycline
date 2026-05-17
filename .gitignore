@@ -26,3 +26,5 @@ article/
 .backup/
 application_linux/
 application_win/
+.old/
+.matplotlib/
