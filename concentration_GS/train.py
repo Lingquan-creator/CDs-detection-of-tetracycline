@@ -180,6 +180,31 @@ def select_feature_set(feature_df: pd.DataFrame, *, use_bg: bool, feature_set: s
     return feature_df.loc[:, list(selected_columns)]
 
 
+def resolve_feature_list(feature_list_arg: Optional[str]) -> Optional[Tuple[str, ...]]:
+    if not feature_list_arg:
+        return None
+    value = str(feature_list_arg).strip()
+    if not value:
+        return None
+    path = Path(value).expanduser()
+    if path.exists() and path.is_file():
+        text = path.read_text(encoding="utf-8")
+        raw_items = text.replace(",", "\n").splitlines()
+    else:
+        raw_items = value.replace(",", " ").split()
+    items = tuple(item.strip() for item in raw_items if item.strip())
+    if not items:
+        raise ValueError("--feature-list did not contain any feature names.")
+    return items
+
+
+def select_custom_features(feature_df: pd.DataFrame, feature_list: Tuple[str, ...]) -> pd.DataFrame:
+    missing = [column for column in feature_list if column not in feature_df.columns]
+    if missing:
+        raise ValueError(f"Custom feature list contains missing columns: {missing}")
+    return feature_df.loc[:, list(feature_list)]
+
+
 def load_training_dataframe(roi_csv: Path) -> Tuple[pd.DataFrame, np.ndarray]:
     if not roi_csv.exists():
         raise FileNotFoundError(f"ROI CSV not found: {roi_csv}")
@@ -690,6 +715,14 @@ def parse_args(default_cfg: TrainConfig) -> argparse.Namespace:
         default=default_cfg.feature_set,
         help="Feature set used for training.",
     )
+    parser.add_argument(
+        "--feature-list",
+        default=" ".join(str(name) for name in getattr(default_cfg, "feature_list", ()) or ()),
+        help=(
+            "Comma/whitespace separated custom feature columns, or a text file containing them. "
+            "When set, --feature-set is ignored. Default comes from TrainConfig.feature_list when configured."
+        ),
+    )
     parser.add_argument("--dropout", type=float, default=default_cfg.dropout, help="Dropout rate.")
     parser.add_argument("--learning-rate", type=float, default=default_cfg.learning_rate, help="AdamW learning rate.")
     parser.add_argument("--weight-decay", type=float, default=default_cfg.weight_decay, help="AdamW weight decay.")
@@ -731,12 +764,21 @@ def main() -> None:
     df, y_true = load_training_dataframe(args.roi_csv)
     use_bg = resolve_use_bg(df, args.g_mode, args.use_bg)
     feature_df = build_feature_frame(df, g_mode=args.g_mode, use_bg=use_bg)
-    feature_df = select_feature_set(feature_df, use_bg=use_bg, feature_set=args.feature_set)
+    feature_list = resolve_feature_list(args.feature_list)
+    if feature_list is not None:
+        feature_df = select_custom_features(feature_df, feature_list)
+        effective_feature_set = "custom"
+    else:
+        feature_df = select_feature_set(feature_df, use_bg=use_bg, feature_set=args.feature_set)
+        effective_feature_set = str(args.feature_set)
     X = feature_df.to_numpy(dtype=np.float64)
     reference_concentrations = np.sort(np.unique(y_true))
 
     print(f"Training data: {args.roi_csv} (n={len(df)})")
-    print(f"Features: g_mode={args.g_mode}, use_bg={use_bg}, feature_set={args.feature_set}, columns={list(feature_df.columns)}")
+    print(
+        f"Features: g_mode={args.g_mode}, use_bg={use_bg}, "
+        f"feature_set={effective_feature_set}, columns={list(feature_df.columns)}"
+    )
 
     bundle = fit_model(
         X,
@@ -803,7 +845,7 @@ def main() -> None:
     loo_metrics = evaluate_summary(loo_summary)
 
     bundle["confidence"] = float(args.confidence)
-    bundle["feature_set"] = str(args.feature_set)
+    bundle["feature_set"] = effective_feature_set
     bundle["train_metrics"] = train_metrics
     bundle["loo_metrics"] = loo_metrics
 

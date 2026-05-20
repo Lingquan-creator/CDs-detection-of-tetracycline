@@ -22,19 +22,28 @@ q(log(C + eps) | x) = Normal(mu_phi(x), sigma_phi(x)^2)
 模块 CLI 当前默认使用：
 
 ```text
-输入: dataset/food/roi_detailed_statistics.csv
+输入: dataset/train/roi_results/roi_detailed_statistics.csv
 输出: concentration_GS/amortized_output/
+predict_model: concentration_GS/amortized_output/best_test/amortized_posterior_model.pt
+predict_roi_csv: dataset/test/roi_results/roi_detailed_statistics.csv
 g_mode: avg
 use_bg: true
 feature_set: compact
+feature_list: ln_R_sig, ln_G_sig, ln_B_sig, ln_RG_sum, ln_RB_sum, ln_GB_sum
 hidden_dim: 8
 dropout: 0.05
-epochs: 2500
-patience: 250
+learning_rate: 0.01
+weight_decay: 0.001
+weight_eps: 50.0
+weight_beta: 1.0
+min_std: 0.08
+std_reg_lambda: 0.01
+epochs: 800
+patience: 100
 confidence: 0.90
 ```
 
-当前最终 train/test/LOO 使用的最佳组合以 `amortized_output/best_optimized_combinations.csv` 为准。
+这些默认值已同步为 `optimization/test/gs/OUTPUT/best_summary.csv` 中的当前 train->test 最优组合。LOO 最优组合仍记录在 `amortized_output/best_optimized_combinations.csv` 中。
 
 ## 输入
 
@@ -57,7 +66,7 @@ bg_R_mean, bg_G1_mean, bg_B_mean
 
 ## 特征
 
-`train.py` 的 CLI 支持 `full`、`compact`、`compact_exposure` 等特征集合。当前 ln-only 寻优流程通过 `optimization/ln_hyperopt.py` 和 `OUTPUT/run_best_models_and_recovery.py` 直接传入优化后的 ln 特征列表。
+`train.py` 的 CLI 支持 `full`、`compact`、`compact_exposure` 等特征集合，也支持 `--feature-list` 直接指定自定义输入向量。当前默认 `feature_list` 已设为 test 模式最优 ln 输入向量。
 
 当前可用的 ln 输入向量来自：
 

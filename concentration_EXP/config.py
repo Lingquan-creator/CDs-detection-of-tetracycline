@@ -8,15 +8,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Tuple
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent
-ROI_STATS_PATH = BASE_DIR.parent / "dataset" / "food" / "roi_detailed_statistics.csv"
+ROI_STATS_PATH = BASE_DIR.parent / "dataset" / "train" / "roi_results" / "roi_detailed_statistics.csv"
+TEST_ROI_STATS_PATH = BASE_DIR.parent / "dataset" / "test" / "roi_results" / "roi_detailed_statistics.csv"
 OUTPUT_DIR = BASE_DIR / "exp_fit_output"
 
 # Response fitting defaults
-DEFAULT_CHANNEL = "light_best"  # Fit ROI-BG light intensity channels, then invert the best fitted channel/model
-DEFAULT_WEIGHT_EPS = 5.0  # Weighting parameter: weights ~ 1/(conc + eps)
+DEFAULT_CHANNEL = "ln_G_sig"  # current train->test optimized EXP selected channel
+DEFAULT_FEATURE_LIST: Tuple[str, ...] = ("ln_R_sig", "ln_G_sig", "ln_B_sig")
+DEFAULT_WEIGHT_EPS = 0.0  # current train->test optimized EXP weighting parameter
 
 # Output filenames
 PARAMS_FILENAME = "exp_fit_params.csv"
@@ -33,6 +36,7 @@ class ExpConfig:
     roi_csv: Path = ROI_STATS_PATH
     output_dir: Path = OUTPUT_DIR
     channel: str = DEFAULT_CHANNEL
+    feature_list: Tuple[str, ...] = DEFAULT_FEATURE_LIST
     weight_eps: float = DEFAULT_WEIGHT_EPS
 
     @property

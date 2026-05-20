@@ -23,6 +23,20 @@ I(C) = q*C^2 + m*C + k
 
 ## 输入
 
+## 当前默认配置
+
+`config.py` 当前默认值已同步为 `optimization/test/exp/OUTPUT/best_summary.csv` 中的 train->test 最优组合：
+
+```text
+roi_csv: dataset/train/roi_results/roi_detailed_statistics.csv
+output: concentration_EXP/exp_fit_output/
+feature_list: ln_R_sig, ln_G_sig, ln_B_sig
+channel: ln_G_sig
+weight_eps: 0.0
+```
+
+`train.py` 默认会使用上述 `feature_list` 和 `channel`，并对支持的响应函数全部拟合；当前最优响应形式为 `exponential_offset`。预测阶段如果要直接使用已整理的 test 最优参数，可指定 `--params concentration_EXP/exp_fit_output/best_test/exp_fit_params.csv`。
+
 当前主流程使用：
 
 ```text

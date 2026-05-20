@@ -11,11 +11,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Tuple
 
 
 BASE_DIR = Path(__file__).resolve().parent
-ROI_STATS_PATH = BASE_DIR.parent / "dataset" / "food" / "roi_detailed_statistics.csv"
+ROI_STATS_PATH = BASE_DIR.parent / "dataset" / "train" / "roi_results" / "roi_detailed_statistics.csv"
+TEST_ROI_STATS_PATH = BASE_DIR.parent / "dataset" / "test" / "roi_results" / "roi_detailed_statistics.csv"
 OUTPUT_DIR = BASE_DIR / "amortized_output"
 
 MODEL_FILENAME = "amortized_posterior_model.pt"
@@ -36,6 +37,14 @@ DEFAULT_FEATURE_SET: Literal[
     "compact",
     "compact_exposure",
 ] = "compact"
+DEFAULT_FEATURE_LIST: Tuple[str, ...] = (
+    "ln_R_sig",
+    "ln_G_sig",
+    "ln_B_sig",
+    "ln_RG_sum",
+    "ln_RB_sum",
+    "ln_GB_sum",
+)
 TARGET_EPS = 1e-6
 DEFAULT_CONFIDENCE = 0.90
 
@@ -44,8 +53,8 @@ HIDDEN_DIM = 8
 DROPOUT = 0.05
 LEARNING_RATE = 1e-2
 WEIGHT_DECAY = 1e-3
-EPOCHS = 2500
-PATIENCE = 250
+EPOCHS = 800
+PATIENCE = 100
 MIN_STD = 0.08          # posterior std floor in standardized log-space
 STD_REG_LAMBDA = 0.01   # penalty on predicted posterior std to avoid variance blow-up
 MAX_STD_LOG = 2.0       # posterior std ceiling after converting back to log-concentration space
@@ -66,6 +75,7 @@ class TrainConfig:
         "compact",
         "compact_exposure",
     ] = DEFAULT_FEATURE_SET
+    feature_list: Tuple[str, ...] = DEFAULT_FEATURE_LIST
     weight_beta: float = WEIGHT_BETA
     hidden_dim: int = HIDDEN_DIM
     dropout: float = DROPOUT
@@ -108,8 +118,8 @@ class TrainConfig:
 
 @dataclass
 class PredictConfig:
-    model_path: Path = OUTPUT_DIR / MODEL_FILENAME
-    default_roi_csv: Path = ROI_STATS_PATH
+    model_path: Path = OUTPUT_DIR / "best_test" / MODEL_FILENAME
+    default_roi_csv: Path = TEST_ROI_STATS_PATH
     output_dir: Path = OUTPUT_DIR
     confidence: float = DEFAULT_CONFIDENCE
 

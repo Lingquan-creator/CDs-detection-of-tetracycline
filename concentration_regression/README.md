@@ -15,21 +15,23 @@
 `config.py` 当前默认值：
 
 ```text
-roi_csv: dataset/food/roi_detailed_statistics.csv
+roi_csv: dataset/train/roi_results/roi_detailed_statistics.csv
 output: concentration_regression/rgb_fit_output/
-target_transform: log
+predict_model: concentration_regression/rgb_fit_output/best_test/concentration_model_v1.pkl
+predict_roi_csv: dataset/test/roi_results/roi_detailed_statistics.csv
+target_transform: identity
 use_bg: true
 bg_correction: subtract
 feature_set: compact
-feature_list: B_sig, ln_RGB_sum, RGB_sum, ln_R_sig, G_sig, ln_RB_sum
-alphas: (0.3,)
-weight_eps: 10.0
-weight_beta: 0.25
+feature_list: ln_G_sig, ln_RB_over_GB
+alphas: (0.03,)
+weight_eps: 5.0
+weight_beta: 0.0
 clip_min: 0.1
 g_mode: avg
 ```
 
-这些是模块 CLI 的默认值；当前最终 train/test/LOO 使用的最佳组合以 `best_optimized_combinations.csv` 为准。
+这些默认值已同步为 `optimization/test/ridge/OUTPUT/best_summary.csv` 中的当前 train->test 最优组合。LOO 最优组合仍记录在 `best_optimized_combinations.csv` 中。
 
 ## 输入
 

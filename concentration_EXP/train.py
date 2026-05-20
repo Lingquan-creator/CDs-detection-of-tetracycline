@@ -557,9 +557,11 @@ def parse_args(default_cfg: ExpConfig) -> argparse.Namespace:
     )
     parser.add_argument(
         "--feature-list",
+        default=" ".join(str(name) for name in getattr(default_cfg, "feature_list", ()) or ()),
         help=(
             "Comma/whitespace separated custom feature columns, or a text file containing them. "
-            "When set, EXP fits those feature values instead of only RGB signal channels."
+            "When set, EXP fits those feature values instead of only RGB signal channels. "
+            "Default comes from ExpConfig.feature_list when configured."
         ),
     )
     
